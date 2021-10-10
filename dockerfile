@@ -1,0 +1,10 @@
+FROM node:14.18.0-stretch
+
+# INSTALL PACKAGES
+WORKDIR /usr/pkg/
+COPY . .
+
+RUN npm i
+
+# ON RUNNING THE IMAGE THIS COMMAND WILL BE TRIGGERED BY DEFAULT
+CMD npm run docker:test

@@ -1,0 +1,55 @@
+{
+  "name": "pdf-to-png-converter",
+  "version": "0.0.1",
+  "description": "Node.js utility to covert PDF pages to PNG files with no native dependencies.",
+  "keywords": [
+    "pdf",
+    "pdf to png",
+    "pdf to image"
+  ],
+  "homepage": "https://github.com/dichovsky/pdf-to-png-converter#readme",
+  "bugs": {
+    "url": "https://github.com/dichovsky/pdf-to-png-converter/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dichovsky/pdf-to-png-converter.git"
+  },
+  "license": "MIT",
+  "author": "Igor Magdich",
+  "main": "out",
+  "types": "out/index.d.ts",
+  "scripts": {
+    "prepublish": "npm run clean && npm run lint && npm run test && npm run tsc",
+    "clean": "rimraf ./out ./coverage ./test-results",
+    "license-checker": "npx license-checker --production --onlyAllow 'MIT; MIT OR X11; BSD; ISC; Apache-2.0; Unlicense'",
+    "lint": "eslint .",
+    "lint:fix": "npm run lint -- --fix",
+    "pretest": "npm run clean",
+    "test": "jest",
+    "tsc": "tsc --pretty",
+    "docker:build": "docker build --compress -t pdf-to-png-converter .",
+    "predocker:run": "npm run clean",
+    "docker:run": "docker run --rm -it -v $PWD/test-results:/usr/pkg/test-results pdf-to-png-converter",
+    "docker:test": "jest"
+  },
+  "dependencies": {
+    "canvas": "2.8.0",
+    "pdfjs-dist": "2.10.377"
+  },
+  "devDependencies": {
+    "@types/jest": "27.0.2",
+    "@types/node": "16.10.3",
+    "@types/pdfjs-dist": "2.7.5",
+    "@types/pixelmatch": "5.2.4",
+    "@types/pngjs": "6.0.1",
+    "@typescript-eslint/eslint-plugin": "4.33.0",
+    "@typescript-eslint/parser": "4.33.0",
+    "eslint": "7.32.0",
+    "jest": "27.2.5",
+    "png-visual-compare": "0.3.1",
+    "ts-jest": "27.0.5",
+    "ts-node": "10.2.1",
+    "typescript": "4.4.3"
+  }
+}
