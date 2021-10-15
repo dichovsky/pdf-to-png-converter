@@ -20,6 +20,7 @@ export type PdfToPngOptions = {
     disableFontFace?: boolean;
     useSystemFonts?: boolean;
     pdfFilePassword?: string;
+    outputFileMask?: string;
 };
 
 export type PngPageOutput = {
@@ -67,9 +68,9 @@ export async function pdfToPng(pdfFilePath: string, props?: PdfToPngOptions): Pr
         };
 
         await page.render(renderContext).promise;
-
+        const pageName: string = props?.outputFileMask ?? parse(pdfFilePath).name;
         const pngPageOutput: PngPageOutput = {
-            name: `${parse(pdfFilePath).name}_page_${pageNumber}.png`,
+            name: `${pageName}_page_${pageNumber}.png`,
             content: (canvasAndContext.canvas as Canvas).toBuffer(),
             path: ''
         };
