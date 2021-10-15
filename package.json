@@ -28,9 +28,9 @@
     "pretest": "npm run clean",
     "test": "jest",
     "tsc": "tsc --pretty",
-    "docker:build": "docker build --compress -t pdf-to-png-converter .",
+    "docker:build": "docker build --compress -t test-pdf-to-png-converter .",
     "predocker:run": "npm run clean",
-    "docker:run": "docker run --rm -it -v $PWD/test-results:/usr/pkg/test-results pdf-to-png-converter",
+    "docker:run": "docker run --rm -it -v $PWD/test-results:/usr/pkg/test-results test-pdf-to-png-converter",
     "docker:test": "jest"
   },
   "dependencies": {
