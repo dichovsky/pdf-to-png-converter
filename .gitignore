@@ -1,6 +1,7 @@
 coverage
 out
 test-results
+.vscode
 
 # Logs
 logs

@@ -10,7 +10,7 @@ test(`Convert To PNG and save results to files`, async () => {
         outputFilesFolder: 'test-results/pdf.to.file/actual',
     });
 
-    pngPages.forEach((pngPage) => {
+    pngPages.forEach((pngPage: PngPageOutput) => {
         const expectedFilePath: string = resolve('test-data/pdf.to.file/expected', pngPage.name);
         const expectedFileContent: Buffer = readFileSync(expectedFilePath);
         const actualFileContent: Buffer = readFileSync(pngPage.path);
