@@ -1,7 +1,0 @@
-node_modules
-test-results
-coverage
-out
-.vscode
-.github
-.devcontainer

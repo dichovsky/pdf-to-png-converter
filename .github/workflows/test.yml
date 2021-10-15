@@ -1,0 +1,42 @@
+name: Tests on push
+on:
+  push:
+    branches-ignore:    
+      - 'release/*' 
+jobs:
+  macos:
+    runs-on: macos-11
+    steps:
+      - uses: actions/checkout@v2
+      - name: Test on macos-11 Use Node.js 14.x
+        uses: actions/setup-node@v2
+        with:
+          node-version: 14.x
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+      - run: npm test
+  ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Test on Ubuntu Use Node.js 14.x
+        uses: actions/setup-node@v2
+        with:
+          node-version: 14.x
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+      - run: npm test
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Test on Windows Use Node.js 14.x
+        uses: actions/setup-node@v2
+        with:
+          node-version: 14.x
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+      - run: npm test
