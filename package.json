@@ -1,6 +1,6 @@
 {
   "name": "pdf-to-png-converter",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Node.js utility to covert PDF pages to PNG files with no native dependencies.",
   "keywords": [
     "pdf",
@@ -17,8 +17,11 @@
   },
   "license": "MIT",
   "author": "Igor Magdich",
-  "main": "out",
+  "main": "out/index.js",
   "types": "out/index.d.ts",
+  "files": [
+    "/out"
+  ],
   "scripts": {
     "build": "npm run clean && npm run tsc",
     "clean": "rimraf ./out ./coverage ./test-results",
