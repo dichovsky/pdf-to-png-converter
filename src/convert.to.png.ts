@@ -52,7 +52,6 @@ export async function pdfToPng(pdfFilePath: string, props?: PdfToPngOptions): Pr
     }
 
     const pdfDocument: PDFDocumentProxy = await pdfjs.getDocument(pdfDocInitParams).promise;
-
     const pngPagesOutput: PngPageOutput[] = [];
 
     for (let pageNumber = 1; pageNumber <= pdfDocument.numPages; pageNumber++) {
