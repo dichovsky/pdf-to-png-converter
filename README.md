@@ -2,7 +2,7 @@
 
 Node.js utility to compare PNG files without binary and OS dependencies.  
 
-[![Tests on push](https://github.com/dichovsky/pdf-to-png-converter/actions/workflows/main.yml/badge.svg?branch=main)](https://github.com/dichovsky/pdf-to-png-converter/actions/workflows/main.yml)
+[![Tests on push](https://github.com/dichovsky/pdf-to-png-converter/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/dichovsky/pdf-to-png-converter/actions/workflows/test.yml)
 
 ## Getting started
 

@@ -1,6 +1,6 @@
 {
   "name": "pdf-to-png-converter",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "Node.js utility to covert PDF pages to PNG files with no native dependencies.",
   "keywords": [
     "pdf",
@@ -50,7 +50,7 @@
     "@typescript-eslint/parser": "5.0.0",
     "eslint": "8.0.1",
     "jest": "27.2.5",
-    "png-visual-compare": "0.3.4",
+    "png-visual-compare": "0.4.0",
     "ts-jest": "27.0.6",
     "ts-node": "10.3.0",
     "typescript": "4.4.4"
