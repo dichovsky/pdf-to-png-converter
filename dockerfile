@@ -1,4 +1,4 @@
-FROM node:16.11.1-buster
+FROM node:16.13.0-buster
 
 # INSTALL PACKAGES
 WORKDIR /usr/pkg/
