@@ -51,7 +51,7 @@
     "@typescript-eslint/parser": "5.4.0",
     "eslint": "8.3.0",
     "jest": "27.4.0",
-    "png-visual-compare": "0.4.3",
+    "png-visual-compare": "0.4.5",
     "ts-jest": "27.0.7",
     "ts-node": "10.4.0",
     "typescript": "4.5.2"
