@@ -1,6 +1,6 @@
 {
   "name": "pdf-to-png-converter",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "description": "Node.js utility to covert PDF pages to PNG files with no native dependencies.",
   "keywords": [
     "pdf",
@@ -16,7 +16,7 @@
     "url": "git+https://github.com/dichovsky/pdf-to-png-converter.git"
   },
   "license": "MIT",
-  "author": "Igor Magdich",
+  "author": "Igor Magdich <magdich.igor@gmail.com>",
   "main": "out/index.js",
   "types": "out/index.d.ts",
   "files": [
@@ -25,17 +25,17 @@
   "scripts": {
     "build": "npm run clean && npm run tsc",
     "clean": "rimraf ./out ./coverage ./test-results",
+    "docker:build": "docker build --compress -t test-pdf-to-png-converter .",
+    "predocker:run": "npm run clean",
+    "docker:run": "docker run --rm -it -v $PWD/test-results:/usr/pkg/test-results test-pdf-to-png-converter",
+    "docker:test": "jest",
     "license-checker": "npx license-checker --production --onlyAllow 'MIT; MIT OR X11; BSD; ISC; Apache-2.0; Unlicense'",
     "lint": "eslint .",
     "lint:fix": "npm run lint -- --fix",
     "pretest": "npm run clean",
     "test": "jest",
     "test:docker": "npm run docker:build && npm run docker:run",
-    "tsc": "tsc --pretty",
-    "docker:build": "docker build --compress -t test-pdf-to-png-converter .",
-    "predocker:run": "npm run clean",
-    "docker:run": "docker run --rm -it -v $PWD/test-results:/usr/pkg/test-results test-pdf-to-png-converter",
-    "docker:test": "jest"
+    "tsc": "tsc --pretty"
   },
   "dependencies": {
     "canvas": "2.8.0",
@@ -43,17 +43,17 @@
   },
   "devDependencies": {
     "@types/jest": "27.0.3",
-    "@types/node": "16.11.10",
+    "@types/node": "16.11.12",
     "@types/pdfjs-dist": "2.10.378",
     "@types/pixelmatch": "5.2.4",
     "@types/pngjs": "6.0.1",
-    "@typescript-eslint/eslint-plugin": "5.4.0",
-    "@typescript-eslint/parser": "5.4.0",
-    "eslint": "8.3.0",
-    "jest": "27.4.0",
-    "png-visual-compare": "0.4.5",
-    "ts-jest": "27.0.7",
+    "@typescript-eslint/eslint-plugin": "5.7.0",
+    "@typescript-eslint/parser": "5.7.0",
+    "eslint": "8.4.1",
+    "jest": "27.4.5",
+    "png-visual-compare": "0.4.6",
+    "ts-jest": "27.1.1",
     "ts-node": "10.4.0",
-    "typescript": "4.5.2"
+    "typescript": "4.5.4"
   }
 }
