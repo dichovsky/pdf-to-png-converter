@@ -1,6 +1,6 @@
-import {Canvas, CanvasRenderingContext2D} from 'canvas';
-import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'fs';
-import {parse, resolve} from 'path';
+import { Canvas, CanvasRenderingContext2D } from 'canvas';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { parse, resolve } from 'path';
 import * as pdfjs from 'pdfjs-dist/legacy/build/pdf';
 import {
     DocumentInitParameters,
@@ -8,8 +8,8 @@ import {
     PDFPageProxy,
     RenderParameters
 } from 'pdfjs-dist/types/src/display/api';
-import {PageViewport} from 'pdfjs-dist/types/src/display/display_utils';
-import {NodeCanvasFactory} from './node.canvas.factory';
+import { PageViewport } from 'pdfjs-dist/types/src/display/display_utils';
+import { NodeCanvasFactory } from './node.canvas.factory';
 
 const cMapUrl = '../node_modules/pdfjs-dist/cmaps/';
 const cMapPacked = true;
@@ -29,20 +29,24 @@ export type PngPageOutput = {
     path: string;
 };
 
-export async function pdfToPng(pdfFilePathOrBuffer: string | ArrayBufferLike, props?: PdfToPngOptions): Promise<PngPageOutput[]> {
-    const isBuffer = Buffer.isBuffer(pdfFilePathOrBuffer);
+export async function pdfToPng(
+    pdfFilePathOrBuffer: string | ArrayBufferLike,
+    props?: PdfToPngOptions,
+): Promise<PngPageOutput[]> {
+    const isBuffer: boolean = Buffer.isBuffer(pdfFilePathOrBuffer);
+
     if (!isBuffer && !existsSync(pdfFilePathOrBuffer as string)) {
         throw Error(`PDF file not found on: ${pdfFilePathOrBuffer}.`);
     }
 
     if (props?.outputFilesFolder && !existsSync(props.outputFilesFolder)) {
-        mkdirSync(props.outputFilesFolder, {recursive: true});
+        mkdirSync(props.outputFilesFolder, { recursive: true });
     }
 
-    if(!props?.outputFileMask && isBuffer) {
+    if (!props?.outputFileMask && isBuffer) {
         throw Error('outputFileMask is required when input is a Buffer.');
     }
-    const pdfFileBuffer = isBuffer ? pdfFilePathOrBuffer : readFileSync(pdfFilePathOrBuffer as string);
+    const pdfFileBuffer: ArrayBuffer = isBuffer ? pdfFilePathOrBuffer as ArrayBuffer : readFileSync(pdfFilePathOrBuffer as string);
     const pdfDocInitParams: DocumentInitParameters = {
         data: new Uint8Array(pdfFileBuffer),
         cMapUrl,
@@ -61,7 +65,7 @@ export async function pdfToPng(pdfFilePathOrBuffer: string | ArrayBufferLike, pr
 
     for (let pageNumber = 1; pageNumber <= pdfDocument.numPages; pageNumber++) {
         const page: PDFPageProxy = await pdfDocument.getPage(pageNumber);
-        const viewport: PageViewport = page.getViewport({scale: props?.viewportScale ?? 1.0});
+        const viewport: PageViewport = page.getViewport({ scale: props?.viewportScale ?? 1.0 });
         const canvasFactory = new NodeCanvasFactory();
         const canvasAndContext = canvasFactory.create(viewport.width, viewport.height);
 
@@ -76,7 +80,7 @@ export async function pdfToPng(pdfFilePathOrBuffer: string | ArrayBufferLike, pr
         const pngPageOutput: PngPageOutput = {
             name: `${pageName}_page_${pageNumber}.png`,
             content: (canvasAndContext.canvas as Canvas).toBuffer(),
-            path: ''
+            path: '',
         };
 
         if (props?.outputFilesFolder) {
