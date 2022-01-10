@@ -21,6 +21,7 @@ export type PdfToPngOptions = {
     useSystemFonts?: boolean;
     pdfFilePassword?: string;
     outputFileMask?: string;
+    pages?: number[];
 };
 
 export type PngPageOutput = {
@@ -63,7 +64,20 @@ export async function pdfToPng(
     const pdfDocument: PDFDocumentProxy = await pdfjs.getDocument(pdfDocInitParams).promise;
     const pngPagesOutput: PngPageOutput[] = [];
 
-    for (let pageNumber = 1; pageNumber <= pdfDocument.numPages; pageNumber++) {
+    let targetedPages = Array.from({ length: pdfDocument.numPages }, (_, index) => index + 1);
+    if (props?.pages) {
+        if (props?.pages.some((pageNum) => pageNum < 1)) {
+            throw new Error('Invalid pages requested, page numbers must be >= 1');
+        }
+        targetedPages = [...props?.pages];
+    }
+
+    for (let pageNumber of targetedPages) {
+        if (pageNumber > pdfDocument.numPages) {
+            // If a requested page is beyond the PDF bounds we skip it.
+            // This allows the use case "generate up to the first n pages from a set of input PDFs"
+            continue;
+        }
         const page: PDFPageProxy = await pdfDocument.getPage(pageNumber);
         const viewport: PageViewport = page.getViewport({ scale: props?.viewportScale ?? 1.0 });
         const canvasFactory = new NodeCanvasFactory();

@@ -21,7 +21,8 @@ test(`Convert PDF To PNG`, async () => {
         useSystemFonts: false, // When `true`, fonts that aren't embedded in the PDF document will fallback to a system font.
         viewportScale: 2.0, // The desired scale of PNG viewport
         outputFilesFolder: 'output/folder', // folder to write output png files,
-        pdfFilePassword: 'password', // password for encrypted PDF
+        pdfFilePassword: 'password', // password for encrypted PDF,
+        pages: [1, 3, 11]   // Subset of pages to convert (first page = 1, optional)
     });
 
    ...
