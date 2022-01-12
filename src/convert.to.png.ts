@@ -21,6 +21,7 @@ export type PdfToPngOptions = {
     useSystemFonts?: boolean;
     pdfFilePassword?: string;
     outputFileMask?: string;
+    pages?: number[];
 };
 
 export type PngPageOutput = {
@@ -46,7 +47,9 @@ export async function pdfToPng(
     if (!props?.outputFileMask && isBuffer) {
         throw Error('outputFileMask is required when input is a Buffer.');
     }
-    const pdfFileBuffer: ArrayBuffer = isBuffer ? pdfFilePathOrBuffer as ArrayBuffer : readFileSync(pdfFilePathOrBuffer as string);
+    const pdfFileBuffer: ArrayBuffer = isBuffer
+        ? (pdfFilePathOrBuffer as ArrayBuffer)
+        : readFileSync(pdfFilePathOrBuffer as string);
     const pdfDocInitParams: DocumentInitParameters = {
         data: new Uint8Array(pdfFileBuffer),
         cMapUrl,
@@ -63,7 +66,20 @@ export async function pdfToPng(
     const pdfDocument: PDFDocumentProxy = await pdfjs.getDocument(pdfDocInitParams).promise;
     const pngPagesOutput: PngPageOutput[] = [];
 
-    for (let pageNumber = 1; pageNumber <= pdfDocument.numPages; pageNumber++) {
+    const targetedPages: number[] = props?.pages
+        ? props.pages
+        : Array.from({ length: pdfDocument.numPages }, (_, index) => index + 1);
+
+    if (targetedPages.some((pageNum) => pageNum < 1)) {
+        throw new Error('Invalid pages requested, page numbers must be >= 1');
+    }
+
+    for (const pageNumber of targetedPages) {
+        if (pageNumber > pdfDocument.numPages) {
+            // If a requested page is beyond the PDF bounds we skip it.
+            // This allows the use case "generate up to the first n pages from a set of input PDFs"
+            continue;
+        }
         const page: PDFPageProxy = await pdfDocument.getPage(pageNumber);
         const viewport: PageViewport = page.getViewport({ scale: props?.viewportScale ?? 1.0 });
         const canvasFactory = new NodeCanvasFactory();
