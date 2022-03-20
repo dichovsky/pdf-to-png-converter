@@ -44,9 +44,9 @@ export async function pdfToPng(
         mkdirSync(props.outputFilesFolder, { recursive: true });
     }
 
-    if (!props?.outputFileMask && isBuffer) {
+   /*if (!props?.outputFileMask && isBuffer) {
         throw Error('outputFileMask is required when input is a Buffer.');
-    }
+    }*/
     const pdfFileBuffer: ArrayBuffer = isBuffer
         ? (pdfFilePathOrBuffer as ArrayBuffer)
         : readFileSync(pdfFilePathOrBuffer as string);
@@ -92,7 +92,9 @@ export async function pdfToPng(
         };
 
         await page.render(renderContext).promise;
-        const pageName: string = props?.outputFileMask ?? parse(pdfFilePathOrBuffer as string).name;
+        let pageName;
+        if (!isBuffer) pageName = path_1.parse(pdfFilePathOrBuffer).name;
+        if (!pageName) pageName = props?.outputFileMask ?? "No_File_Name";
         const pngPageOutput: PngPageOutput = {
             name: `${pageName}_page_${pageNumber}.png`,
             content: (canvasAndContext.canvas as Canvas).toBuffer(),
