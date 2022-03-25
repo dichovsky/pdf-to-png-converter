@@ -8,7 +8,7 @@ test(`Convert protected PDF To PNG`, async () => {
     const pdfFilePath: string = resolve('test-data/large_pdf-protected.pdf');
     const pngPages: PngPageOutput[] = await pdfToPng(pdfFilePath, {
         outputFilesFolder: 'test-results/protected.pdf/actual',
-        pdfFilePassword: 'uES69xm545C/HP!'
+        pdfFilePassword: 'uES69xm545C/HP!',
     });
 
     pngPages.forEach((pngPage: PngPageOutput) => {
