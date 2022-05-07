@@ -2,13 +2,8 @@ import { Canvas, CanvasRenderingContext2D } from 'canvas';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { parse, resolve } from 'path';
 import * as pdfjs from 'pdfjs-dist/legacy/build/pdf';
-import {
-    DocumentInitParameters,
-    PDFDocumentProxy,
-    PDFPageProxy,
-    RenderParameters,
-} from 'pdfjs-dist/types/src/display/api';
-import { PageViewport } from 'pdfjs-dist/types/src/display/display_utils';
+import * as pdfApiTypes from 'pdfjs-dist/types/src/display/api';
+import * as pdfDisplayUtilsTypes from 'pdfjs-dist/types/src/display/display_utils';
 import { CanvasContext, NodeCanvasFactory } from './node.canvas.factory';
 
 const cMapUrl = '../node_modules/pdfjs-dist/cmaps/';
@@ -57,7 +52,7 @@ export async function pdfToPng(
         ? (pdfFilePathOrBuffer as ArrayBuffer)
         : readFileSync(pdfFilePathOrBuffer as string);
 
-    const pdfDocInitParams: DocumentInitParameters = {
+    const pdfDocInitParams: pdfApiTypes.DocumentInitParameters = {
         data: new Uint8Array(pdfFileBuffer),
         cMapUrl,
         cMapPacked,
@@ -75,7 +70,7 @@ export async function pdfToPng(
         pdfDocInitParams.password = props.pdfFilePassword;
     }
 
-    const pdfDocument: PDFDocumentProxy = await pdfjs.getDocument(pdfDocInitParams).promise;
+    const pdfDocument: pdfApiTypes.PDFDocumentProxy = await pdfjs.getDocument(pdfDocInitParams).promise;
     const pngPagesOutput: PngPageOutput[] = [];
 
     const targetedPages: number[] = props?.pagesToProcess
@@ -96,14 +91,14 @@ export async function pdfToPng(
             // This allows the use case "generate up to the first n pages from a set of input PDFs"
             continue;
         }
-        const page: PDFPageProxy = await pdfDocument.getPage(pageNumber);
-        const viewport: PageViewport = page.getViewport({
+        const page: pdfApiTypes.PDFPageProxy = await pdfDocument.getPage(pageNumber);
+        const viewport: pdfDisplayUtilsTypes.PageViewport = page.getViewport({
             scale: props?.viewportScale ? props.viewportScale : (PDF_TO_PNG_OPTIONS_DEFAULTS.viewportScale as number),
         });
         const canvasFactory = new NodeCanvasFactory();
         const canvasAndContext: CanvasContext = canvasFactory.create(viewport.width, viewport.height);
 
-        const renderContext: RenderParameters = {
+        const renderContext: pdfApiTypes.RenderParameters = {
             canvasContext: canvasAndContext.context as CanvasRenderingContext2D,
             viewport,
             canvasFactory,
