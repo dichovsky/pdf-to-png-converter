@@ -2,21 +2,30 @@ import { Canvas, CanvasRenderingContext2D } from 'canvas';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { parse, resolve } from 'path';
 import * as pdfjs from 'pdfjs-dist/legacy/build/pdf';
-import * as pdfApi from 'pdfjs-dist/types/src/display/api';
-import { PageViewport } from 'pdfjs-dist/types/src/display/display_utils';
-import { NodeCanvasFactory } from './node.canvas.factory';
+import * as pdfApiTypes from 'pdfjs-dist/types/src/display/api';
+import * as pdfDisplayUtilsTypes from 'pdfjs-dist/types/src/display/display_utils';
+import { CanvasContext, NodeCanvasFactory } from './node.canvas.factory';
 
 const cMapUrl = '../node_modules/pdfjs-dist/cmaps/';
 const cMapPacked = true;
 
+export const PDF_TO_PNG_OPTIONS_DEFAULTS: PdfToPngOptions = {
+    viewportScale: 1,
+    disableFontFace: true,
+    useSystemFonts: false,
+    outputFileMask: 'buffer',
+    strictPagesToProcess: false
+};
+
 export type PdfToPngOptions = {
     viewportScale?: number;
-    outputFilesFolder?: string;
     disableFontFace?: boolean;
     useSystemFonts?: boolean;
     pdfFilePassword?: string;
+    outputFolder?: string;
     outputFileMask?: string;
-    pages?: number[];
+    pagesToProcess?: number[];
+    strictPagesToProcess?: boolean;
 };
 
 export type PngPageOutput = {
@@ -35,67 +44,86 @@ export async function pdfToPng(
         throw Error(`PDF file not found on: ${pdfFilePathOrBuffer}.`);
     }
 
-    if (props?.outputFilesFolder && !existsSync(props.outputFilesFolder)) {
-        mkdirSync(props.outputFilesFolder, { recursive: true });
+    if (props?.outputFolder && !existsSync(props.outputFolder)) {
+        mkdirSync(props.outputFolder, { recursive: true });
     }
 
-    if (!props?.outputFileMask && isBuffer) {
-        throw Error('outputFileMask is required when input is a Buffer.');
-    }
     const pdfFileBuffer: ArrayBuffer = isBuffer
         ? (pdfFilePathOrBuffer as ArrayBuffer)
         : readFileSync(pdfFilePathOrBuffer as string);
-    const pdfDocInitParams: pdfApi.DocumentInitParameters = {
+
+    const pdfDocInitParams: pdfApiTypes.DocumentInitParameters = {
         data: new Uint8Array(pdfFileBuffer),
         cMapUrl,
         cMapPacked,
     };
 
-    pdfDocInitParams.disableFontFace = props?.disableFontFace ?? true;
-    pdfDocInitParams.useSystemFonts = props?.useSystemFonts ?? false;
+    pdfDocInitParams.disableFontFace = props?.disableFontFace
+        ? props.disableFontFace
+        : PDF_TO_PNG_OPTIONS_DEFAULTS.disableFontFace;
+
+    pdfDocInitParams.useSystemFonts = props?.useSystemFonts
+        ? props.useSystemFonts
+        : PDF_TO_PNG_OPTIONS_DEFAULTS.useSystemFonts;
 
     if (props?.pdfFilePassword) {
-        pdfDocInitParams.password = props?.pdfFilePassword;
+        pdfDocInitParams.password = props.pdfFilePassword;
     }
 
-    const pdfDocument: pdfApi.PDFDocumentProxy = await pdfjs.getDocument(pdfDocInitParams).promise;
+    const pdfDocument: pdfApiTypes.PDFDocumentProxy = await pdfjs.getDocument(pdfDocInitParams).promise;
     const pngPagesOutput: PngPageOutput[] = [];
 
-    const targetedPages: number[] = props?.pages
-        ? props.pages
+    const targetedPages: number[] = props?.pagesToProcess
+        ? props.pagesToProcess
         : Array.from({ length: pdfDocument.numPages }, (_, index) => index + 1);
 
-    if (targetedPages.some((pageNum) => pageNum < 1)) {
+    if (props?.strictPagesToProcess && targetedPages.some((pageNum) => pageNum < 1)) {
         throw new Error('Invalid pages requested, page numbers must be >= 1');
     }
 
+    if (props?.strictPagesToProcess && targetedPages.some((pageNum) => pageNum > pdfDocument.numPages)) {
+        throw new Error('Invalid pages requested, page numbers must be <= total pages');
+    }
+
     for (const pageNumber of targetedPages) {
-        if (pageNumber > pdfDocument.numPages) {
+        if (pageNumber > pdfDocument.numPages || pageNumber < 1) {
             // If a requested page is beyond the PDF bounds we skip it.
             // This allows the use case "generate up to the first n pages from a set of input PDFs"
             continue;
         }
-        const page: pdfApi.PDFPageProxy = await pdfDocument.getPage(pageNumber);
-        const viewport: PageViewport = page.getViewport({ scale: props?.viewportScale ?? 1.0 });
+        const page: pdfApiTypes.PDFPageProxy = await pdfDocument.getPage(pageNumber);
+        const viewport: pdfDisplayUtilsTypes.PageViewport = page.getViewport({
+            scale: props?.viewportScale ? props.viewportScale : (PDF_TO_PNG_OPTIONS_DEFAULTS.viewportScale as number),
+        });
         const canvasFactory = new NodeCanvasFactory();
-        const canvasAndContext = canvasFactory.create(viewport.width, viewport.height);
+        const canvasAndContext: CanvasContext = canvasFactory.create(viewport.width, viewport.height);
 
-        const renderContext: pdfApi.RenderParameters = {
+        const renderContext: pdfApiTypes.RenderParameters = {
             canvasContext: canvasAndContext.context as CanvasRenderingContext2D,
             viewport,
             canvasFactory,
         };
 
         await page.render(renderContext).promise;
-        const pageName: string = props?.outputFileMask ?? parse(pdfFilePathOrBuffer as string).name;
+
+        let pageName;
+        if (props?.outputFileMask) {
+            pageName = props.outputFileMask;
+        }
+        if (!pageName && !isBuffer) {
+            pageName = parse(pdfFilePathOrBuffer as string).name;
+        }
+        if (!pageName) {
+            pageName = PDF_TO_PNG_OPTIONS_DEFAULTS.outputFileMask;
+        }
         const pngPageOutput: PngPageOutput = {
             name: `${pageName}_page_${pageNumber}.png`,
             content: (canvasAndContext.canvas as Canvas).toBuffer(),
             path: '',
         };
 
-        if (props?.outputFilesFolder) {
-            pngPageOutput.path = resolve(props.outputFilesFolder, pngPageOutput.name);
+        if (props?.outputFolder) {
+            pngPageOutput.path = resolve(props.outputFolder, pngPageOutput.name);
             writeFileSync(pngPageOutput.path, pngPageOutput.content);
         }
 

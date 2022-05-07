@@ -14,7 +14,7 @@ test(`Convert To PNG without saving to file`, async () => {
         const expectedFileContent: Buffer = readFileSync(expectedFilePath);
         const compareResult: number = comparePng(pngPage.content, expectedFileContent);
 
-        expect(existsSync(pngPage.path)).toBeFalsy();
+        expect(existsSync(pngPage.path)).toBe(false);
         expect(compareResult).toBe(0);
     });
 });

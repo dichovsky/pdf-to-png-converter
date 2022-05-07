@@ -1,11 +1,13 @@
 {
   "name": "pdf-to-png-converter",
-  "version": "0.2.5",
-  "description": "Node.js utility to convert PDF pages to PNG files with no native dependencies.",
+  "version": "1.0.0",
+  "description": "Node.js utility to convert PDF file/buffer pages to PNG files/buffers with no native dependencies.",
   "keywords": [
     "pdf",
     "pdf to png",
-    "pdf to image"
+    "pdf to image",
+    "pdf file to image",
+    "pdf buffer to image"
   ],
   "homepage": "https://github.com/dichovsky/pdf-to-png-converter#readme",
   "bugs": {

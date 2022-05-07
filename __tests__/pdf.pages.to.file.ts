@@ -1,14 +1,13 @@
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import comparePng from 'png-visual-compare';
-import { pdfToPng } from '../src';
-import { PngPageOutput } from '../src/convert.to.png';
+import { pdfToPng, PngPageOutput } from '../src';
 
 test(`Convert specific pages To PNG and save results to files`, async () => {
     const pdfFilePath: string = resolve('test-data/large_pdf.pdf');
     const pngPages: PngPageOutput[] = await pdfToPng(pdfFilePath, {
-        outputFilesFolder: 'test-results/pdf.pages.to.file/actual',
-        pages: [2, 5, 7, 99],
+        outputFolder: 'test-results/pdf.pages.to.file/actual',
+        pagesToProcess: [-1, 0, 2, 5, 7, 99, 999999],
     });
 
     // Should skip page 99 since it's beyond PDF bounds
