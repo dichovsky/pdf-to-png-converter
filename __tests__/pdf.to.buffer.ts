@@ -1,4 +1,4 @@
-import { readFileSync, existsSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { resolve } from 'path';
 import comparePng from 'png-visual-compare';
 import { pdfToPng, PngPageOutput } from '../src';
@@ -14,7 +14,7 @@ test(`Convert To PNG without saving to file`, async () => {
         const expectedFileContent: Buffer = readFileSync(expectedFilePath);
         const compareResult: number = comparePng(pngPage.content, expectedFileContent);
 
-        expect(existsSync(pngPage.path)).toBeFalsy();
+        expect(existsSync(pngPage.path)).toBe(false);
         expect(compareResult).toBe(0);
     });
 });

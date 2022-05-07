@@ -1,13 +1,12 @@
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import comparePng from 'png-visual-compare';
-import { pdfToPng } from '../src';
-import { PngPageOutput } from '../src/convert.to.png';
+import { pdfToPng, PngPageOutput } from '../src';
 
 test(`Convert To PNG and save results to files`, async () => {
     const pdfFilePath: string = resolve('test-data/large_pdf.pdf');
     const pngPages: PngPageOutput[] = await pdfToPng(pdfFilePath, {
-        outputFilesFolder: 'test-results/pdf.to.file/actual',
+        outputFolder: 'test-results/pdf.to.file/actual',
     });
 
     pngPages.forEach((pngPage: PngPageOutput) => {
