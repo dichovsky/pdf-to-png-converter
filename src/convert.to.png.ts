@@ -9,12 +9,18 @@ import { CanvasContext, NodeCanvasFactory } from './node.canvas.factory';
 const cMapUrl = '../node_modules/pdfjs-dist/cmaps/';
 const cMapPacked = true;
 
+export const VerbosityLevel = {
+    ERRORS: 0,
+    WARNINGS: 1,
+    INFOS: 5,
+};
+
 export const PDF_TO_PNG_OPTIONS_DEFAULTS: PdfToPngOptions = {
     viewportScale: 1,
     disableFontFace: true,
     useSystemFonts: false,
     outputFileMask: 'buffer',
-    strictPagesToProcess: false
+    strictPagesToProcess: false,
 };
 
 export type PdfToPngOptions = {
@@ -26,6 +32,7 @@ export type PdfToPngOptions = {
     outputFileMask?: string;
     pagesToProcess?: number[];
     strictPagesToProcess?: boolean;
+    verbosityLevel?: number;
 };
 
 export type PngPageOutput = {
@@ -56,6 +63,7 @@ export async function pdfToPng(
         data: new Uint8Array(pdfFileBuffer),
         cMapUrl,
         cMapPacked,
+        verbosity: props?.verbosityLevel ?? VerbosityLevel.ERRORS,
     };
 
     pdfDocInitParams.disableFontFace = props?.disableFontFace
