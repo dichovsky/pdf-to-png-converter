@@ -1,4 +1,4 @@
-FROM node:current-buster-slim
+FROM node:16.15.0-slim
 
 WORKDIR /usr/pkg/
 COPY . .
