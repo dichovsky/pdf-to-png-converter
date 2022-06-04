@@ -2,12 +2,12 @@ import { existsSync, readFileSync } from 'fs';
 import { parse, resolve } from 'path';
 import comparePng from 'png-visual-compare';
 import { pdfToPng, PngPageOutput } from '../src';
-import { PDF_TO_PNG_OPTIONS_DEFAULTS } from '../src/convert.to.png';
+import { PDF_TO_PNG_OPTIONS_DEFAULTS } from '../src/const';
 
 const pdfFilePath: string = resolve('test-data/large_pdf.pdf');
 const pdfBuffer: Buffer = readFileSync(pdfFilePath);
 
-test(`Convert To PNG without saving to file, output file mask is defined`, async () => {
+test(`should convert PDF To PNG without saving to file, output file mask is defined`, async () => {
     const pngPages: PngPageOutput[] = await pdfToPng(pdfBuffer, {
         viewportScale: 2.0,
         outputFileMask: 'large_pdf',
@@ -23,7 +23,7 @@ test(`Convert To PNG without saving to file, output file mask is defined`, async
     });
 });
 
-test(`Convert To PNG without saving to file, output file mask is not defined`, async () => {
+test(`should convert PDF To PNG without saving to file, output file mask is not defined`, async () => {
     const pngPages: PngPageOutput[] = await pdfToPng(pdfBuffer, {
         viewportScale: 2.0,
     });

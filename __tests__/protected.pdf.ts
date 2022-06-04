@@ -3,7 +3,7 @@ import { resolve } from 'path';
 import comparePng from 'png-visual-compare';
 import { pdfToPng, PngPageOutput } from '../src';
 
-test(`Convert protected PDF To PNG`, async () => {
+test(`should convert protected PDF To PNG`, async () => {
     const pdfFilePath: string = resolve('test-data/large_pdf-protected.pdf');
     const pngPages: PngPageOutput[] = await pdfToPng(pdfFilePath, {
         outputFolder: 'test-results/protected.pdf/actual',

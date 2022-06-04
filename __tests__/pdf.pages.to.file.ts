@@ -3,7 +3,7 @@ import { resolve } from 'path';
 import comparePng from 'png-visual-compare';
 import { pdfToPng, PngPageOutput } from '../src';
 
-test(`Convert specific pages To PNG and save results to files`, async () => {
+test(`should convert specific PDF pages To PNG files`, async () => {
     const pdfFilePath: string = resolve('test-data/large_pdf.pdf');
     const pngPages: PngPageOutput[] = await pdfToPng(pdfFilePath, {
         outputFolder: 'test-results/pdf.pages.to.file/actual',
