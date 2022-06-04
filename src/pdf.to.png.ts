@@ -4,47 +4,13 @@ import { parse, resolve } from 'path';
 import * as pdfjs from 'pdfjs-dist/legacy/build/pdf';
 import * as pdfApiTypes from 'pdfjs-dist/types/src/display/api';
 import * as pdfDisplayUtilsTypes from 'pdfjs-dist/types/src/display/display_utils';
+import { PdfToPngOptions, PngPageOutput } from '.';
+import { PDF_TO_PNG_OPTIONS_DEFAULTS } from './const';
+
 import { CanvasContext, NodeCanvasFactory } from './node.canvas.factory';
+import { propsToPdfDocInitParams } from './props.to.pdf.doc.init.params';
 
-const cMapUrl = '../node_modules/pdfjs-dist/cmaps/';
-const cMapPacked = true;
-
-export const VerbosityLevel = {
-    ERRORS: 0,
-    WARNINGS: 1,
-    INFOS: 5,
-};
-
-export const PDF_TO_PNG_OPTIONS_DEFAULTS: PdfToPngOptions = {
-    viewportScale: 1,
-    disableFontFace: true,
-    useSystemFonts: false,
-    outputFileMask: 'buffer',
-    strictPagesToProcess: false,
-};
-
-export type PdfToPngOptions = {
-    viewportScale?: number;
-    disableFontFace?: boolean;
-    useSystemFonts?: boolean;
-    pdfFilePassword?: string;
-    outputFolder?: string;
-    outputFileMask?: string;
-    pagesToProcess?: number[];
-    strictPagesToProcess?: boolean;
-    verbosityLevel?: number;
-};
-
-export type PngPageOutput = {
-    name: string;
-    content: Buffer;
-    path: string;
-};
-
-export async function pdfToPng(
-    pdfFilePathOrBuffer: string | ArrayBufferLike,
-    props?: PdfToPngOptions,
-): Promise<PngPageOutput[]> {
+export async function pdfToPng(pdfFilePathOrBuffer: string | ArrayBufferLike, props?: PdfToPngOptions): Promise<PngPageOutput[]> {
     const isBuffer: boolean = Buffer.isBuffer(pdfFilePathOrBuffer);
 
     if (!isBuffer && !existsSync(pdfFilePathOrBuffer as string)) {
@@ -59,29 +25,13 @@ export async function pdfToPng(
         ? (pdfFilePathOrBuffer as ArrayBuffer)
         : readFileSync(pdfFilePathOrBuffer as string);
 
-    const pdfDocInitParams: pdfApiTypes.DocumentInitParameters = {
-        data: new Uint8Array(pdfFileBuffer),
-        cMapUrl,
-        cMapPacked,
-        verbosity: props?.verbosityLevel ?? VerbosityLevel.ERRORS,
-    };
-
-    pdfDocInitParams.disableFontFace = props?.disableFontFace
-        ? props.disableFontFace
-        : PDF_TO_PNG_OPTIONS_DEFAULTS.disableFontFace;
-
-    pdfDocInitParams.useSystemFonts = props?.useSystemFonts
-        ? props.useSystemFonts
-        : PDF_TO_PNG_OPTIONS_DEFAULTS.useSystemFonts;
-
-    if (props?.pdfFilePassword) {
-        pdfDocInitParams.password = props.pdfFilePassword;
-    }
+    const pdfDocInitParams: pdfApiTypes.DocumentInitParameters = propsToPdfDocInitParams(props);
+    pdfDocInitParams.data = new Uint8Array(pdfFileBuffer);
 
     const pdfDocument: pdfApiTypes.PDFDocumentProxy = await pdfjs.getDocument(pdfDocInitParams).promise;
     const pngPagesOutput: PngPageOutput[] = [];
 
-    const targetedPages: number[] = props?.pagesToProcess
+    const targetedPages: number[] = props?.pagesToProcess !== undefined
         ? props.pagesToProcess
         : Array.from({ length: pdfDocument.numPages }, (_, index) => index + 1);
 
@@ -101,7 +51,9 @@ export async function pdfToPng(
         }
         const page: pdfApiTypes.PDFPageProxy = await pdfDocument.getPage(pageNumber);
         const viewport: pdfDisplayUtilsTypes.PageViewport = page.getViewport({
-            scale: props?.viewportScale ? props.viewportScale : (PDF_TO_PNG_OPTIONS_DEFAULTS.viewportScale as number),
+            scale: props?.viewportScale  !== undefined 
+                ? props.viewportScale 
+                : (PDF_TO_PNG_OPTIONS_DEFAULTS.viewportScale as number),
         });
         const canvasFactory = new NodeCanvasFactory();
         const canvasAndContext: CanvasContext = canvasFactory.create(viewport.width, viewport.height);

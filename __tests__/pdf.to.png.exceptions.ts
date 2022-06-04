@@ -1,7 +1,7 @@
 import { resolve } from 'path';
 import { pdfToPng } from '../src';
 
-test(`Should throw "PDF file not found" exception`, async () => {
+test(`should throw "PDF file not found" exception`, async () => {
     const pdfFilePath: string = resolve('non_existing_file.pdf');
 
     await expect(async () => {
@@ -9,7 +9,7 @@ test(`Should throw "PDF file not found" exception`, async () => {
     }).rejects.toThrow(Error);
 });
 
-test(`Should throw error when page index = 0 is requested`, async () => {
+test(`should throw error when page index = 0 is requested`, async () => {
     const pdfFilePath: string = resolve('test-data/large_pdf.pdf');
 
     await expect(async () => {
@@ -17,7 +17,7 @@ test(`Should throw error when page index = 0 is requested`, async () => {
     }).rejects.toThrow('Invalid pages requested');
 });
 
-test(`Should throw error when page index < 1 is requested`, async () => {
+test(`should throw error when page index < 1 is requested`, async () => {
     const pdfFilePath: string = resolve('test-data/large_pdf.pdf');
 
     await expect(async () => {
@@ -25,7 +25,7 @@ test(`Should throw error when page index < 1 is requested`, async () => {
     }).rejects.toThrow('Invalid pages requested');
 });
 
-test(`Should throw error when page index > then file contains and strictPagesToProcess is enabled`, async () => {
+test(`should throw error when page index > then file contains and strictPagesToProcess is enabled`, async () => {
     const pdfFilePath: string = resolve('test-data/large_pdf.pdf');
 
     await expect(async () => {
