@@ -1,7 +1,7 @@
-import { VerbosityLevel } from 'pdfjs-dist';
 import * as pdfApiTypes from 'pdfjs-dist/types/src/display/api';
 import { PDF_TO_PNG_OPTIONS_DEFAULTS } from './const';
 import { PdfToPngOptions } from './types/pdf.to.png.options';
+import { VerbosityLevel } from './types/verbosity.level';
 
 export function propsToPdfDocInitParams(props?: PdfToPngOptions): pdfApiTypes.DocumentInitParameters {
     const cMapUrl = '../node_modules/pdfjs-dist/cmaps/';
