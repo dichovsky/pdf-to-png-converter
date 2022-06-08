@@ -17,7 +17,7 @@ npm install -D pdf-to-png-converter
 ```javascript
 test(`Convert PDF To PNG`, async () => {
     const pngPages: PngPageOutput[] = await pdfToPng(pdfFilePath, // The function accepts PDF file path or a Buffer
-    { 
+    {
         disableFontFace: false, // When `false`, fonts will be rendered using a built-in font renderer that constructs the glyphs with primitive path commands. Default value is true.
         useSystemFonts: false, // When `true`, fonts that aren't embedded in the PDF document will fallback to a system font. Default value is false.
         viewportScale: 2.0, // The desired scale of PNG viewport. Default value is 1.0.
@@ -26,18 +26,24 @@ test(`Convert PDF To PNG`, async () => {
         pdfFilePassword: 'pa$$word', // Password for encrypted PDF.
         pagesToProcess: [1, 3, 11],   // Subset of pages to convert (first page = 1), other pages will be skipped if specified.
         strictPagesToProcess: false // When `true`, will throw an error if specified page number in pagesToProcess is invalid, otherwise will skip invalid page. Default value is false.
+        verbosityLevel: 0 // Verbosity level. ERRORS: 0, WARNINGS: 1, INFOS: 5. Default value is 0.
     });
-
    ...
 });
 ```
 
-### Output
+## Output
 
 ```javascript
 {
     name: string; // PNG page name in a format `{pdfFileName}_page_{pdfPageNumber}.png`,
     content: Buffer; // PNG page Buffer content
     path: string; // Path to the rendered PNG page file (empty string and if outputFilesFolder is not provided)
-};
+}
 ```
+
+## Buy Me A Coffee
+
+In case you want support my work
+
+[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://buymeacoffee.com/dichovsky)
