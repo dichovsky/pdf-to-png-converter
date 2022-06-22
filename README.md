@@ -1,6 +1,6 @@
 # pdf-to-png-converter
 
-Node.js utility to compare PNG files without binary and OS dependencies.  
+Node.js utility to compare PNG files without binary and OS dependencies* (except MacOs on arm64).  
 
 [![Tests on push](https://github.com/dichovsky/pdf-to-png-converter/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/dichovsky/pdf-to-png-converter/actions/workflows/test.yml)
 
@@ -37,4 +37,12 @@ test(`Convert PDF To PNG`, async () => {
     content: Buffer; // PNG page content
     path: string; // path to stored PNG file (empty string if outputFilesFolder is not provided)
 };
+```
+
+### MacOs M1 prerequisites
+
+MacOs M1 dependencies prerequisites installation
+
+```bash
+arch -arm64 brew install pkg-config cairo pango libpng jpeg giflib librsvg
 ```
