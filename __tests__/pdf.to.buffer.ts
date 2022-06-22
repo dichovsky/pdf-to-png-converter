@@ -3,7 +3,7 @@ import { resolve } from 'path';
 import comparePng from 'png-visual-compare';
 import { pdfToPng, PngPageOutput } from '../src';
 
-test(`Convert To PNG without saving to file`, async () => {
+test(`should convert PDF To PNG buffer (without saving to file)`, async () => {
     const pdfFilePath: string = resolve('test-data/large_pdf.pdf');
     const pngPages: PngPageOutput[] = await pdfToPng(pdfFilePath, {
         viewportScale: 2.0,
@@ -14,7 +14,7 @@ test(`Convert To PNG without saving to file`, async () => {
         const expectedFileContent: Buffer = readFileSync(expectedFilePath);
         const compareResult: number = comparePng(pngPage.content, expectedFileContent);
 
-        expect(existsSync(pngPage.path)).toBeFalsy();
+        expect(existsSync(pngPage.path)).toBe(false);
         expect(compareResult).toBe(0);
     });
 });
