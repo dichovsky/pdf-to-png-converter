@@ -1,10 +1,20 @@
 # pdf-to-png-converter
 
-Node.js utility to convert PDF file/buffer pages to PNG files/buffers without binary and OS dependencies.
+Node.js utility to convert PDF file/buffer pages to PNG files/buffers without binary and OS dependencies (except MacOs on arm64).
 
 [![Tests on push](https://github.com/dichovsky/pdf-to-png-converter/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/dichovsky/pdf-to-png-converter/actions/workflows/test.yml)
 
 ## Getting started
+
+### MacOs M1 prerequisites
+
+MacOs M1 dependencies prerequisites installation
+
+```bash
+arch -arm64 brew install pkg-config cairo pango libpng jpeg giflib librsvg
+```
+
+### Package installation
 
 Installation:
 
