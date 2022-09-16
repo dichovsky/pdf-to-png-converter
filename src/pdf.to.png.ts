@@ -6,7 +6,6 @@ import * as pdfApiTypes from 'pdfjs-dist/types/src/display/api';
 import * as pdfDisplayUtilsTypes from 'pdfjs-dist/types/src/display/display_utils';
 import { PdfToPngOptions, PngPageOutput } from '.';
 import { PDF_TO_PNG_OPTIONS_DEFAULTS } from './const';
-
 import { CanvasContext, NodeCanvasFactory } from './node.canvas.factory';
 import { propsToPdfDocInitParams } from './props.to.pdf.doc.init.params';
 
@@ -15,10 +14,6 @@ export async function pdfToPng(pdfFilePathOrBuffer: string | ArrayBufferLike, pr
 
     if (!isBuffer && !existsSync(pdfFilePathOrBuffer as string)) {
         throw Error(`PDF file not found on: ${pdfFilePathOrBuffer}.`);
-    }
-
-    if (props?.outputFolder && !existsSync(props.outputFolder)) {
-        mkdirSync(props.outputFolder, { recursive: true });
     }
 
     const pdfFileBuffer: ArrayBuffer = isBuffer
@@ -31,19 +26,23 @@ export async function pdfToPng(pdfFilePathOrBuffer: string | ArrayBufferLike, pr
     const pdfDocument: pdfApiTypes.PDFDocumentProxy = await pdfjs.getDocument(pdfDocInitParams).promise;
     const pngPagesOutput: PngPageOutput[] = [];
 
-    const targetedPages: number[] = props?.pagesToProcess !== undefined
+    const targetedPageNumbers: number[] = props?.pagesToProcess !== undefined
         ? props.pagesToProcess
         : Array.from({ length: pdfDocument.numPages }, (_, index) => index + 1);
 
-    if (props?.strictPagesToProcess && targetedPages.some((pageNum) => pageNum < 1)) {
-        throw new Error('Invalid pages requested, page numbers must be >= 1');
+    if (props?.strictPagesToProcess && targetedPageNumbers.some((pageNum) => pageNum < 1)) {
+        throw new Error('Invalid pages requested, page number must be >= 1');
     }
 
-    if (props?.strictPagesToProcess && targetedPages.some((pageNum) => pageNum > pdfDocument.numPages)) {
-        throw new Error('Invalid pages requested, page numbers must be <= total pages');
+    if (props?.strictPagesToProcess && targetedPageNumbers.some((pageNum) => pageNum > pdfDocument.numPages)) {
+        throw new Error('Invalid pages requested, page number must be <= total pages');
     }
 
-    for (const pageNumber of targetedPages) {
+    if (props?.outputFolder && !existsSync(props.outputFolder)) {
+        mkdirSync(props.outputFolder, { recursive: true });
+    }
+
+    for (const pageNumber of targetedPageNumbers) {
         if (pageNumber > pdfDocument.numPages || pageNumber < 1) {
             // If a requested page is beyond the PDF bounds we skip it.
             // This allows the use case "generate up to the first n pages from a set of input PDFs"
