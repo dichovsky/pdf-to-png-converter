@@ -24,7 +24,6 @@ export async function pdfToPng(pdfFilePathOrBuffer: string | ArrayBufferLike, pr
     pdfDocInitParams.data = new Uint8Array(pdfFileBuffer);
 
     const pdfDocument: pdfApiTypes.PDFDocumentProxy = await pdfjs.getDocument(pdfDocInitParams).promise;
-    const pngPagesOutput: PngPageOutput[] = [];
 
     const targetedPageNumbers: number[] = props?.pagesToProcess !== undefined
         ? props.pagesToProcess
@@ -42,6 +41,20 @@ export async function pdfToPng(pdfFilePathOrBuffer: string | ArrayBufferLike, pr
         mkdirSync(props.outputFolder, { recursive: true });
     }
 
+    let pageName;
+    if (props?.outputFileMask) {
+        pageName = props.outputFileMask;
+    }
+    if (!pageName && !isBuffer) {
+        pageName = parse(pdfFilePathOrBuffer as string).name;
+    }
+    if (!pageName) {
+        pageName = PDF_TO_PNG_OPTIONS_DEFAULTS.outputFileMask;
+    }
+
+    const pngPagesOutput: PngPageOutput[] = [];
+    const canvasFactory = new NodeCanvasFactory();
+
     for (const pageNumber of targetedPageNumbers) {
         if (pageNumber > pdfDocument.numPages || pageNumber < 1) {
             // If a requested page is beyond the PDF bounds we skip it.
@@ -54,7 +67,6 @@ export async function pdfToPng(pdfFilePathOrBuffer: string | ArrayBufferLike, pr
                 ? props.viewportScale 
                 : (PDF_TO_PNG_OPTIONS_DEFAULTS.viewportScale as number),
         });
-        const canvasFactory = new NodeCanvasFactory();
         const canvasAndContext: CanvasContext = canvasFactory.create(viewport.width, viewport.height);
 
         const renderContext: pdfApiTypes.RenderParameters = {
@@ -65,21 +77,13 @@ export async function pdfToPng(pdfFilePathOrBuffer: string | ArrayBufferLike, pr
 
         await page.render(renderContext).promise;
 
-        let pageName;
-        if (props?.outputFileMask) {
-            pageName = props.outputFileMask;
-        }
-        if (!pageName && !isBuffer) {
-            pageName = parse(pdfFilePathOrBuffer as string).name;
-        }
-        if (!pageName) {
-            pageName = PDF_TO_PNG_OPTIONS_DEFAULTS.outputFileMask;
-        }
         const pngPageOutput: PngPageOutput = {
             name: `${pageName}_page_${pageNumber}.png`,
             content: (canvasAndContext.canvas as Canvas).toBuffer(),
             path: '',
         };
+
+        canvasFactory.destroy(canvasAndContext);
 
         if (props?.outputFolder) {
             pngPageOutput.path = resolve(props.outputFolder, pngPageOutput.name);
