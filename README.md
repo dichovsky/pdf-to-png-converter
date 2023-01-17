@@ -46,9 +46,12 @@ test(`Convert PDF To PNG`, async () => {
 
 ```javascript
 {
-    name: string; // PNG page name in a format `{pdfFileName}_page_{pdfPageNumber}.png`,
+    pageNumber: number; // Page number in PDF file
+    name: string; // PNG page name in a format `{pdfFileName}_page_{pdfPageNumber}.png`
     content: Buffer; // PNG page Buffer content
     path: string; // Path to the rendered PNG page file (empty string and if outputFilesFolder is not provided)
+    width: number; // PNG page width
+    height: number; // PNG page height
 }
 ```
 
