@@ -87,7 +87,7 @@ export async function pdfToPng(
             name: `${pageName}_page_${pageNumber}.png`,
             content: (canvasAndContext.canvas as Canvas).toBuffer(),
             path: '',
-            width: viewport.width, 
+            width: viewport.width,
             height: viewport.height,
         };
 

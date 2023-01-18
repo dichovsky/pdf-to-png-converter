@@ -1,4 +1,4 @@
-import { strict } from 'assert';
+import { strict } from 'node:assert';
 import Canvas from 'canvas';
 
 export interface CanvasContext {

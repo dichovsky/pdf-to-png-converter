@@ -1,5 +1,5 @@
-import { existsSync, readFileSync } from 'fs';
-import { parse, resolve } from 'path';
+import { existsSync, readFileSync } from 'node:fs';
+import { parse, resolve } from 'node:path';
 import comparePng from 'png-visual-compare';
 import { pdfToPng, PngPageOutput } from '../src';
 import { PDF_TO_PNG_OPTIONS_DEFAULTS } from '../src/const';
