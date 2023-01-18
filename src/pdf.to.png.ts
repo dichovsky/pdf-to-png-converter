@@ -1,6 +1,6 @@
 import { Canvas, CanvasRenderingContext2D } from 'canvas';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
-import { parse, resolve } from 'path';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { parse, resolve } from 'node:path';
 import * as pdfjs from 'pdfjs-dist/legacy/build/pdf';
 import * as pdfApiTypes from 'pdfjs-dist/types/src/display/api';
 import * as pdfDisplayUtilsTypes from 'pdfjs-dist/types/src/display/display_utils';

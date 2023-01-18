@@ -7,11 +7,11 @@
     "useTabs": false,
     "arrowParens": "always",
     "overrides": [
-      {
-        "files": ["*.json", ".*.json"],
-        "options": {
-          "tabWidth": 4
+        {
+            "files": ["*.json", ".*.json"],
+            "options": {
+                "tabWidth": 4
+            }
         }
-      }
     ]
-  }
+}
