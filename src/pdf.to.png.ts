@@ -1,7 +1,7 @@
 import { Canvas, CanvasRenderingContext2D } from 'canvas';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { parse, resolve } from 'node:path';
-import * as pdfjs from 'pdfjs-dist/legacy/build/pdf';
+import { getDocument } from 'pdfjs-dist';
 import * as pdfApiTypes from 'pdfjs-dist/types/src/display/api';
 import * as pdfDisplayUtilsTypes from 'pdfjs-dist/types/src/display/display_utils';
 import { PdfToPngOptions, PngPageOutput } from '.';
@@ -26,7 +26,7 @@ export async function pdfToPng(
     const pdfDocInitParams: pdfApiTypes.DocumentInitParameters = propsToPdfDocInitParams(props);
     pdfDocInitParams.data = new Uint8Array(pdfFileBuffer);
 
-    const pdfDocument: pdfApiTypes.PDFDocumentProxy = await pdfjs.getDocument(pdfDocInitParams).promise;
+    const pdfDocument: pdfApiTypes.PDFDocumentProxy = await getDocument(pdfDocInitParams).promise;
 
     const targetedPageNumbers: number[] =
         props?.pagesToProcess !== undefined
