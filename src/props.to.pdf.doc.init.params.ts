@@ -6,9 +6,11 @@ import { VerbosityLevel } from './types/verbosity.level';
 export function propsToPdfDocInitParams(props?: PdfToPngOptions): pdfApiTypes.DocumentInitParameters {
     const cMapUrl = '../node_modules/pdfjs-dist/cmaps/';
     const cMapPacked = true;
+    const standardFontDataUrl = '../node_modules/pdfjs-dist/standard_fonts/';
     const pdfDocInitParams: pdfApiTypes.DocumentInitParameters = {
         cMapUrl,
         cMapPacked,
+        standardFontDataUrl,
     };
 
     pdfDocInitParams.verbosity = props?.verbosityLevel !== undefined ? props?.verbosityLevel : VerbosityLevel.ERRORS;
@@ -18,6 +20,9 @@ export function propsToPdfDocInitParams(props?: PdfToPngOptions): pdfApiTypes.Do
 
     pdfDocInitParams.useSystemFonts =
         props?.useSystemFonts !== undefined ? props.useSystemFonts : PDF_TO_PNG_OPTIONS_DEFAULTS.useSystemFonts;
+
+    pdfDocInitParams.enableXfa =
+        props?.enableXfa !== undefined ? props.enableXfa : PDF_TO_PNG_OPTIONS_DEFAULTS.enableXfa;
 
     pdfDocInitParams.password =
         props?.pdfFilePassword !== undefined ? props?.pdfFilePassword : PDF_TO_PNG_OPTIONS_DEFAULTS.pdfFilePassword;

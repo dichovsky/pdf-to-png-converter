@@ -1,4 +1,4 @@
-import { resolve } from 'path';
+import { resolve } from 'node:path';
 import { pdfToPng } from '../src';
 
 test(`should throw "PDF file not found" exception`, async () => {
