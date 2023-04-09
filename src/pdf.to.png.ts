@@ -91,7 +91,7 @@ export async function pdfToPng(
         };
 
         canvasFactory.destroy(canvasAndContext);
-
+        page.cleanup();
         if (props?.outputFolder) {
             pngPageOutput.path = resolve(props.outputFolder, pngPageOutput.name);
             writeFileSync(pngPageOutput.path, pngPageOutput.content);

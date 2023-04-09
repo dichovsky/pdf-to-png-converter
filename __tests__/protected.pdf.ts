@@ -1,7 +1,6 @@
-import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import comparePng from 'png-visual-compare';
 import { pdfToPng, PngPageOutput } from '../src';
+import { comparePNG } from '../src/compare.png';
 
 test(`should convert protected PDF To PNG`, async () => {
     const pdfFilePath: string = resolve('test-data/large_pdf-protected.pdf');
@@ -12,8 +11,7 @@ test(`should convert protected PDF To PNG`, async () => {
 
     pngPages.forEach((pngPage: PngPageOutput) => {
         const expectedFilePath: string = resolve('test-data/protected.pdf/expected', pngPage.name);
-        const expectedFileContent: Buffer = readFileSync(expectedFilePath);
-        const compareResult: number = comparePng(pngPage.content, expectedFileContent);
+        const compareResult: number = comparePNG(pngPage.content, expectedFilePath);
 
         expect(compareResult).toBe(0);
     });

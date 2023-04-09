@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { parse, resolve } from 'node:path';
-import comparePng from 'png-visual-compare';
-import { pdfToPng, PngPageOutput } from '../src';
+import { PngPageOutput, pdfToPng } from '../src';
+import { comparePNG } from '../src/compare.png';
 import { PDF_TO_PNG_OPTIONS_DEFAULTS } from '../src/const';
 
 const pdfFilePath: string = resolve('test-data/large_pdf.pdf');
@@ -15,8 +15,7 @@ test(`should convert PDF To PNG without saving to file, output file mask is defi
 
     pngPages.forEach((pngPage: PngPageOutput) => {
         const expectedFilePath: string = resolve('test-data/pdf.to.buffer/expected', pngPage.name);
-        const expectedFileContent: Buffer = readFileSync(expectedFilePath);
-        const compareResult: number = comparePng(pngPage.content, expectedFileContent);
+        const compareResult: number = comparePNG(pngPage.content, expectedFilePath);
 
         expect(existsSync(pngPage.path)).toBe(false);
         expect(compareResult).toBe(0);
@@ -33,8 +32,7 @@ test(`should convert PDF To PNG without saving to file, output file mask is not 
             'test-data/pdf.to.buffer/expected',
             pngPage.name.replace(PDF_TO_PNG_OPTIONS_DEFAULTS.outputFileMask as string, parse(pdfFilePath).name),
         );
-        const expectedFileContent: Buffer = readFileSync(expectedFilePath);
-        const compareResult: number = comparePng(pngPage.content, expectedFileContent);
+        const compareResult: number = comparePNG(pngPage.content, expectedFilePath);
 
         expect(pngPage.name).toBe(`${PDF_TO_PNG_OPTIONS_DEFAULTS.outputFileMask as string}_page_${index + 1}.png`);
         expect(existsSync(pngPage.path)).toBe(false);

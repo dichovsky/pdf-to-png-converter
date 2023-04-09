@@ -1,7 +1,7 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import comparePng from 'png-visual-compare';
-import { pdfToPng, PngPageOutput } from '../src';
+import { PngPageOutput, pdfToPng } from '../src';
+import { comparePNG } from '../src/compare.png';
 
 test(`should convert PDF To PNG buffer (without saving to file)`, async () => {
     const pdfFilePath: string = resolve('test-data/large_pdf.pdf');
@@ -11,8 +11,7 @@ test(`should convert PDF To PNG buffer (without saving to file)`, async () => {
 
     pngPages.forEach((pngPage: PngPageOutput) => {
         const expectedFilePath: string = resolve('test-data/pdf.to.buffer/expected', pngPage.name);
-        const expectedFileContent: Buffer = readFileSync(expectedFilePath);
-        const compareResult: number = comparePng(pngPage.content, expectedFileContent);
+        const compareResult: number = comparePNG(pngPage.content, expectedFilePath);
 
         expect(existsSync(pngPage.path)).toBe(false);
         expect(compareResult).toBe(0);

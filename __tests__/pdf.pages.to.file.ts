@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import comparePng from 'png-visual-compare';
 import { pdfToPng, PngPageOutput } from '../src';
+import { comparePNG } from '../src/compare.png';
 
 test(`should convert specific PDF pages To PNG files`, async () => {
     const pdfFilePath: string = resolve('test-data/large_pdf.pdf');
@@ -15,9 +15,8 @@ test(`should convert specific PDF pages To PNG files`, async () => {
 
     pngPages.forEach((pngPage: PngPageOutput) => {
         const expectedFilePath: string = resolve('test-data/pdf.to.file/expected', pngPage.name);
-        const expectedFileContent: Buffer = readFileSync(expectedFilePath);
         const actualFileContent: Buffer = readFileSync(pngPage.path);
-        const compareResult: number = comparePng(actualFileContent, expectedFileContent);
+        const compareResult: number = comparePNG(actualFileContent, expectedFilePath);
 
         expect(compareResult).toBe(0);
     });
