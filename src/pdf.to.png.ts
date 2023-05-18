@@ -1,5 +1,5 @@
 import { Canvas, CanvasRenderingContext2D } from 'canvas';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { promises } from 'node:fs';
 import { parse, resolve } from 'node:path';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf';
 import * as pdfApiTypes from 'pdfjs-dist/types/src/display/api';
@@ -15,13 +15,9 @@ export async function pdfToPng(
 ): Promise<PngPageOutput[]> {
     const isBuffer: boolean = Buffer.isBuffer(pdfFilePathOrBuffer);
 
-    if (!isBuffer && !existsSync(pdfFilePathOrBuffer as string)) {
-        throw Error(`PDF file not found on: ${pdfFilePathOrBuffer}.`);
-    }
-
     const pdfFileBuffer: ArrayBuffer = isBuffer
         ? (pdfFilePathOrBuffer as ArrayBuffer)
-        : readFileSync(pdfFilePathOrBuffer as string);
+        : await promises.readFile(pdfFilePathOrBuffer as string);
 
     const pdfDocInitParams: pdfApiTypes.DocumentInitParameters = propsToPdfDocInitParams(props);
     pdfDocInitParams.data = new Uint8Array(pdfFileBuffer);
@@ -42,8 +38,8 @@ export async function pdfToPng(
         throw new Error('Invalid pages requested, page number must be <= total pages');
     }
 
-    if (props?.outputFolder && !existsSync(props.outputFolder)) {
-        mkdirSync(props.outputFolder, { recursive: true });
+    if (props?.outputFolder) {
+        await promises.mkdir(props.outputFolder, { recursive: true });
     }
 
     let pageName;
@@ -94,11 +90,11 @@ export async function pdfToPng(
         page.cleanup();
         if (props?.outputFolder) {
             pngPageOutput.path = resolve(props.outputFolder, pngPageOutput.name);
-            writeFileSync(pngPageOutput.path, pngPageOutput.content);
+            await promises.writeFile(pngPageOutput.path, pngPageOutput.content);
         }
 
         pngPagesOutput.push(pngPageOutput);
     }
-
+    await pdfDocument.cleanup();
     return pngPagesOutput;
 }
