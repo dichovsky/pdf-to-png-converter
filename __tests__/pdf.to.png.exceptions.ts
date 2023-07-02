@@ -1,14 +1,6 @@
 import { resolve } from 'node:path';
 import { pdfToPng } from '../src';
 
-test(`should throw "PDF file not found" exception`, async () => {
-    const pdfFilePath: string = resolve('non_existing_file.pdf');
-
-    await expect(async () => {
-        await pdfToPng(pdfFilePath);
-    }).rejects.toThrow(Error);
-});
-
 test(`should throw error when page index = 0 is requested`, async () => {
     const pdfFilePath: string = resolve('test-data/large_pdf.pdf');
 

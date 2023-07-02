@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { pdfToPng, PngPageOutput } from '../src';
+import { PngPageOutput, pdfToPng } from '../src';
 import { comparePNG } from '../src/compare.png';
 
 test(`should convert PDF To PNG files`, async () => {
