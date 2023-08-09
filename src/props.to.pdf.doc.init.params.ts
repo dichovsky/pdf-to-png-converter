@@ -5,7 +5,7 @@ import { VerbosityLevel } from './types/verbosity.level';
 import { join } from "path";
 
 export function propsToPdfDocInitParams(props?: PdfToPngOptions): pdfApiTypes.DocumentInitParameters {
-    const cMapUrl = join(__dirname,'../node_modules/pdfjs-dist/cmaps/');
+    const cMapUrl = join(__dirname,'../../../node_modules/pdfjs-dist/cmaps/');
     const cMapPacked = true;
     const standardFontDataUrl = join(__dirname, '../../../node_modules/pdfjs-dist/standard_fonts/');
     const pdfDocInitParams: pdfApiTypes.DocumentInitParameters = {
