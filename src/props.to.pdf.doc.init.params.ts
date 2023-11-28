@@ -2,11 +2,12 @@ import * as pdfApiTypes from 'pdfjs-dist/types/src/display/api';
 import { PDF_TO_PNG_OPTIONS_DEFAULTS } from './const';
 import { PdfToPngOptions } from './types/pdf.to.png.options';
 import { VerbosityLevel } from './types/verbosity.level';
+import { join } from "path";
 
 export function propsToPdfDocInitParams(props?: PdfToPngOptions): pdfApiTypes.DocumentInitParameters {
-    const cMapUrl = '../node_modules/pdfjs-dist/cmaps/';
+    const cMapUrl = join(__dirname,'../../../node_modules/pdfjs-dist/cmaps/');
     const cMapPacked = true;
-    const standardFontDataUrl = '../node_modules/pdfjs-dist/standard_fonts/';
+    const standardFontDataUrl = join(__dirname, '../../../node_modules/pdfjs-dist/standard_fonts/');
     const pdfDocInitParams: pdfApiTypes.DocumentInitParameters = {
         cMapUrl,
         cMapPacked,
