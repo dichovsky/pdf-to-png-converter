@@ -1,7 +1,6 @@
 import { Canvas, CanvasRenderingContext2D } from 'canvas';
 import { promises } from 'node:fs';
 import { parse, resolve } from 'node:path';
-import { getDocument } from 'pdfjs-dist/legacy/build/pdf';
 import * as pdfApiTypes from 'pdfjs-dist/types/src/display/api';
 import * as pdfDisplayUtilsTypes from 'pdfjs-dist/types/src/display/display_utils';
 import { PdfToPngOptions, PngPageOutput } from '.';
@@ -9,7 +8,15 @@ import { PDF_TO_PNG_OPTIONS_DEFAULTS } from './const';
 import { CanvasContext, NodeCanvasFactory } from './node.canvas.factory';
 import { propsToPdfDocInitParams } from './props.to.pdf.doc.init.params';
 
+/**
+ * Converts a PDF file to PNG images.
+ * @param pdfFilePathOrBuffer - The path to the PDF file or a buffer containing the PDF file.
+ * @param props - Optional configuration options for the conversion process.
+ * @returns An array of objects containing information about each generated PNG image.
+ */
 export async function pdfToPng(pdfFilePathOrBuffer: string | ArrayBufferLike, props?: PdfToPngOptions): Promise<PngPageOutput[]> {
+    const pdf = await import('pdfjs-dist/legacy/build/pdf.mjs');
+
     const isBuffer: boolean = Buffer.isBuffer(pdfFilePathOrBuffer);
 
     const pdfFileBuffer: ArrayBuffer = isBuffer
@@ -21,7 +28,7 @@ export async function pdfToPng(pdfFilePathOrBuffer: string | ArrayBufferLike, pr
 
     const canvasFactory = new NodeCanvasFactory();
     pdfDocInitParams.canvasFactory = canvasFactory;
-    const pdfDocument: pdfApiTypes.PDFDocumentProxy = await getDocument(pdfDocInitParams).promise;
+    const pdfDocument: pdfApiTypes.PDFDocumentProxy = await pdf.getDocument(pdfDocInitParams).promise;
     const targetedPageNumbers: number[] =
         props?.pagesToProcess !== undefined
             ? props.pagesToProcess

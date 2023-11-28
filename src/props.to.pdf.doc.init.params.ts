@@ -3,6 +3,11 @@ import { PDF_TO_PNG_OPTIONS_DEFAULTS } from './const';
 import { PdfToPngOptions } from './types/pdf.to.png.options';
 import { VerbosityLevel } from './types/verbosity.level';
 
+/**
+ * Converts the given `PdfToPngOptions` object to a `pdfApiTypes.DocumentInitParameters` object.
+ * @param props - The `PdfToPngOptions` object to convert.
+ * @returns The resulting `pdfApiTypes.DocumentInitParameters` object.
+ */
 export function propsToPdfDocInitParams(props?: PdfToPngOptions): pdfApiTypes.DocumentInitParameters {
     const cMapUrl = '../node_modules/pdfjs-dist/cmaps/';
     const cMapPacked = true;

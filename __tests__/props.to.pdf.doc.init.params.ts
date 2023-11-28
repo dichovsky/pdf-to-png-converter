@@ -1,3 +1,5 @@
+import { expect } from 'chai';
+import { test } from 'mocha';
 import { DocumentInitParameters } from 'pdfjs-dist/types/src/display/api';
 import { propsToPdfDocInitParams } from '../src/props.to.pdf.doc.init.params';
 import { PdfToPngOptions } from '../src/types/pdf.to.png.options';
@@ -157,6 +159,6 @@ for (const testData of testDataArray) {
     test(`should convert props to PdfDocInitParams when ${testData.id}`, async () => {
         const actualPdfDocInitParams: DocumentInitParameters = propsToPdfDocInitParams(testData.props);
 
-        expect(actualPdfDocInitParams).toStrictEqual(testData.expectedPdfDocInitParams);
+        expect(actualPdfDocInitParams).to.deep.equal(testData.expectedPdfDocInitParams);
     });
 }
