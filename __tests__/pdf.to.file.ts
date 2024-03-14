@@ -43,7 +43,7 @@ test(`should convert simple sample`, async () => {
     const pdfFilePath: string = resolve('./test-data/sample.pdf');
     const pngPages: PngPageOutput[] = await pdfToPng(pdfFilePath, {
         outputFolder: 'test-results/sample/actual',
-        disableFontFace: false,
+        disableFontFace: true,
         useSystemFonts: false,
         viewportScale: 2.0,
     });

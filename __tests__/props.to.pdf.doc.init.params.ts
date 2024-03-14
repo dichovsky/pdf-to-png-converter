@@ -1,12 +1,12 @@
 import { expect } from 'chai';
 import { test } from 'mocha';
-import { resolve } from 'node:path';
 import { DocumentInitParameters } from 'pdfjs-dist/types/src/display/api';
+import { DOCUMENT_INIT_PARAMS_DEFAULTS } from '../src/const';
 import { propsToPdfDocInitParams } from '../src/props.to.pdf.doc.init.params';
 import { PdfToPngOptions } from '../src/types/pdf.to.png.options';
 
-const cMapUrl: string = resolve('./node_modules/pdfjs-dist/standard_fonts/');
-const standardFontDataUrl: string = resolve('./node_modules/pdfjs-dist/cmaps/');
+const cMapUrl: string = DOCUMENT_INIT_PARAMS_DEFAULTS.cMapUrl as string;
+const standardFontDataUrl: string = DOCUMENT_INIT_PARAMS_DEFAULTS.standardFontDataUrl as string;
 
 const testDataArray: { id: string; props?: PdfToPngOptions; expectedPdfDocInitParams: DocumentInitParameters }[] = [
     {
