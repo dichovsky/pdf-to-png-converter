@@ -1,14 +1,20 @@
+import { expect } from 'chai';
+import { test } from 'mocha';
 import { DocumentInitParameters } from 'pdfjs-dist/types/src/display/api';
+import { DOCUMENT_INIT_PARAMS_DEFAULTS } from '../src/const';
 import { propsToPdfDocInitParams } from '../src/props.to.pdf.doc.init.params';
 import { PdfToPngOptions } from '../src/types/pdf.to.png.options';
+
+const cMapUrl: string = DOCUMENT_INIT_PARAMS_DEFAULTS.cMapUrl as string;
+const standardFontDataUrl: string = DOCUMENT_INIT_PARAMS_DEFAULTS.standardFontDataUrl as string;
 
 const testDataArray: { id: string; props?: PdfToPngOptions; expectedPdfDocInitParams: DocumentInitParameters }[] = [
     {
         id: 'props undefined',
         expectedPdfDocInitParams: {
-            cMapUrl: '../node_modules/pdfjs-dist/cmaps/',
+            cMapUrl,
             cMapPacked: true,
-            standardFontDataUrl: '../node_modules/pdfjs-dist/standard_fonts/',
+            standardFontDataUrl,
             verbosity: 0,
             disableFontFace: true,
             useSystemFonts: false,
@@ -20,9 +26,9 @@ const testDataArray: { id: string; props?: PdfToPngOptions; expectedPdfDocInitPa
         id: 'props are empty',
         props: {},
         expectedPdfDocInitParams: {
-            cMapUrl: '../node_modules/pdfjs-dist/cmaps/',
+            cMapUrl,
             cMapPacked: true,
-            standardFontDataUrl: '../node_modules/pdfjs-dist/standard_fonts/',
+            standardFontDataUrl,
             verbosity: 0,
             disableFontFace: true,
             useSystemFonts: false,
@@ -36,9 +42,9 @@ const testDataArray: { id: string; props?: PdfToPngOptions; expectedPdfDocInitPa
             viewportScale: 15,
         },
         expectedPdfDocInitParams: {
-            cMapUrl: '../node_modules/pdfjs-dist/cmaps/',
+            cMapUrl,
             cMapPacked: true,
-            standardFontDataUrl: '../node_modules/pdfjs-dist/standard_fonts/',
+            standardFontDataUrl,
             verbosity: 0,
             disableFontFace: true,
             useSystemFonts: false,
@@ -52,9 +58,9 @@ const testDataArray: { id: string; props?: PdfToPngOptions; expectedPdfDocInitPa
             disableFontFace: false,
         },
         expectedPdfDocInitParams: {
-            cMapUrl: '../node_modules/pdfjs-dist/cmaps/',
+            cMapUrl,
             cMapPacked: true,
-            standardFontDataUrl: '../node_modules/pdfjs-dist/standard_fonts/',
+            standardFontDataUrl,
             verbosity: 0,
             disableFontFace: false,
             useSystemFonts: false,
@@ -68,9 +74,9 @@ const testDataArray: { id: string; props?: PdfToPngOptions; expectedPdfDocInitPa
             useSystemFonts: true,
         },
         expectedPdfDocInitParams: {
-            cMapUrl: '../node_modules/pdfjs-dist/cmaps/',
+            cMapUrl,
             cMapPacked: true,
-            standardFontDataUrl: '../node_modules/pdfjs-dist/standard_fonts/',
+            standardFontDataUrl,
             verbosity: 0,
             disableFontFace: true,
             useSystemFonts: true,
@@ -84,9 +90,9 @@ const testDataArray: { id: string; props?: PdfToPngOptions; expectedPdfDocInitPa
             pdfFilePassword: '12345',
         },
         expectedPdfDocInitParams: {
-            cMapUrl: '../node_modules/pdfjs-dist/cmaps/',
+            cMapUrl,
             cMapPacked: true,
-            standardFontDataUrl: '../node_modules/pdfjs-dist/standard_fonts/',
+            standardFontDataUrl,
             verbosity: 0,
             disableFontFace: true,
             useSystemFonts: false,
@@ -100,9 +106,9 @@ const testDataArray: { id: string; props?: PdfToPngOptions; expectedPdfDocInitPa
             verbosityLevel: 1,
         },
         expectedPdfDocInitParams: {
-            cMapUrl: '../node_modules/pdfjs-dist/cmaps/',
+            cMapUrl,
             cMapPacked: true,
-            standardFontDataUrl: '../node_modules/pdfjs-dist/standard_fonts/',
+            standardFontDataUrl,
             verbosity: 1,
             disableFontFace: true,
             useSystemFonts: false,
@@ -116,9 +122,9 @@ const testDataArray: { id: string; props?: PdfToPngOptions; expectedPdfDocInitPa
             enableXfa: true,
         },
         expectedPdfDocInitParams: {
-            cMapUrl: '../node_modules/pdfjs-dist/cmaps/',
+            cMapUrl,
             cMapPacked: true,
-            standardFontDataUrl: '../node_modules/pdfjs-dist/standard_fonts/',
+            standardFontDataUrl,
             verbosity: 0,
             disableFontFace: true,
             useSystemFonts: false,
@@ -141,9 +147,9 @@ const testDataArray: { id: string; props?: PdfToPngOptions; expectedPdfDocInitPa
             verbosityLevel: 2,
         },
         expectedPdfDocInitParams: {
-            cMapUrl: '../node_modules/pdfjs-dist/cmaps/',
+            cMapUrl,
             cMapPacked: true,
-            standardFontDataUrl: '../node_modules/pdfjs-dist/standard_fonts/',
+            standardFontDataUrl,
             verbosity: 2,
             disableFontFace: false,
             useSystemFonts: true,
@@ -157,6 +163,6 @@ for (const testData of testDataArray) {
     test(`should convert props to PdfDocInitParams when ${testData.id}`, async () => {
         const actualPdfDocInitParams: DocumentInitParameters = propsToPdfDocInitParams(testData.props);
 
-        expect(actualPdfDocInitParams).toStrictEqual(testData.expectedPdfDocInitParams);
+        expect(actualPdfDocInitParams).to.deep.equal(testData.expectedPdfDocInitParams);
     });
 }
