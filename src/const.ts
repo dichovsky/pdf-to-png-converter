@@ -13,7 +13,7 @@ export const PDF_TO_PNG_OPTIONS_DEFAULTS: PdfToPngOptions = {
 };
 
 export const DOCUMENT_INIT_PARAMS_DEFAULTS: DocumentInitParameters = {
-    cMapUrl: join(__dirname, '../../node_modules/pdfjs-dist/cmaps/'),
+    cMapUrl: join(__dirname, '../../../node_modules/pdfjs-dist/cmaps/'),
     cMapPacked: true,
-    standardFontDataUrl: join(__dirname, '../../node_modules/pdfjs-dist/standard_fonts/'),
+    standardFontDataUrl: join(__dirname, '../../../node_modules/pdfjs-dist/standard_fonts/'),
 }
