@@ -3,8 +3,7 @@ on:
   push:
     branches-ignore:    
       - 'release/*' 
-permissions:
-  contents: write
+
 jobs:
   macos:
     runs-on: [self-hosted, macOS]
@@ -12,8 +11,12 @@ jobs:
       matrix:
         node: [ 18, 20 ]
     steps:
-      - uses: actions/checkout@v2
-      - name: Test on macos-11 Use Node.js ${{ matrix.node }}
+      - name : Checkout
+        uses: actions/checkout@v2
+        with:
+          ref: main
+          lfs: true
+      - name: Setup Node.js ${{ matrix.node }}
         uses: actions/setup-node@v2
         with:
           node-version: ${{ matrix.node }}
@@ -30,8 +33,12 @@ jobs:
       matrix:
         node: [ 18, 20 ]
     steps:
-      - uses: actions/checkout@v2
-      - name: Test on Ubuntu Use Node.js ${{ matrix.node }}
+      - name : Checkout
+        uses: actions/checkout@v2
+        with:
+          ref: main
+          lfs: true
+      - name: Setup Node.js ${{ matrix.node }}
         uses: actions/setup-node@v2
         with:
           node-version: ${{ matrix.node }}
@@ -48,8 +55,12 @@ jobs:
       matrix:
         node: [ 18, 20 ]
     steps:
-      - uses: actions/checkout@v2
-      - name: Test on Windows Use Node.js ${{ matrix.node }}
+      - name : Checkout
+        uses: actions/checkout@v2
+        with:
+          ref: main
+          lfs: true
+      - name: Setup Node.js ${{ matrix.node }}
         uses: actions/setup-node@v2
         with:
           node-version: ${{ matrix.node }}
