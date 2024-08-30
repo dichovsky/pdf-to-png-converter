@@ -166,9 +166,13 @@ for (const testData of testDataArray) {
         expect(actualPdfDocInitParams).to.deep.equal(testData.expectedPdfDocInitParams);
         
         const standardFonts = readdirSync(actualPdfDocInitParams.standardFontDataUrl as string, { recursive: true });
+        standardFonts.sort();
+        STANDARD_FONTS.sort();
         expect(standardFonts).to.deep.equal(STANDARD_FONTS);
 
         const cMap = readdirSync(actualPdfDocInitParams.cMapUrl as string, { recursive: true });
+        cMap.sort();
+        STANDARD_CMAPS.sort();
         expect(cMap).to.deep.equal(STANDARD_CMAPS);
     });
 }
