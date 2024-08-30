@@ -15,7 +15,7 @@ import { propsToPdfDocInitParams } from './props.to.pdf.doc.init.params';
  * @returns An array of objects containing information about each generated PNG image.
  */
 export async function pdfToPng(pdfFilePathOrBuffer: string | ArrayBufferLike, props?: PdfToPngOptions): Promise<PngPageOutput[]> {
-    const pdf = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs');
 
     const isBuffer: boolean = Buffer.isBuffer(pdfFilePathOrBuffer);
 
@@ -28,7 +28,8 @@ export async function pdfToPng(pdfFilePathOrBuffer: string | ArrayBufferLike, pr
 
     const canvasFactory = new NodeCanvasFactory();
     pdfDocInitParams.canvasFactory = canvasFactory;
-    const pdfDocument: pdfApiTypes.PDFDocumentProxy = await pdf.getDocument(pdfDocInitParams).promise;
+
+    const pdfDocument: pdfApiTypes.PDFDocumentProxy = await getDocument(pdfDocInitParams).promise;
     const targetedPageNumbers: number[] =
         props?.pagesToProcess !== undefined
             ? props.pagesToProcess
@@ -90,7 +91,7 @@ export async function pdfToPng(pdfFilePathOrBuffer: string | ArrayBufferLike, pr
 
         canvasFactory.destroy(canvasAndContext);
         page.cleanup();
-        
+
         if (props?.outputFolder) {
             pngPageOutput.path = resolve(props.outputFolder, pngPageOutput.name);
             await promises.writeFile(pngPageOutput.path, pngPageOutput.content);

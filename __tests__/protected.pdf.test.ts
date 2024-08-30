@@ -1,5 +1,4 @@
-import { expect } from 'chai';
-import { test } from 'mocha';
+import { expect, test } from 'vitest'
 import { resolve } from 'node:path';
 import { pdfToPng, PngPageOutput } from '../src';
 import { comparePNG } from '../src/compare.png';

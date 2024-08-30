@@ -1,7 +1,7 @@
-import { expect } from 'chai';
-import { test } from 'mocha';
+import { expect, test } from 'vitest'
+import { readdirSync } from 'node:fs';
 import { DocumentInitParameters } from 'pdfjs-dist/types/src/display/api';
-import { DOCUMENT_INIT_PARAMS_DEFAULTS } from '../src/const';
+import { DOCUMENT_INIT_PARAMS_DEFAULTS, STANDARD_CMAPS, STANDARD_FONTS } from '../src/const';
 import { propsToPdfDocInitParams } from '../src/props.to.pdf.doc.init.params';
 import { PdfToPngOptions } from '../src/types/pdf.to.png.options';
 
@@ -164,5 +164,15 @@ for (const testData of testDataArray) {
         const actualPdfDocInitParams: DocumentInitParameters = propsToPdfDocInitParams(testData.props);
 
         expect(actualPdfDocInitParams).to.deep.equal(testData.expectedPdfDocInitParams);
+        
+        const standardFonts = readdirSync(actualPdfDocInitParams.standardFontDataUrl as string, { recursive: true });
+        standardFonts.sort();
+        STANDARD_FONTS.sort();
+        expect(standardFonts).to.deep.equal(STANDARD_FONTS);
+
+        const cMap = readdirSync(actualPdfDocInitParams.cMapUrl as string, { recursive: true });
+        cMap.sort();
+        STANDARD_CMAPS.sort();
+        expect(cMap).to.deep.equal(STANDARD_CMAPS);
     });
 }
