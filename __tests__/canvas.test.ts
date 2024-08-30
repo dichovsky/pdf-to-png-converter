@@ -14,7 +14,7 @@ test('should reset the canvas width and height', () => {
 
     factory.reset(canvasAndContext, 300, 400);
 
-    expect(canvasAndContext.canvas).to.not.be.undefined;
+    expect(canvasAndContext!.canvas).toBeDefined();
     expect(canvasAndContext!.canvas!.width).to.equal(300);
     expect(canvasAndContext!.canvas!.height).to.equal(400);
 });
