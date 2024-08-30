@@ -3,6 +3,8 @@ on:
   push:
     branches-ignore:    
       - 'release/*' 
+permissions:
+  contents: write
 jobs:
   macos:
     runs-on: [self-hosted, macOS]
