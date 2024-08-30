@@ -5,7 +5,7 @@ on:
       - 'release/*' 
 jobs:
   macos:
-    runs-on: macos-11
+    runs-on: self-hosted, macOS
     strategy:
       matrix:
         node: [ 18, 20 ]
