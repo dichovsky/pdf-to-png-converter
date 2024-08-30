@@ -3,6 +3,4 @@ RUN apt-get update && apt-get install -y build-essential libcairo2-dev libpango1
 WORKDIR /usr/pkg/
 COPY . .
 RUN npm ci
-RUN npm run build
-
 CMD npm run docker:test
