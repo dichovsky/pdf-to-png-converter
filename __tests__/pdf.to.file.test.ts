@@ -1,5 +1,4 @@
-import { expect } from 'chai';
-import { test } from 'mocha';
+import { expect, test } from 'vitest'
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { PngPageOutput, pdfToPng } from '../src';

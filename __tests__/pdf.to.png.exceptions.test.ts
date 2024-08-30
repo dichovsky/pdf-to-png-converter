@@ -1,8 +1,6 @@
-import { test } from 'mocha';
+import { expect, test } from 'vitest'
 import { resolve } from 'node:path';
 import { pdfToPng } from '../src';
-import { expect } from 'chai';
-
 
 test(`should throw error when page index = 0 is requested`, async () => {
     const pdfFilePath: string = resolve('./test-data/large_pdf.pdf');

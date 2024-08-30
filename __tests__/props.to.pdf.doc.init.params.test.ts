@@ -1,5 +1,4 @@
-import { expect } from 'chai';
-import { test } from 'mocha';
+import { expect, test } from 'vitest'
 import { readdirSync } from 'node:fs';
 import { DocumentInitParameters } from 'pdfjs-dist/types/src/display/api';
 import { DOCUMENT_INIT_PARAMS_DEFAULTS, STANDARD_CMAPS, STANDARD_FONTS } from '../src/const';
