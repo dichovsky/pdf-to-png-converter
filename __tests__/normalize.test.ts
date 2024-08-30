@@ -5,7 +5,7 @@ test('should normalize path ending with slash', () => {
     const path = '/path/to/folder/';
     const normalizedPath: string = normalizePath(path);
     if (process.platform === 'win32') {
-        expect(normalizedPath).to.equal('C:\\path\\to\\folder\\');
+        expect(normalizedPath).to.equal(`${__dirname[0]}:\\path\\to\\folder\\`);
     } else {
         expect(normalizedPath).to.equal('/path/to/folder/');
     }
@@ -15,7 +15,7 @@ test('should normalize path without ending slash', () => {
     const path = '/path/to/folder';
     const normalizedPath: string = normalizePath(path);
     if (process.platform === 'win32') {
-        expect(normalizedPath).to.equal('C:\\path\\to\\folder\\');
+        expect(normalizedPath).to.equal(`${__dirname[0]}:\\path\\to\\folder\\`);
     } else {
         expect(normalizedPath).to.equal('/path/to/folder/');
     }
@@ -31,7 +31,7 @@ test('should normalize root path', () => {
     const normalizedPath: string = normalizePath(path);
 
     if (process.platform === 'win32') {
-        expect(normalizedPath).to.equal('C:\\');
+        expect(normalizedPath).to.equal(`${__dirname[0]}:\\`);
     } else {
         expect(normalizedPath).to.equal('/');
     }
@@ -39,8 +39,8 @@ test('should normalize root path', () => {
 
 if (process.platform === 'win32') {
     test('should append trailing backslash if path ends with backslash on Windows systems', () => {
-        const path = 'C:\\Windows\\';
+        const path = `${__dirname[0]}:\\Windows\\`;
         const normalizedPath = normalizePath(path);
-        expect(normalizedPath).to.equal('C:\\Windows\\');
+        expect(normalizedPath).to.equal(`${__dirname[0]}:\\Windows\\`);
     });
 }
