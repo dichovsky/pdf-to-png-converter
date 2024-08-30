@@ -9,12 +9,10 @@ jobs:
     runs-on: [self-hosted, macOS]
     strategy:
       matrix:
-        node: [ 18, 20 ]
+        node: [ 20 ]
     steps:
       - name : Checkout
         uses: actions/checkout@v2
-        with:
-          ref: main
       - name: Setup Node.js ${{ matrix.node }}
         uses: actions/setup-node@v2
         with:
@@ -30,12 +28,10 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node: [ 18, 20 ]
+        node: [ 18 ]
     steps:
       - name : Checkout
         uses: actions/checkout@v2
-        with:
-          ref: main
       - name: Setup Node.js ${{ matrix.node }}
         uses: actions/setup-node@v2
         with:
@@ -51,12 +47,10 @@ jobs:
     runs-on: windows-latest
     strategy:
       matrix:
-        node: [ 18, 20 ]
+        node: [ 16 ]
     steps:
       - name : Checkout
         uses: actions/checkout@v2
-        with:
-          ref: main
       - name: Setup Node.js ${{ matrix.node }}
         uses: actions/setup-node@v2
         with:
