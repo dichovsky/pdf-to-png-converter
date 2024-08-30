@@ -25,3 +25,9 @@ test('should normalize root path', () => {
     const normalizedPath: string = normalizePath(path);
     expect(normalizedPath).to.equal('/');
 });
+
+test('should append trailing backslash if path ends with backslash on Windows systems', () => {
+    const path = 'C:\\Users\\test\\Projects\\pdf-to-png-converter\\src\\';
+    const normalizedPath = normalizePath(path);
+    expect(normalizedPath).to.equal('C:\\Users\\test\\Projects\\pdf-to-png-converter\\src\\');
+});
