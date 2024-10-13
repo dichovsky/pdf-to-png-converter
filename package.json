@@ -27,6 +27,7 @@
   "scripts": {
     "prebuild": "npm run clean",
     "build": "tsc --pretty --project tsconfig.prod.json",
+    "build:test": "tsc --pretty --noEmit --project tsconfig.json",
     "clean": "rimraf ./out ./coverage ./test-results",
     "docker:build": "docker build --compress -t test-pdf-to-png-converter .",
     "predocker:run": "npm run clean",
