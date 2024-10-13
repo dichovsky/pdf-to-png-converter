@@ -1,6 +1,6 @@
-import { expect, test } from 'vitest'
 import { readdirSync } from 'node:fs';
 import { DocumentInitParameters } from 'pdfjs-dist/types/src/display/api';
+import { expect, test } from 'vitest';
 import { DOCUMENT_INIT_PARAMS_DEFAULTS, STANDARD_CMAPS, STANDARD_FONTS } from '../src/const';
 import { propsToPdfDocInitParams } from '../src/props.to.pdf.doc.init.params';
 import { PdfToPngOptions } from '../src/types/pdf.to.png.options';
@@ -18,7 +18,7 @@ const testDataArray: { id: string; props?: PdfToPngOptions; expectedPdfDocInitPa
             verbosity: 0,
             disableFontFace: true,
             useSystemFonts: false,
-            enableXfa: false,
+            enableXfa: true,
             password: undefined,
         },
     },
@@ -32,7 +32,7 @@ const testDataArray: { id: string; props?: PdfToPngOptions; expectedPdfDocInitPa
             verbosity: 0,
             disableFontFace: true,
             useSystemFonts: false,
-            enableXfa: false,
+            enableXfa: true,
             password: undefined,
         },
     },
@@ -48,7 +48,7 @@ const testDataArray: { id: string; props?: PdfToPngOptions; expectedPdfDocInitPa
             verbosity: 0,
             disableFontFace: true,
             useSystemFonts: false,
-            enableXfa: false,
+            enableXfa: true,
             password: undefined,
         },
     },
@@ -64,7 +64,7 @@ const testDataArray: { id: string; props?: PdfToPngOptions; expectedPdfDocInitPa
             verbosity: 0,
             disableFontFace: false,
             useSystemFonts: false,
-            enableXfa: false,
+            enableXfa: true,
             password: undefined,
         },
     },
@@ -80,7 +80,7 @@ const testDataArray: { id: string; props?: PdfToPngOptions; expectedPdfDocInitPa
             verbosity: 0,
             disableFontFace: true,
             useSystemFonts: true,
-            enableXfa: false,
+            enableXfa: true,
             password: undefined,
         },
     },
@@ -96,7 +96,7 @@ const testDataArray: { id: string; props?: PdfToPngOptions; expectedPdfDocInitPa
             verbosity: 0,
             disableFontFace: true,
             useSystemFonts: false,
-            enableXfa: false,
+            enableXfa: true,
             password: '12345',
         },
     },
@@ -112,7 +112,7 @@ const testDataArray: { id: string; props?: PdfToPngOptions; expectedPdfDocInitPa
             verbosity: 1,
             disableFontFace: true,
             useSystemFonts: false,
-            enableXfa: false,
+            enableXfa: true,
             password: undefined,
         },
     },
@@ -164,7 +164,7 @@ for (const testData of testDataArray) {
         const actualPdfDocInitParams: DocumentInitParameters = propsToPdfDocInitParams(testData.props);
 
         expect(actualPdfDocInitParams).to.deep.equal(testData.expectedPdfDocInitParams);
-        
+
         const standardFonts = readdirSync(actualPdfDocInitParams.standardFontDataUrl as string, { recursive: true });
         standardFonts.sort();
         STANDARD_FONTS.sort();

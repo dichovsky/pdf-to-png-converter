@@ -1,11 +1,8 @@
-import { Canvas, CanvasRenderingContext2D } from 'canvas';
 import { promises } from 'node:fs';
 import { parse, resolve } from 'node:path';
-import * as pdfApiTypes from 'pdfjs-dist/types/src/display/api';
-import * as pdfDisplayUtilsTypes from 'pdfjs-dist/types/src/display/display_utils';
 import { PdfToPngOptions, PngPageOutput } from '.';
 import { PDF_TO_PNG_OPTIONS_DEFAULTS } from './const';
-import { CanvasContext, NodeCanvasFactory } from './node.canvas.factory';
+import { NodeCanvasFactory } from './node.canvas.factory';
 import { propsToPdfDocInitParams } from './props.to.pdf.doc.init.params';
 
 /**
@@ -14,22 +11,25 @@ import { propsToPdfDocInitParams } from './props.to.pdf.doc.init.params';
  * @param props - Optional configuration options for the conversion process.
  * @returns An array of objects containing information about each generated PNG image.
  */
-export async function pdfToPng(pdfFilePathOrBuffer: string | ArrayBufferLike, props?: PdfToPngOptions): Promise<PngPageOutput[]> {
-    const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs');
-
+export async function pdfToPng(
+    pdfFilePathOrBuffer: string | ArrayBufferLike,
+    props?: PdfToPngOptions,
+): Promise<PngPageOutput[]> {
     const isBuffer: boolean = Buffer.isBuffer(pdfFilePathOrBuffer);
 
     const pdfFileBuffer: ArrayBuffer = isBuffer
         ? (pdfFilePathOrBuffer as ArrayBuffer)
         : await promises.readFile(pdfFilePathOrBuffer as string);
 
-    const pdfDocInitParams: pdfApiTypes.DocumentInitParameters = propsToPdfDocInitParams(props);
-    pdfDocInitParams.data = new Uint8Array(pdfFileBuffer);
+    const pdfDocInitParams = {
+        ...propsToPdfDocInitParams(props),
+        data: new Uint8Array(pdfFileBuffer),
+    };
 
-    const canvasFactory = new NodeCanvasFactory();
-    pdfDocInitParams.canvasFactory = canvasFactory;
+    const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    const pdfDocument = await getDocument(pdfDocInitParams).promise;
+    const canvasFactory = pdfDocument.canvasFactory as NodeCanvasFactory;
 
-    const pdfDocument: pdfApiTypes.PDFDocumentProxy = await getDocument(pdfDocInitParams).promise;
     const targetedPageNumbers: number[] =
         props?.pagesToProcess !== undefined
             ? props.pagesToProcess
@@ -45,16 +45,12 @@ export async function pdfToPng(pdfFilePathOrBuffer: string | ArrayBufferLike, pr
         await promises.mkdir(props.outputFolder, { recursive: true });
     }
 
-    let pageName;
-    if (props?.outputFileMask) {
-        pageName = props.outputFileMask;
-    }
-    if (!pageName && !isBuffer) {
-        pageName = parse(pdfFilePathOrBuffer as string).name;
-    }
-    if (!pageName) {
-        pageName = PDF_TO_PNG_OPTIONS_DEFAULTS.outputFileMask;
-    }
+    const outputFileMask: string =
+        props?.outputFileMask !== undefined
+            ? props.outputFileMask
+            : isBuffer
+                ? PDF_TO_PNG_OPTIONS_DEFAULTS.outputFileMask
+                : parse(pdfFilePathOrBuffer as string).name;
 
     const pngPagesOutput: PngPageOutput[] = [];
 
@@ -64,33 +60,21 @@ export async function pdfToPng(pdfFilePathOrBuffer: string | ArrayBufferLike, pr
             // This allows the use case "generate up to the first n pages from a set of input PDFs"
             continue;
         }
-        const page: pdfApiTypes.PDFPageProxy = await pdfDocument.getPage(pageNumber);
-        const viewport: pdfDisplayUtilsTypes.PageViewport = page.getViewport({
-            scale:
-                props?.viewportScale !== undefined
-                    ? props.viewportScale
-                    : (PDF_TO_PNG_OPTIONS_DEFAULTS.viewportScale as number),
+        const page = await pdfDocument.getPage(pageNumber);
+        const viewport = page.getViewport({
+            scale: props?.viewportScale !== undefined ? props.viewportScale : PDF_TO_PNG_OPTIONS_DEFAULTS.viewportScale,
         });
-        const canvasAndContext: CanvasContext = canvasFactory.create(viewport.width, viewport.height);
+        const { canvas, context } = canvasFactory.create(viewport.width, viewport.height);
 
-        const renderContext: pdfApiTypes.RenderParameters = {
-            canvasContext: canvasAndContext.context as CanvasRenderingContext2D,
-            viewport,
-        };
-
-        await page.render(renderContext).promise;
-
+        await page.render({ canvasContext: context, viewport }).promise;
         const pngPageOutput: PngPageOutput = {
             pageNumber,
-            name: `${pageName}_page_${pageNumber}.png`,
-            content: (canvasAndContext.canvas as Canvas).toBuffer(),
+            name: `${outputFileMask}_page_${pageNumber}.png`,
+            content: canvas.toBuffer(),
             path: '',
             width: viewport.width,
             height: viewport.height,
         };
-
-        canvasFactory.destroy(canvasAndContext);
-        page.cleanup();
 
         if (props?.outputFolder) {
             pngPageOutput.path = resolve(props.outputFolder, pngPageOutput.name);
@@ -98,6 +82,8 @@ export async function pdfToPng(pdfFilePathOrBuffer: string | ArrayBufferLike, pr
         }
 
         pngPagesOutput.push(pngPageOutput);
+
+        page.cleanup();
     }
     await pdfDocument.cleanup();
     return pngPagesOutput;

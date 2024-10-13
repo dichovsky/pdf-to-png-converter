@@ -1,12 +1,11 @@
 import { DocumentInitParameters } from 'pdfjs-dist/types/src/display/api';
 import { normalizePath } from './normalize.path';
-import { PdfToPngOptions } from './types/pdf.to.png.options';
 
-export const PDF_TO_PNG_OPTIONS_DEFAULTS: PdfToPngOptions = {
+export const PDF_TO_PNG_OPTIONS_DEFAULTS = {
     viewportScale: 1,
     disableFontFace: true,
     useSystemFonts: false,
-    enableXfa: false,
+    enableXfa: true,
     outputFileMask: 'buffer',
     strictPagesToProcess: false,
     pdfFilePassword: undefined,

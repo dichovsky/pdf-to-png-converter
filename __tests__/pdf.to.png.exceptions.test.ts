@@ -1,5 +1,5 @@
-import { expect, test } from 'vitest'
 import { resolve } from 'node:path';
+import { expect, test } from 'vitest';
 import { pdfToPng } from '../src';
 
 test(`should throw error when page index = 0 is requested`, async () => {
@@ -21,7 +21,7 @@ test(`should throw error when page index < 1 is requested`, async () => {
 test(`should throw error when page index > then file contains and strictPagesToProcess is enabled`, async () => {
     const pdfFilePath: string = resolve('./test-data/large_pdf.pdf');
 
-    await pdfToPng(pdfFilePath, { pagesToProcess: [1, 2, 1000], strictPagesToProcess: true }).catch((error: Error) => { 
+    await pdfToPng(pdfFilePath, { pagesToProcess: [1, 2, 1000], strictPagesToProcess: true }).catch((error: Error) => {
         expect(error.message).to.equal('Invalid pages requested, page number must be <= total pages');
     });
 });

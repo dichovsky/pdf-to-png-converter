@@ -1,5 +1,5 @@
-import { expect, test } from 'vitest'
 import { resolve } from 'node:path';
+import { expect, test } from 'vitest';
 import { pdfToPng, PngPageOutput } from '../src';
 import { comparePNG } from '../src/compare.png';
 
@@ -12,7 +12,11 @@ test(`should convert protected PDF To PNG`, async () => {
 
     pngPages.forEach((pngPage: PngPageOutput) => {
         const expectedFilePath: string = resolve('./test-data/protected.pdf/expected', pngPage.name);
-        const compareResult: number = comparePNG(pngPage.content, expectedFilePath);
+        const compareResult: number = comparePNG({
+            actualFile: pngPage.content,
+            expectedFile: expectedFilePath,
+            createExpectedFileIfMissing: true,
+        });
 
         expect(compareResult).to.equal(0);
     });
