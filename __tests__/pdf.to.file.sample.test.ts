@@ -4,14 +4,16 @@ import { expect, test } from 'vitest';
 import { PngPageOutput, pdfToPng } from '../src';
 import { comparePNG } from '../src/compare.png';
 
-test(`should convert PDF with layers`, async () => {
-    const pdfFilePath: string = resolve('./test-data/layers.pdf');
+test(`should convert simple sample`, async () => {
+    const pdfFilePath: string = resolve('./test-data/sample.pdf');
     const pngPages: PngPageOutput[] = await pdfToPng(pdfFilePath, {
-        outputFolder: 'test-results/layers/actual',
+        outputFolder: 'test-results/sample/actual',
+        viewportScale: 2.0,
     });
 
+    expect(pngPages.length).to.equal(2);
     pngPages.forEach((pngPage: PngPageOutput) => {
-        const expectedFilePath: string = resolve('./test-data/layers/expected', pngPage.name);
+        const expectedFilePath: string = resolve('./test-data/sample/expected', pngPage.name);
         const actualFileContent: Buffer = readFileSync(pngPage.path);
         const compareResult: number = comparePNG({
             actualFile: actualFileContent,

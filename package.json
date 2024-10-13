@@ -1,6 +1,6 @@
 {
   "name": "pdf-to-png-converter",
-  "version": "3.3.0",
+  "version": "3.5.0",
   "description": "Node.js utility to convert PDF file/buffer pages to PNG files/buffers with no native dependencies.",
   "keywords": [
     "pdf",
@@ -27,12 +27,11 @@
   "scripts": {
     "prebuild": "npm run clean",
     "build": "tsc --pretty --project tsconfig.prod.json",
-    "build:test": "tsc --pretty --noEmit --project tsconfig.test.json",
-    "clean": "npx rimraf ./out ./coverage ./test-results",
+    "build:test": "tsc --pretty --noEmit --project tsconfig.json",
+    "clean": "rimraf ./out ./coverage ./test-results",
     "docker:build": "docker build --compress -t test-pdf-to-png-converter .",
     "predocker:run": "npm run clean",
     "docker:run": "docker run --rm -it -v $PWD/test-results:/usr/pkg/test-results test-pdf-to-png-converter",
-    "predocker:test": "npm run build:test",
     "docker:test": "vitest run",
     "license-checker": "npx license-checker --production --onlyAllow 'MIT; MIT OR X11; BSD; ISC; Apache-2.0; Unlicense'",
     "lint": "eslint .",
@@ -42,19 +41,18 @@
     "test:docker": "npm run docker:build && npm run docker:run"
   },
   "dependencies": {
-    "canvas": "^2.11.2",
-    "pdfjs-dist": "^4.5.136"
+    "pdfjs-dist": "^4.7.76"
   },
   "devDependencies": {
-    "@types/node": "^20.16.2",
-    "@typescript-eslint/eslint-plugin": "^8.3.0",
-    "@typescript-eslint/parser": "^8.3.0",
-    "@vitest/coverage-v8": "^2.0.5",
-    "eslint": "^9.9.1",
-    "png-visual-compare": "^1.2.3",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.5.4",
-    "vitest": "^2.0.5"
+    "@types/node": "^22.7.5",
+    "@typescript-eslint/eslint-plugin": "^8.8.1",
+    "@typescript-eslint/parser": "^8.8.1",
+    "@vitest/coverage-v8": "^2.1.2",
+    "eslint": "^9.12.0",
+    "png-visual-compare": "^2.1.0",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.2"
   },
   "engines": {
     "node": ">=18.0.0"

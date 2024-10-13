@@ -1,6 +1,6 @@
-import { expect, test } from 'vitest'
 import { existsSync, readFileSync } from 'node:fs';
 import { parse, resolve } from 'node:path';
+import { expect, test } from 'vitest';
 import { PngPageOutput, pdfToPng } from '../src';
 import { comparePNG } from '../src/compare.png';
 import { PDF_TO_PNG_OPTIONS_DEFAULTS } from '../src/const';
@@ -18,7 +18,11 @@ test(`should convert PDF To PNG without saving to file, output file mask is not 
             'test-data/pdf.to.buffer/expected',
             pngPage.name.replace(PDF_TO_PNG_OPTIONS_DEFAULTS.outputFileMask as string, parse(pdfFilePath).name),
         );
-        const compareResult: number = comparePNG(pngPage.content, expectedFilePath);
+        const compareResult: number = comparePNG({
+            actualFile: pngPage.content,
+            expectedFile: expectedFilePath,
+            createExpectedFileIfMissing: false,
+        });
 
         expect(pngPage.name).to.equal(`${PDF_TO_PNG_OPTIONS_DEFAULTS.outputFileMask as string}_page_${index + 1}.png`);
         expect(existsSync(pngPage.path)).to.equal(false);
