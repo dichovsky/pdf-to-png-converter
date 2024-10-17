@@ -141,7 +141,6 @@ const testDataArray: { id: string; props?: PdfToPngOptions; expectedPdfDocInitPa
             enableXfa: true,
             pdfFilePassword: 'pdfFilePassword',
             outputFolder: 'outputFolder',
-            outputFileMask: 'outputFileMask',
             pagesToProcess: [1, 2, 3],
             strictPagesToProcess: true,
             verbosityLevel: 2,
