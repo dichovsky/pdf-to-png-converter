@@ -7,9 +7,22 @@ import { propsToPdfDocInitParams } from './props.to.pdf.doc.init.params';
 
 /**
  * Converts a PDF file to PNG images.
- * @param pdfFilePathOrBuffer - The path to the PDF file or a buffer containing the PDF file.
- * @param props - Optional configuration options for the conversion process.
- * @returns An array of objects containing information about each generated PNG image.
+ *
+ * @param pdfFilePathOrBuffer - The path to the PDF file or a buffer containing the PDF data.
+ * @param props - Optional properties to customize the conversion process.
+ * @returns A promise that resolves to an array of PNG page outputs.
+ *
+ * @throws Will throw an error if invalid pages are requested when `strictPagesToProcess` is true.
+ *
+ * @example
+ * ```typescript
+ * const pngPages = await pdfToPng('/path/to/pdf/file.pdf', {
+ *   pagesToProcess: [1, 2, 3],
+ *   outputFolder: '/path/to/output/folder',
+ *   viewportScale: 2.0,
+ *   outputFileMaskFunc: (pageNumber) => `custom_name_page_${pageNumber}.png`,
+ * });
+ * ```
  */
 export async function pdfToPng(
     pdfFilePathOrBuffer: string | ArrayBufferLike,
@@ -45,13 +58,6 @@ export async function pdfToPng(
         await promises.mkdir(props.outputFolder, { recursive: true });
     }
 
-    const outputFileMask: string =
-        props?.outputFileMask !== undefined
-            ? props.outputFileMask
-            : isBuffer
-                ? PDF_TO_PNG_OPTIONS_DEFAULTS.outputFileMask
-                : parse(pdfFilePathOrBuffer as string).name;
-
     const pngPagesOutput: PngPageOutput[] = [];
 
     for (const pageNumber of targetedPageNumbers) {
@@ -66,10 +72,17 @@ export async function pdfToPng(
         });
         const { canvas, context } = canvasFactory.create(viewport.width, viewport.height);
 
+        const name: string = props?.outputFileMaskFunc
+            ? props.outputFileMaskFunc(pageNumber)
+            : `${
+                  isBuffer 
+                    ? PDF_TO_PNG_OPTIONS_DEFAULTS.outputFileMask 
+                    : parse(pdfFilePathOrBuffer as string).name
+              }_page_${pageNumber}.png`;
         await page.render({ canvasContext: context, viewport }).promise;
         const pngPageOutput: PngPageOutput = {
             pageNumber,
-            name: `${outputFileMask}_page_${pageNumber}.png`,
+            name,
             content: canvas.toBuffer(),
             path: '',
             width: viewport.width,

@@ -5,7 +5,7 @@ export type PdfToPngOptions = {
     enableXfa?: boolean;
     pdfFilePassword?: string;
     outputFolder?: string;
-    outputFileMask?: string;
+    outputFileMaskFunc?: (pageNumber: number) => string;
     pagesToProcess?: number[];
     strictPagesToProcess?: boolean;
     verbosityLevel?: number;
