@@ -1,6 +1,6 @@
 {
   "name": "pdf-to-png-converter",
-  "version": "3.5.2",
+  "version": "3.6.0",
   "description": "Node.js utility to convert PDF file/buffer pages to PNG files/buffers with no native dependencies.",
   "keywords": [
     "pdf",
@@ -27,34 +27,35 @@
   "scripts": {
     "prebuild": "npm run clean",
     "build": "tsc --pretty --project tsconfig.prod.json",
+    "build:docker": "tsc --pretty --project tsconfig.prod.json",
     "build:test": "tsc --pretty --noEmit --project tsconfig.json",
     "clean": "rimraf ./out ./coverage ./test-results",
     "docker:build": "docker build --compress -t test-pdf-to-png-converter .",
-    "predocker:run": "npm run clean",
     "docker:run": "docker run --rm -it -v $PWD/test-results:/usr/pkg/test-results test-pdf-to-png-converter",
-    "docker:test": "vitest run",
+    "predocker:test": "npm run build:docker",
+    "docker:test": "vitest run --coverage",
     "license-checker": "npx license-checker --production --onlyAllow 'MIT; MIT OR X11; BSD; ISC; Apache-2.0; Unlicense'",
     "lint": "eslint .",
     "lint:fix": "npm run lint -- --fix",
-    "pretest": "npm run clean",
+    "pretest": "npm run build",
     "test": "vitest run --coverage",
-    "test:docker": "npm run docker:build && npm run docker:run"
+    "test:docker": "npm run clean && npm run docker:build && npm run docker:run"
   },
   "dependencies": {
-    "pdfjs-dist": "^4.7.76"
+    "pdfjs-dist": "^4.9.155"
   },
   "devDependencies": {
-    "@types/node": "^22.7.8",
-    "@typescript-eslint/eslint-plugin": "^8.11.0",
-    "@typescript-eslint/parser": "^8.11.0",
-    "@vitest/coverage-v8": "^2.1.3",
-    "eslint": "^9.13.0",
+    "@types/node": "^22.10.1",
+    "@typescript-eslint/eslint-plugin": "^8.17.0",
+    "@typescript-eslint/parser": "^8.17.0",
+    "@vitest/coverage-v8": "^2.1.8",
+    "eslint": "^9.16.0",
     "png-visual-compare": "^2.1.0",
     "rimraf": "^6.0.1",
-    "typescript": "^5.6.3",
-    "vitest": "^2.1.3"
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   }
 }
