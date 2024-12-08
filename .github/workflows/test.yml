@@ -1,45 +1,45 @@
 name: Tests on push
 on:
-  push:
-    branches-ignore:    
-      - 'release/*' 
-
+    push:
+        branches-ignore:
+            - 'release/*'
+    pull_request:
 jobs:
-  ubuntu:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node: [ 22 ]
-    steps:
-      - name : Checkout
-        uses: actions/checkout@v2
-      - name: Setup Node.js ${{ matrix.node }}
-        uses: actions/setup-node@v2
-        with:
-          node-version: ${{ matrix.node }}
-          cache: 'npm'
-      - name: Install dependencies
-        run: npm ci
-      - name: Build and lint
-        run: npm run build:test && npm run lint
-      - name: Test
-        run: npm test
-  windows:
-    runs-on: windows-latest
-    strategy:
-      matrix:
-        node: [ 20 ]
-    steps:
-      - name : Checkout
-        uses: actions/checkout@v2
-      - name: Setup Node.js ${{ matrix.node }}
-        uses: actions/setup-node@v2
-        with:
-          node-version: ${{ matrix.node }}
-          cache: 'npm'
-      - name: Install dependencies
-        run: npm ci
-      - name: Build and lint
-        run: npm run build:test && npm run lint
-      - name: Test
-        run: npm test
+    ubuntu:
+        runs-on: ubuntu-latest
+        strategy:
+            matrix:
+                node: [20, 22]
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+            - name: Setup Node.js ${{ matrix.node }}
+              uses: actions/setup-node@v4
+              with:
+                  node-version: ${{ matrix.node }}
+                  cache: 'npm'
+            - name: Install dependencies
+              run: npm ci
+            - name: Build and lint
+              run: npm run build:test && npm run lint
+            - name: Test
+              run: npm test
+    windows:
+        runs-on: windows-latest
+        strategy:
+            matrix:
+                node: [20, 22]
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+            - name: Setup Node.js ${{ matrix.node }}
+              uses: actions/setup-node@v4
+              with:
+                  node-version: ${{ matrix.node }}
+                  cache: 'npm'
+            - name: Install dependencies
+              run: npm ci
+            - name: Build and lint
+              run: npm run build:test && npm run lint
+            - name: Test
+              run: npm test
