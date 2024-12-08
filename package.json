@@ -1,6 +1,6 @@
 {
   "name": "pdf-to-png-converter",
-  "version": "3.5.2",
+  "version": "3.6.0",
   "description": "Node.js utility to convert PDF file/buffer pages to PNG files/buffers with no native dependencies.",
   "keywords": [
     "pdf",
@@ -41,7 +41,7 @@
     "test:docker": "npm run docker:build && npm run docker:run"
   },
   "dependencies": {
-    "pdfjs-dist": "^4.7.76"
+    "pdfjs-dist": "^4.9.155"
   },
   "devDependencies": {
     "@types/node": "^22.7.8",
