@@ -6,14 +6,6 @@ Node.js utility to convert PDF file/buffer pages to PNG files/buffers without bi
 
 ## Getting Started
 
-### macOS M1 Prerequisites
-
-macOS M1 dependencies prerequisites installation:
-
-```bash
-arch -arm64 brew install pkg-config cairo pango libpng librsvg
-```
-
 ### Package Installation
 
 Installation:
