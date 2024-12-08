@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test } from 'vitest';
 import { PngPageOutput, pdfToPng } from '../src';
-import { comparePNG } from '../src/compare.png';
+import { comparePNG } from '../src/comparePNG';
 
 test(`should convert simple sample`, async () => {
     const pdfFilePath: string = resolve('./test-data/sample.pdf');

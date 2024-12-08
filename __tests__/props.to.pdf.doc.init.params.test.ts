@@ -2,7 +2,7 @@ import { readdirSync } from 'node:fs';
 import { DocumentInitParameters } from 'pdfjs-dist/types/src/display/api';
 import { expect, test } from 'vitest';
 import { DOCUMENT_INIT_PARAMS_DEFAULTS, STANDARD_CMAPS, STANDARD_FONTS } from '../src/const';
-import { propsToPdfDocInitParams } from '../src/props.to.pdf.doc.init.params';
+import { propsToPdfDocInitParams } from '../src/propsToPdfDocInitParams';
 import { PdfToPngOptions } from '../src/types/pdf.to.png.options';
 
 const cMapUrl: string = DOCUMENT_INIT_PARAMS_DEFAULTS.cMapUrl as string;

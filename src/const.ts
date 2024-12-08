@@ -1,5 +1,5 @@
 import { DocumentInitParameters } from 'pdfjs-dist/types/src/display/api';
-import { normalizePath } from './normalize.path';
+import { normalizePath } from './normalizePath';
 
 export const PDF_TO_PNG_OPTIONS_DEFAULTS = {
     viewportScale: 1,
