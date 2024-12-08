@@ -75,15 +75,13 @@ export async function pdfToPng(
         const name: string = props?.outputFileMaskFunc
             ? props.outputFileMaskFunc(pageNumber)
             : `${
-                  isBuffer 
-                    ? PDF_TO_PNG_OPTIONS_DEFAULTS.outputFileMask 
-                    : parse(pdfFilePathOrBuffer as string).name
+                  isBuffer ? PDF_TO_PNG_OPTIONS_DEFAULTS.outputFileMask : parse(pdfFilePathOrBuffer as string).name
               }_page_${pageNumber}.png`;
         await page.render({ canvasContext: context, viewport }).promise;
         const pngPageOutput: PngPageOutput = {
             pageNumber,
             name,
-            content: canvas.toBuffer(),
+            content: canvas.toBuffer('image/png'),
             path: '',
             width: viewport.width,
             height: viewport.height,

@@ -41,7 +41,7 @@
     "test:docker": "npm run docker:build && npm run docker:run"
   },
   "dependencies": {
-    "pdfjs-dist": "^4.7.76"
+    "pdfjs-dist": "^4.9.155"
   },
   "devDependencies": {
     "@types/node": "^22.7.8",
