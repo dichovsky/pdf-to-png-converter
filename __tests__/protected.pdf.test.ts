@@ -1,7 +1,7 @@
 import { resolve } from 'node:path';
 import { expect, test } from 'vitest';
 import { pdfToPng, PngPageOutput } from '../src';
-import { comparePNG } from '../src/compare.png';
+import { comparePNG } from '../src/comparePNG';
 
 test(`should convert protected PDF To PNG`, async () => {
     const pdfFilePath: string = resolve('./test-data/large_pdf-protected.pdf');

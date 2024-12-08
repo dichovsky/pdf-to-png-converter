@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test } from 'vitest';
 import { PngPageOutput, pdfToPng } from '../src';
-import { comparePNG } from '../src/compare.png';
+import { comparePNG } from '../src/comparePNG';
 
 test(`should convert specific PDF pages To PNG files`, async () => {
     const pdfFilePath: string = resolve('./test-data/large_pdf.pdf');

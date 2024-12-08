@@ -2,8 +2,7 @@ import { promises as fsPromises } from 'node:fs';
 import { parse, resolve } from 'node:path';
 import { PDFDocumentProxy } from 'pdfjs-dist';
 import { PDF_TO_PNG_OPTIONS_DEFAULTS } from './const';
-import { NodeCanvasFactory } from './node.canvas.factory';
-import { propsToPdfDocInitParams } from './props.to.pdf.doc.init.params';
+import { propsToPdfDocInitParams } from './propsToPdfDocInitParams';
 import { PdfToPngOptions, PngPageOutput } from './types';
 
 /**
@@ -92,7 +91,7 @@ async function processPdfPage(
 ): Promise<PngPageOutput> {
     const page = await pdfDocument.getPage(pageNumber);
     const viewport = page.getViewport({ scale: pageViewportScale });
-    const { canvas, context } = (pdfDocument.canvasFactory as NodeCanvasFactory).create(viewport.width, viewport.height);
+    const { canvas, context } = (pdfDocument.canvasFactory as any).create(viewport.width, viewport.height);
 
     await page.render({ canvasContext: context, viewport }).promise;
     const pngPageOutput: PngPageOutput = {

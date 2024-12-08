@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { normalizePath } from '../src/normalize.path';
+import { normalizePath } from '../src/normalizePath';
 
 test('should normalize path ending with slash', () => {
     const path = '/path/to/folder/';

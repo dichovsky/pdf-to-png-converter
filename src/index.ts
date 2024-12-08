@@ -1,2 +1,2 @@
-export { pdfToPng } from './pdf.to.png';
+export { pdfToPng } from './pdfToPng';
 export * from './types';
