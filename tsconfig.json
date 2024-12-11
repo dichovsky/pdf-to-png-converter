@@ -1,5 +1,5 @@
 {
-  "extends": "@tsconfig/node20/tsconfig.json",
+  "extends": "@tsconfig/node22/tsconfig.json",
   "compilerOptions": {                                   /* Specify multiple folders that act like './node_modules/@types'. */
     "types": ["node"],                                   /* Specify type package names to be included without being referenced in a source file. */
     "declaration": true,                                 /* Generate .d.ts files from TypeScript and JavaScript files in your project. */
