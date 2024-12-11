@@ -1,6 +1,6 @@
 # pdf-to-png-converter
 
-Node.js utility to convert PDF file/buffer pages to PNG files/buffers without binary and OS dependencies (except macOS on arm64).
+A Node.js utility to convert PDF file/buffer pages to PNG files/buffers without binary and OS dependencies. This utility is ideal for applications that need to process and convert PDF documents into image formats for easier viewing, sharing, or further image processing. It supports various options for rendering fonts, handling encrypted PDFs, and specifying output details, making it a versatile tool for developers working with PDF files in different environments.
 
 [![Tests on push](https://github.com/dichovsky/pdf-to-png-converter/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/dichovsky/pdf-to-png-converter/actions/workflows/test.yml)
 
@@ -14,6 +14,8 @@ Installation:
 npm install -D pdf-to-png-converter
 ```
 
+**Note:** This package requires Node.js version 22 or higher.
+
 ## Example
 
 ```javascript
@@ -26,7 +28,7 @@ test(`Convert PDF To PNG`, async () => {
         enableXfa: false, // Render Xfa forms if any. Default value is false.
         viewportScale: 2.0, // The desired scale of PNG viewport. Default value is 1.0.
         outputFolder: 'output/folder', // Folder to write output PNG files. If not specified, PNG output will be available only as a Buffer content, without saving to a file.
-        outputFileMaskFunc, // Output filename mask function.
+        outputFileMaskFunc: (pageNum) => `page_${pageNum}.png`, // Function to generate custom output filenames. Example: (pageNum) => `page_${pageNum}.png`
         pdfFilePassword: 'pa$$word', // Password for encrypted PDF.
         pagesToProcess: [1, 3, 11], // Subset of pages to convert (first page = 1), other pages will be skipped if specified.
         strictPagesToProcess: false, // When `true`, will throw an error if specified page number in pagesToProcess is invalid, otherwise will skip invalid page. Default value is false.
@@ -45,7 +47,7 @@ The output of the `pdfToPng` function is an array of objects with the following 
     pageNumber: number; // Page number in PDF file
     name: string; // PNG page name (use outputFileMaskFunc to change it)
     content: Buffer; // PNG page Buffer content
-    path: string; // Path to the rendered PNG page file (empty string if outputFilesFolder is not provided)
+    path: string; // Path to the rendered PNG page file (empty string if outputFolder is not provided)
     width: number; // PNG page width
     height: number; // PNG page height
 }
