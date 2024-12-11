@@ -45,20 +45,20 @@
     "pdfjs-dist": "^4.9.155"
   },
   "devDependencies": {
-    "@tsconfig/node22": "^22.0.0",
+    "@tsconfig/recommended": "^1.0.8",
     "@types/eslint__eslintrc": "^2.1.2",
     "@types/node": "^22.10.1",
     "@typescript-eslint/eslint-plugin": "^8.18.0",
     "@typescript-eslint/parser": "^8.18.0",
     "@vitest/coverage-v8": "^2.1.8",
     "eslint": "^9.16.0",
-    "png-visual-compare": "^2.3.0",
+    "png-visual-compare": "^2.4.0",
     "rimraf": "^6.0.1",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
   },
   "engines": {
-    "node": ">=22",
+    "node": ">=20",
     "yarn": "please-use-npm"
   }
 }

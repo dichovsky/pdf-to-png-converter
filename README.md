@@ -14,7 +14,7 @@ Installation:
 npm install -D pdf-to-png-converter
 ```
 
-**Note:** This package requires Node.js version 22 or higher.
+**Note:** This package requires Node.js version 20 or higher.
 
 ## Example
 
