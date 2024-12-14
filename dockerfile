@@ -1,4 +1,4 @@
-FROM node:22
+FROM node:20
 WORKDIR /usr/pkg/
 COPY . .
 RUN npm ci
