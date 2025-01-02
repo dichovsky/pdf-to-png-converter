@@ -7,12 +7,12 @@ import { comparePNG } from '../src/comparePNG';
 test(`should convert simple sample`, async () => {
     const pdfFilePath: string = resolve('./test-data/sample.pdf');
     const pngPages: PngPageOutput[] = await pdfToPng(pdfFilePath, {
-        outputFolder: 'test-results/sample/actual',
+        outputFolder: resolve('./test-results/sample/actual'),
         viewportScale: 2.0,
     });
 
     expect(pngPages.length).to.equal(2);
-    pngPages.forEach((pngPage: PngPageOutput) => {
+    for (const pngPage of pngPages) {
         const expectedFilePath: string = resolve('./test-data/sample/expected', pngPage.name);
         const actualFileContent: Buffer = readFileSync(pngPage.path);
         const compareResult: number = comparePNG({
@@ -22,5 +22,5 @@ test(`should convert simple sample`, async () => {
         });
 
         expect(compareResult).to.equal(0);
-    });
+    }
 });

@@ -7,14 +7,14 @@ import { comparePNG } from '../src/comparePNG';
 test(`should convert specific PDF pages To PNG files`, async () => {
     const pdfFilePath: string = resolve('./test-data/large_pdf.pdf');
     const pngPages: PngPageOutput[] = await pdfToPng(pdfFilePath, {
-        outputFolder: 'test-results/pdf.pages.to.file/actual',
+        outputFolder: resolve('./test-results/pdf.pages.to.file/actual'),
         pagesToProcess: [-1, 0, 2, 5, 7, 99, 999999],
     });
 
     // Should skip page 99 since it's beyond PDF bounds
     expect(pngPages.length).to.equal(3);
 
-    pngPages.forEach((pngPage: PngPageOutput) => {
+    for (const pngPage of pngPages) {
         const expectedFilePath: string = resolve('./test-data/pdf.to.file/expected', pngPage.name);
         const actualFileContent: Buffer = readFileSync(pngPage.path);
         const compareResult: number = comparePNG({
@@ -24,5 +24,5 @@ test(`should convert specific PDF pages To PNG files`, async () => {
         });
 
         expect(compareResult).to.equal(0);
-    });
+    }
 });
