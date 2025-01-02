@@ -11,15 +11,17 @@ test(`should apply file mask is defined for pdf buffer`, async () => {
         outputFileMaskFunc: (pageNumber: number) => `custom_buffer_${pageNumber}.png`,
     });
 
-    pngPages.forEach((pngPage: PngPageOutput, index: number) => {
+    expect(pngPages.length).to.toBeGreaterThan(0);
+    for (const [index, pngPage] of pngPages.entries()) {
         expect(pngPage.name).to.equal(`custom_buffer_${index + 1}.png`);
-    });
+    }
 });
 
 test(`should apply default buffer name if outputFileMaskFunc is not defined for pdf buffer`, async () => {
     const pngPages: PngPageOutput[] = await pdfToPng(pdfBuffer);
 
-    pngPages.forEach((pngPage: PngPageOutput, index: number) => {
+    expect(pngPages.length).to.toBeGreaterThan(0);
+    for (const [index, pngPage] of pngPages.entries()) {
         expect(pngPage.name).to.equal(`buffer_page_${index + 1}.png`);
-    });
+    }
 });

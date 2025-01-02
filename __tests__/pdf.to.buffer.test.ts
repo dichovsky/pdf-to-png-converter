@@ -11,7 +11,8 @@ test(`should convert PDF To PNG buffer (without saving to file)`, async () => {
         viewportScale: 2.0,
     });
 
-    pngPages.forEach((pngPage: PngPageOutput) => {
+    expect(pngPages.length).to.toBeGreaterThan(0);
+    for (const pngPage of pngPages) {
         const expectedFilePath: string = resolve('./test-data/pdf.to.buffer/expected', pngPage.name);
         const compareResult: number = comparePNG({
             actualFile: pngPage.content,
@@ -21,5 +22,5 @@ test(`should convert PDF To PNG buffer (without saving to file)`, async () => {
 
         expect(existsSync(pngPage.path)).to.equal(false);
         expect(compareResult).to.equal(0);
-    });
+    }
 });

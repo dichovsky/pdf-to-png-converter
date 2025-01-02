@@ -6,11 +6,12 @@ import { comparePNG } from '../src/comparePNG';
 test(`should convert protected PDF To PNG`, async () => {
     const pdfFilePath: string = resolve('./test-data/large_pdf-protected.pdf');
     const pngPages: PngPageOutput[] = await pdfToPng(pdfFilePath, {
-        outputFolder: 'test-results/protected.pdf/actual',
+        outputFolder: resolve('./test-results/protected.pdf/actual'),
         pdfFilePassword: 'uES69xm545C/HP!',
     });
 
-    pngPages.forEach((pngPage: PngPageOutput) => {
+    expect(pngPages.length).to.toBeGreaterThan(0);
+    for (const pngPage of pngPages) {
         const expectedFilePath: string = resolve('./test-data/protected.pdf/expected', pngPage.name);
         const compareResult: number = comparePNG({
             actualFile: pngPage.content,
@@ -19,5 +20,5 @@ test(`should convert protected PDF To PNG`, async () => {
         });
 
         expect(compareResult).to.equal(0);
-    });
+    }
 });

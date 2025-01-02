@@ -4,6 +4,7 @@ import { PDFDocumentProxy } from 'pdfjs-dist';
 import { PDF_TO_PNG_OPTIONS_DEFAULTS } from './const';
 import { propsToPdfDocInitParams } from './propsToPdfDocInitParams';
 import { PdfToPngOptions, PngPageOutput } from './types';
+import { NodeCanvasFactory } from './node.canvas.factory';
 
 /**
  * Converts a PDF file to PNG images.
@@ -91,7 +92,8 @@ async function processPdfPage(
 ): Promise<PngPageOutput> {
     const page = await pdfDocument.getPage(pageNumber);
     const viewport = page.getViewport({ scale: pageViewportScale });
-    const { canvas, context } = (pdfDocument.canvasFactory as any).create(viewport.width, viewport.height);
+    const canvasFactory = new NodeCanvasFactory();
+    const { canvas, context } = canvasFactory.create(viewport.width, viewport.height);
 
     await page.render({ canvasContext: context, viewport }).promise;
     const pngPageOutput: PngPageOutput = {
@@ -104,5 +106,6 @@ async function processPdfPage(
     };
 
     page.cleanup();
+    canvasFactory.destroy({ canvas, context });
     return pngPageOutput;
 }
