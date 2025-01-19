@@ -25,9 +25,10 @@ import { NodeCanvasFactory } from './node.canvas.factory';
  * });
  * ```
  */
+
 export async function pdfToPng(pdfFile: string | ArrayBufferLike, props?: PdfToPngOptions): Promise<PngPageOutput[]> {
-    const isBuffer: boolean = Buffer.isBuffer(pdfFile);
-    const pdfFileBuffer: ArrayBuffer = isBuffer ? (pdfFile as ArrayBuffer) : (await fsPromises.readFile(pdfFile as string)).buffer;
+    const isString: boolean = typeof pdfFile == "string";
+    const pdfFileBuffer: ArrayBufferLike = isString ? (await fsPromises.readFile(pdfFile as string)).buffer : pdfFile as ArrayBufferLike;
     const pdfDocument = await getPdfDocument(pdfFileBuffer, props);
     // Get the pages to process based on the provided options, invalid pages will be filtered out
     const pagesToProcess: number[] = props?.pagesToProcess ?? Array.from({ length: pdfDocument.numPages }, (_, index) => index + 1);
@@ -43,7 +44,7 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike, props?: PdfToP
                 .map((pageNumber) => {
                     const pageViewportScale: number =
                         props?.viewportScale !== undefined ? props.viewportScale : PDF_TO_PNG_OPTIONS_DEFAULTS.viewportScale;
-                    const defaultMask: string = isBuffer ? PDF_TO_PNG_OPTIONS_DEFAULTS.outputFileMask : parse(pdfFile as string).name;
+                    const defaultMask: string = isString ? parse(pdfFile as string).name : PDF_TO_PNG_OPTIONS_DEFAULTS.outputFileMask;
                     const pageName: string = props?.outputFileMaskFunc?.(pageNumber) ?? `${defaultMask}_page_${pageNumber}.png`;
                     return processPdfPage(pdfDocument, pageName, pageNumber, pageViewportScale);
                 }),
@@ -75,7 +76,7 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike, props?: PdfToP
  * @param props - Optional properties to customize the PDF document initialization.
  * @returns A promise that resolves to a PDFDocumentProxy object representing the PDF document.
  */
-async function getPdfDocument(pdfFileBuffer: ArrayBuffer, props?: PdfToPngOptions): Promise<PDFDocumentProxy> {
+async function getPdfDocument(pdfFileBuffer: ArrayBufferLike, props?: PdfToPngOptions): Promise<PDFDocumentProxy> {
     const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs');
     const documentInitParameters = propsToPdfDocInitParams(props);
     return await getDocument({
