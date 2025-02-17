@@ -58,7 +58,6 @@
     "vitest": "^2.1.8"
   },
   "engines": {
-    "node": ">=20",
-    "yarn": "please-use-npm"
+    "node": ">=20"
   }
 }
