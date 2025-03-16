@@ -7,6 +7,5 @@ export type PdfToPngOptions = {
     outputFolder?: string;
     outputFileMaskFunc?: (pageNumber: number) => string;
     pagesToProcess?: number[];
-    strictPagesToProcess?: boolean;
     verbosityLevel?: number;
 };

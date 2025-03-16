@@ -32,6 +32,7 @@ import { NodeCanvasFactory } from './node.canvas.factory';
  */
 
 export async function pdfToPng(pdfFile: string | ArrayBufferLike, props?: PdfToPngOptions): Promise<PngPageOutput[]> {
+    // Read the PDF file and initialize the PDF document
     const isString: boolean = typeof pdfFile == 'string';
     const pdfFileBuffer: ArrayBufferLike = isString ? (await fsPromises.readFile(pdfFile as string)).buffer : (pdfFile as ArrayBufferLike);
     const pdfDocument = await getPdfDocument(pdfFileBuffer, props);
@@ -50,7 +51,6 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike, props?: PdfToP
             ? parse(pdfFile as string).name
             : PDF_TO_PNG_OPTIONS_DEFAULTS.outputFileMask;
         
-        // Process each page in parallel
         const pngPageOutputs: PngPageOutput[] = await Promise.all(
             validPagesToProcess.map((pageNumber) => {
                     const pageName: string = props?.outputFileMaskFunc?.(pageNumber) ?? `${defaultMask}_page_${pageNumber}.png`;
