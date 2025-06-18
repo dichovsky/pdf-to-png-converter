@@ -1,2 +1,3 @@
-export { pdfToPng } from './pdfToPng';
-export * from './types';
+export { pdfToPng, getPdfDocumentInfo, getPdfDocument } from './pdfToPng'
+export type { PdfDocumentInfo } from './pdfToPng'
+export * from './types'
