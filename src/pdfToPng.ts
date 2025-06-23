@@ -1,36 +1,29 @@
 import { promises as fsPromises } from 'node:fs';
-import { parse, resolve } from 'node:path';
+import { parse, posix } from 'node:path';
 import { PDFDocumentProxy } from 'pdfjs-dist';
 import { PDF_TO_PNG_OPTIONS_DEFAULTS } from './const';
+import { NodeCanvasFactory } from './node.canvas.factory';
 import { propsToPdfDocInitParams } from './propsToPdfDocInitParams';
 import { PdfToPngOptions, PngPageOutput } from './types';
-import { NodeCanvasFactory } from './node.canvas.factory';
 
 /**
- * Converts a PDF file to PNG images.
+ * Converts a PDF file to PNG images, one per page.
  *
- * @param {string | Buffer} pdfFile - The path to the PDF file or a buffer containing the PDF data.
- * @param {PdfToPngOptions} [props] - Optional properties to customize the conversion process.
- * @param {number[]} [props.pagesToProcess] - An array of page numbers to process.
- * @param {string} [props.outputFolder] - The folder where the output PNG files will be saved.
- * @param {number} [props.viewportScale] - The scale to apply to the page viewport.
- * @param {(pageNumber: number) => string} [props.outputFileMaskFunc] - A function to generate custom file names for the output PNG files.
- * @param {boolean} [props.strictPagesToProcess] - Whether to throw an error if invalid pages are requested.
- * @returns {Promise<PngPageOutput[]>} A promise that resolves to an array of PNG page outputs.
+ * @param pdfFile - The PDF file to convert. Can be a file path (string) or an ArrayBufferLike.
+ * @param props - Optional configuration options for the conversion process.
+ * @returns A promise that resolves to an array of `PngPageOutput` objects, each representing a PNG image of a PDF page.
  *
- * @throws Will throw an error if invalid pages are requested when `strictPagesToProcess` is true.
+ * @remarks
+ * - If `pdfFile` is a string, it is treated as a file path and read from disk.
+ * - The `props.pagesToProcess` option allows specifying which pages to convert (1-based indices).
+ * - The `props.viewportScale` option controls the rendering scale of the PDF pages.
+ * - The `props.outputFileMaskFunc` option allows customizing the output file name for each page.
+ * - If `props.outputFolder` is provided, the PNG files are saved to the specified folder.
+ * - The function processes pages in parallel for efficiency.
+ * - All resources are cleaned up after processing.
  *
- * @example
- * ```typescript
- * const pngPages = await pdfToPng('/path/to/pdf/file.pdf', {
- *   pagesToProcess: [1, 2, 3],
- *   outputFolder: '/path/to/output/folder',
- *   viewportScale: 2.0,
- *   outputFileMaskFunc: (pageNumber) => `custom_name_page_${pageNumber}.png`,
- * });
- * ```
+ * @throws Will throw if the PDF file cannot be read or processed.
  */
-
 export async function pdfToPng(pdfFile: string | ArrayBufferLike, props?: PdfToPngOptions): Promise<PngPageOutput[]> {
     // Read the PDF file and initialize the PDF document
     const isString: boolean = typeof pdfFile == 'string';
@@ -44,18 +37,15 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike, props?: PdfToP
     // Process each page in parallel
     const pngPagesOutput: PngPageOutput[] = [];
     try {
-        const pageViewportScale: number = props?.viewportScale !== undefined
-            ? props.viewportScale
-            : PDF_TO_PNG_OPTIONS_DEFAULTS.viewportScale;
-        const defaultMask: string = isString
-            ? parse(pdfFile as string).name
-            : PDF_TO_PNG_OPTIONS_DEFAULTS.outputFileMask;
-        
+        const pageViewportScale: number =
+            props?.viewportScale !== undefined ? props.viewportScale : PDF_TO_PNG_OPTIONS_DEFAULTS.viewportScale;
+        const defaultMask: string = isString ? parse(pdfFile as string).name : PDF_TO_PNG_OPTIONS_DEFAULTS.outputFileMask;
+
         const pngPageOutputs: PngPageOutput[] = await Promise.all(
             validPagesToProcess.map((pageNumber) => {
-                    const pageName: string = props?.outputFileMaskFunc?.(pageNumber) ?? `${defaultMask}_page_${pageNumber}.png`;
-                    return processPdfPage(pdfDocument, pageName, pageNumber, pageViewportScale);
-                }),
+                const pageName: string = props?.outputFileMaskFunc?.(pageNumber) ?? `${defaultMask}_page_${pageNumber}.png`;
+                return processPdfPage(pdfDocument, pageName, pageNumber, pageViewportScale);
+            }),
         );
         pngPagesOutput.push(...pngPageOutputs);
     } finally {
@@ -64,11 +54,12 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike, props?: PdfToP
 
     // Save the PNG files to the output folder
     if (props?.outputFolder !== undefined) {
-        await fsPromises.mkdir(props.outputFolder, { recursive: true });
+        const sanitizedOutputFolder: string = sanitizePath(process.cwd(), props.outputFolder);
+        await fsPromises.mkdir(sanitizedOutputFolder, { recursive: true });
 
         await Promise.all(
             pngPagesOutput.map(async (pngPageOutput) => {
-                pngPageOutput.path = resolve(props.outputFolder as string, pngPageOutput.name);
+                pngPageOutput.path = sanitizePath(sanitizedOutputFolder, pngPageOutput.name);
                 await fsPromises.writeFile(pngPageOutput.path, pngPageOutput.content);
             }),
         );
@@ -78,17 +69,18 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike, props?: PdfToP
 }
 
 /**
- * Asynchronously retrieves a PDF document from a given ArrayBuffer.
+ * Loads a PDF document from a given ArrayBuffer and returns a PDF.js document proxy.
  *
  * @param pdfFileBuffer - The buffer containing the PDF file data.
- * @param props - Optional properties to customize the PDF document initialization.
- * @param {PdfToPngOptions} [props] - The options for customizing the PDF to PNG conversion.
- * @param {number[]} [props.pagesToProcess] - An array of page numbers to process.
- * @param {string} [props.outputFolder] - The folder where the output PNG files will be saved.
- * @param {number} [props.viewportScale] - The scale to apply to the page viewport.
- * @param {(pageNumber: number) => string} [props.outputFileMaskFunc] - A function to generate custom file names for the output PNG files.
- * @param {boolean} [props.strictPagesToProcess] - Whether to throw an error if invalid pages are requested.
- * @returns {Promise<PDFDocumentProxy>} A promise that resolves to a PDFDocumentProxy object representing the PDF document.
+ * @param props - Optional configuration options for PDF loading.
+ * @returns A promise that resolves to a PDFDocumentProxy representing the loaded PDF.
+ *
+ * @remarks
+ * This function dynamically imports the PDF.js library and initializes the document
+ * using the provided buffer and options. The options are converted to PDF.js-compatible
+ * initialization parameters via `propsToPdfDocInitParams`.
+ *
+ * @throws Will throw if the PDF cannot be loaded or parsed.
  */
 async function getPdfDocument(pdfFileBuffer: ArrayBufferLike, props?: PdfToPngOptions): Promise<PDFDocumentProxy> {
     const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs');
@@ -100,13 +92,13 @@ async function getPdfDocument(pdfFileBuffer: ArrayBufferLike, props?: PdfToPngOp
 }
 
 /**
- * Processes a single page of a PDF document and converts it to a PNG image.
+ * Renders a specific page of a PDF document to a PNG image buffer.
  *
- * @param pdf - The PDF document proxy object representing the PDF document to be processed. This object provides methods to access the pages and other information about the PDF document.
- * @param pageName - The name to assign to the processed page.
- * @param pageNumber - The number of the page to process.
- * @param pageViewportScale - The scale to apply to the page viewport.
- * @returns A promise that resolves to an object containing the PNG image data and metadata.
+ * @param pdf - The PDF.js document proxy representing the loaded PDF.
+ * @param pageName - The name to associate with the rendered page.
+ * @param pageNumber - The 1-based index of the page to render.
+ * @param pageViewportScale - The scale factor to apply to the page viewport for rendering.
+ * @returns A promise that resolves to a `PngPageOutput` object containing the rendered PNG buffer and page metadata.
  */
 async function processPdfPage(pdf: PDFDocumentProxy, pageName: string, pageNumber: number, pageViewportScale: number) {
     const page = await pdf.getPage(pageNumber);
@@ -129,4 +121,26 @@ async function processPdfPage(pdf: PDFDocumentProxy, pageName: string, pageNumbe
         page.cleanup();
         canvasFactory.destroy({ canvas, context });
     }
+}
+
+/**
+ * Sanitizes and resolves a target file path against a base path, ensuring that the resulting path
+ * does not escape the base directory (prevents path traversal attacks). Converts all backslashes
+ * to forward slashes for POSIX compatibility, normalizes both paths, and resolves the target path
+ * relative to the base path. Throws an error if the resolved path is outside the base path.
+ *
+ * @param basePath - The base directory path to resolve against.
+ * @param targetPath - The target path to sanitize and resolve.
+ * @returns The resolved, sanitized absolute path within the base directory.
+ * @throws {Error} If the resolved path is outside the base directory (path traversal detected).
+ */
+export function sanitizePath(basePath: string, targetPath: string): string {
+    // Replace backslashes with forward slashes to ensure POSIX compatibility
+    const normalizedBasePath = posix.normalize(basePath);
+    const normalizedTargetPath = posix.normalize(targetPath.replace(/\\/g, posix.sep));
+    const resolvedPath = posix.resolve(normalizedBasePath, normalizedTargetPath);
+    if (!resolvedPath.startsWith(normalizedBasePath + posix.sep) && resolvedPath !== normalizedBasePath) {
+        throw new Error('Invalid path: Path traversal detected.');
+    }
+    return resolvedPath;
 }
