@@ -42,11 +42,11 @@
     "test:license": "npx --yes license-checker --production --onlyAllow \"ISC; MIT; MIT OR X11; BSD; Apache-2.0; Unlicense\""
   },
   "dependencies": {
-    "@napi-rs/canvas": "^0.1.71",
+    "@napi-rs/canvas": "^0.1.72",
     "pdfjs-dist": "^5.3.31"
   },
   "devDependencies": {
-    "@types/node": "^24.0.3",
+    "@types/node": "^24.0.4",
     "@typescript-eslint/eslint-plugin": "^8.35.0",
     "@typescript-eslint/parser": "^8.35.0",
     "@vitest/coverage-v8": "^3.2.4",
