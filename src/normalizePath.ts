@@ -11,7 +11,7 @@ export function normalizePath(path: string): string {
     if (path === '') {
         throw new Error('Path cannot be empty');
     }
-    const resolvedPath: string = (normalize(resolve( path)));
+    const resolvedPath: string = normalize(resolve( path));
 
     if (process.platform === 'win32') {
         if (resolvedPath.endsWith('\\')) {
