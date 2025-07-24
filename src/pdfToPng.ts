@@ -1,5 +1,5 @@
 import { promises as fsPromises } from 'node:fs';
-import { parse, posix } from 'node:path';
+import { join, parse } from 'node:path';
 import { PDFDocumentProxy } from 'pdfjs-dist';
 import { PDF_TO_PNG_OPTIONS_DEFAULTS } from './const';
 import { NodeCanvasFactory } from './node.canvas.factory';
@@ -24,10 +24,22 @@ import { PdfToPngOptions, PngPageOutput } from './types';
  *
  * @throws Will throw if the PDF file cannot be read or processed.
  */
-export async function pdfToPng(pdfFile: string | ArrayBufferLike, props?: PdfToPngOptions): Promise<PngPageOutput[]> {
+export async function pdfToPng(pdfFile: string | ArrayBufferLike | Buffer, props?: PdfToPngOptions): Promise<PngPageOutput[]> {
     // Read the PDF file and initialize the PDF document
     const isString: boolean = typeof pdfFile == 'string';
-    const pdfFileBuffer: ArrayBufferLike = isString ? (await fsPromises.readFile(pdfFile as string)).buffer : (pdfFile as ArrayBufferLike);
+    const pdfFileBuffer: ArrayBufferLike = isString
+        ? await (async () => {
+            const buffer = await fsPromises.readFile(pdfFile as string);
+            // Ensure we always return an ArrayBuffer
+            if (buffer instanceof ArrayBuffer) {
+                return buffer;
+            } else if (Buffer.isBuffer(buffer)) {
+                return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+            } else {
+                throw new Error('Unsupported buffer type');
+            }
+        })()
+        : (pdfFile as ArrayBufferLike);
     const pdfDocument = await getPdfDocument(pdfFileBuffer, props);
 
     // Get the pages to process based on the provided options, invalid pages will be filtered out
@@ -54,12 +66,12 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike, props?: PdfToP
 
     // Save the PNG files to the output folder
     if (props?.outputFolder !== undefined) {
-        const sanitizedOutputFolder: string = sanitizePath(process.cwd(), props.outputFolder);
-        await fsPromises.mkdir(sanitizedOutputFolder, { recursive: true });
+        const outputFolder: string = join(process.cwd(), props.outputFolder);
+        await fsPromises.mkdir(outputFolder, { recursive: true });
 
         await Promise.all(
             pngPagesOutput.map(async (pngPageOutput) => {
-                pngPageOutput.path = sanitizePath(sanitizedOutputFolder, pngPageOutput.name);
+                pngPageOutput.path = join(outputFolder, pngPageOutput.name);
                 await fsPromises.writeFile(pngPageOutput.path, pngPageOutput.content);
             }),
         );
@@ -121,26 +133,4 @@ async function processPdfPage(pdf: PDFDocumentProxy, pageName: string, pageNumbe
         page.cleanup();
         canvasFactory.destroy({ canvas, context });
     }
-}
-
-/**
- * Sanitizes and resolves a target file path against a base path, ensuring that the resulting path
- * does not escape the base directory (prevents path traversal attacks). Converts all backslashes
- * to forward slashes for POSIX compatibility, normalizes both paths, and resolves the target path
- * relative to the base path. Throws an error if the resolved path is outside the base path.
- *
- * @param basePath - The base directory path to resolve against.
- * @param targetPath - The target path to sanitize and resolve.
- * @returns The resolved, sanitized absolute path within the base directory.
- * @throws {Error} If the resolved path is outside the base directory (path traversal detected).
- */
-export function sanitizePath(basePath: string, targetPath: string): string {
-    // Replace backslashes with forward slashes to ensure POSIX compatibility
-    const normalizedBasePath = posix.normalize(basePath);
-    const normalizedTargetPath = posix.normalize(targetPath.replace(/\\/g, posix.sep));
-    const resolvedPath = posix.resolve(normalizedBasePath, normalizedTargetPath);
-    if (!resolvedPath.startsWith(normalizedBasePath + posix.sep) && resolvedPath !== normalizedBasePath) {
-        throw new Error('Invalid path: Path traversal detected.');
-    }
-    return resolvedPath;
 }
