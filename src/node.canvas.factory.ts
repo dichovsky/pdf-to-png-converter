@@ -31,6 +31,7 @@ export class NodeCanvasFactory {
         assert.ok(width > 0 && height > 0, 'Canvas width and height must be greater than zero');
         canvasAndContext.canvas.width = width;
         canvasAndContext.canvas.height = height;
+        canvasAndContext.context = canvasAndContext.canvas.getContext('2d');
     }
 
     /**

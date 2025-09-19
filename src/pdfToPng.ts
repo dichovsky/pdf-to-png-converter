@@ -29,16 +29,16 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike | Buffer, props
     const isString: boolean = typeof pdfFile == 'string';
     const pdfFileBuffer: ArrayBufferLike = isString
         ? await (async () => {
-            const buffer = await fsPromises.readFile(pdfFile as string);
-            // Ensure we always return an ArrayBuffer
-            if (buffer instanceof ArrayBuffer) {
-                return buffer;
-            } else if (Buffer.isBuffer(buffer)) {
-                return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
-            } else {
-                throw new Error('Unsupported buffer type');
-            }
-        })()
+              const buffer = await fsPromises.readFile(pdfFile as string);
+              // Ensure we always return an ArrayBuffer
+              if (buffer instanceof ArrayBuffer) {
+                  return buffer;
+              } else if (Buffer.isBuffer(buffer)) {
+                  return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+              } else {
+                  throw new Error('Unsupported buffer type');
+              }
+          })()
         : (pdfFile as ArrayBufferLike);
     const pdfDocument = await getPdfDocument(pdfFileBuffer, props);
 
@@ -115,11 +115,12 @@ async function getPdfDocument(pdfFileBuffer: ArrayBufferLike, props?: PdfToPngOp
 async function processPdfPage(pdf: PDFDocumentProxy, pageName: string, pageNumber: number, pageViewportScale: number) {
     const page = await pdf.getPage(pageNumber);
     const viewport = page.getViewport({ scale: pageViewportScale });
-    const canvasFactory = new NodeCanvasFactory();
+    const canvasFactory = pdf.canvasFactory ? (pdf.canvasFactory as NodeCanvasFactory) : new NodeCanvasFactory();
+
     const { canvas, context } = canvasFactory.create(viewport.width, viewport.height);
 
     try {
-        await page.render({ canvasContext: context, viewport }).promise;
+        await page.render({ canvasContext: context, viewport, canvas }).promise;
         const pngPageOutput: PngPageOutput = {
             pageNumber,
             name: pageName,

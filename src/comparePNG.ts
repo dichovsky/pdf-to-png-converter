@@ -24,7 +24,7 @@ export function comparePNG({
     if (createExpectedFileIfMissing && !existsSync(expectedFile)) {
         const expectedFileDir = parse(expectedFile).dir;
         mkdirSync(expectedFileDir, { recursive: true });
-        const actualBuffer: Buffer = typeof actualFile === 'string' ? readFileSync(actualFile) : actualFile;
+        const actualBuffer = typeof actualFile === 'string' ? readFileSync(actualFile) : actualFile;
         writeFileSync(expectedFile, actualBuffer);
     }
     return comparePng(actualFile, expectedFile, opts);

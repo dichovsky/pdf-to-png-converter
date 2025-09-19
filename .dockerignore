@@ -3,5 +3,3 @@ test-results
 coverage
 out
 .vscode
-.github
-.devcontainer
