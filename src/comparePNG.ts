@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { parse } from 'node:path';
-import comparePng, { ComparePngOptions } from 'png-visual-compare';
+import { type ComparePngOptions, comparePng } from 'png-visual-compare';
 
 /**
  * Compares a PNG image with an expected PNG image.

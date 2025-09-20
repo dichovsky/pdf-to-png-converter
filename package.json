@@ -1,6 +1,6 @@
 {
   "name": "pdf-to-png-converter",
-  "version": "3.8.0",
+  "version": "3.9.0",
   "description": "Node.js utility to convert PDF file/buffer pages to PNG files/buffers with no native dependencies.",
   "keywords": [
     "pdf",
@@ -29,9 +29,8 @@
   ],
   "scripts": {
     "prebuild": "npm run clean",
-    "build": "tsc --pretty --project tsconfig.prod.json",
-    "build:docker": "tsc --pretty --project tsconfig.prod.json",
-    "build:test": "tsc --pretty --noEmit --project tsconfig.json",
+    "build": "tsc --pretty --project tsconfig.json",
+    "build:docker": "tsc --pretty --project tsconfig.json",
     "clean": "rimraf ./out ./coverage ./test-results",
     "docker:build": "docker build --compress -t test-pdf-to-png-converter .",
     "docker:run": "docker run --rm -it -v ${PWD}/test-results:/usr/pkg/test-results test-pdf-to-png-converter",
@@ -53,7 +52,7 @@
     "@typescript-eslint/parser": "^8.44.0",
     "@vitest/coverage-v8": "^3.2.4",
     "eslint": "^9.36.0",
-    "png-visual-compare": "^2.5.1",
+    "png-visual-compare": "^3.1.0",
     "rimraf": "^6.0.1",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"

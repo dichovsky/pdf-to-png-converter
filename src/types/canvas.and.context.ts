@@ -1,4 +1,4 @@
-import { Canvas, SKRSContext2D } from '@napi-rs/canvas';
+import { Canvas, type SKRSContext2D } from '@napi-rs/canvas';
 
 export type CanvasAndContext = {
     canvas: Canvas | null;

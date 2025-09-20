@@ -1,5 +1,5 @@
 import { readdirSync } from 'node:fs';
-import { DocumentInitParameters } from 'pdfjs-dist/types/src/display/api';
+import type { DocumentInitParameters } from 'pdfjs-dist/types/src/display/api';
 import { expect, test } from 'vitest';
 import { DOCUMENT_INIT_PARAMS_DEFAULTS, STANDARD_CMAPS, STANDARD_FONTS } from '../src/const';
 import { propsToPdfDocInitParams } from '../src/propsToPdfDocInitParams';

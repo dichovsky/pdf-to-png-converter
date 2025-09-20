@@ -1,6 +1,6 @@
 import { Canvas } from '@napi-rs/canvas';
 import { strict as assert } from 'node:assert';
-import { CanvasAndContext } from './types';
+import type { CanvasAndContext } from './types';
 
 export class NodeCanvasFactory {
     /**

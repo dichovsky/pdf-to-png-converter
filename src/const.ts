@@ -1,4 +1,4 @@
-import { DocumentInitParameters } from 'pdfjs-dist/types/src/display/api';
+import type { DocumentInitParameters } from 'pdfjs-dist/types/src/display/api';
 import { normalizePath } from './normalizePath';
 
 export const PDF_TO_PNG_OPTIONS_DEFAULTS = {

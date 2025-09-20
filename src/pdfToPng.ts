@@ -1,10 +1,10 @@
 import { promises as fsPromises } from 'node:fs';
 import { join, parse } from 'node:path';
-import { PDFDocumentProxy } from 'pdfjs-dist';
+import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { PDF_TO_PNG_OPTIONS_DEFAULTS } from './const';
 import { NodeCanvasFactory } from './node.canvas.factory';
 import { propsToPdfDocInitParams } from './propsToPdfDocInitParams';
-import { PdfToPngOptions, PngPageOutput } from './types';
+import type { PdfToPngOptions, PngPageOutput } from './types';
 
 /**
  * Converts a PDF file to PNG images, one per page.

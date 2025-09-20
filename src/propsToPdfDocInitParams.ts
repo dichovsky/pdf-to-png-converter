@@ -1,6 +1,6 @@
-import * as pdfApiTypes from 'pdfjs-dist/types/src/display/api';
+import type * as pdfApiTypes from 'pdfjs-dist/types/src/display/api';
 import { DOCUMENT_INIT_PARAMS_DEFAULTS, PDF_TO_PNG_OPTIONS_DEFAULTS } from './const';
-import { PdfToPngOptions } from './types/pdf.to.png.options';
+import type { PdfToPngOptions } from './types/pdf.to.png.options';
 import { VerbosityLevel } from './types/verbosity.level';
 
 /**
