@@ -1,25 +1,24 @@
 {
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "_version": "22.0.0",
   "compilerOptions": {
-    "strict": true,
-    "target": "ESNext",
     "lib": [
-      "ES2024"
+      "es2024",
+      "ESNext.Array",
+      "ESNext.Collection",
+      "ESNext.Iterator"
     ],
-    "allowJs": true,
-    "jsx": "preserve",
-    "esModuleInterop": true,
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "forceConsistentCasingInFileNames": true,
-    "useUnknownInCatchVariables": true,
-    "noImplicitOverride": true,
-    "verbatimModuleSyntax": true,
-    "declaration": true,
-    "skipLibCheck": true,
+    "module": "nodenext",
+    "target": "es2022",
     "types": [
       "node"
     ],
     "outDir": "./out",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "moduleResolution": "node16",
+    "declaration": true,
   },
   "include": [
     "./src/**/*"
