@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test } from 'vitest';
 import { PngPageOutput, pdfToPng } from '../src';
-import { comparePNG } from '../src/comparePNG';
+import { comparePNG } from './comparePNG';
 
 const pdfFilePath: string = resolve('./test-data/large_pdf.pdf');
 
