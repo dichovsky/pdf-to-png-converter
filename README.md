@@ -39,6 +39,7 @@ test(`Convert PDF To PNG`, async () => {
         pagesToProcess: [1, 3, 11], // Subset of pages to convert (first page = 1), other pages will be skipped if specified.
         strictPagesToProcess: false, // When `true`, will throw an error if specified page number in pagesToProcess is invalid, otherwise will skip invalid page. Default value is false.
         verbosityLevel: 0, // Verbosity level. ERRORS: 0, WARNINGS: 1, INFOS: 5. Default value is 0.
+        returnPageContent: true, // When `false`, the `content` buffer will not be returned in the output, which can save memory. Default value is true.
     });
     // Further processing of pngPages
 });
@@ -52,7 +53,7 @@ The output of the `pdfToPng` function is an array of objects with the following 
 {
     pageNumber: number; // Page number in PDF file
     name: string; // PNG page name (use outputFileMaskFunc to change it)
-    content: Buffer; // PNG page Buffer content
+    content?: Buffer; // PNG page Buffer content (optional, depends on `returnPageContent` option)
     path: string; // Path to the rendered PNG page file (empty string if outputFolder is not provided)
     width: number; // PNG page width
     height: number; // PNG page height

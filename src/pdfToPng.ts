@@ -7,22 +7,48 @@ import { propsToPdfDocInitParams } from './propsToPdfDocInitParams';
 import type { PdfToPngOptions, PngPageOutput } from './types';
 
 /**
- * Converts a PDF file to PNG images, one per page.
+ * Convert a PDF (file path, ArrayBuffer-like, or Node Buffer) into one or more PNG images.
  *
- * @param pdfFile - The PDF file to convert. Can be a file path (string) or an ArrayBufferLike.
- * @param props - Optional configuration options for the conversion process.
- * @returns A promise that resolves to an array of `PngPageOutput` objects, each representing a PNG image of a PDF page.
+ * The function:
+ * - Accepts a PDF specified as a filesystem path (string), an ArrayBuffer-like object, or a Node Buffer.
+ * - Normalizes input to an ArrayBuffer-like representation and opens the PDF via an internal document loader.
+ * - Determines which pages to render using props.pagesToProcess (or all pages by default) and filters out invalid page numbers.
+ * - Renders each valid page in parallel using a viewport scale (props.viewportScale or default) and an output file naming strategy
+ *   (props.outputFileMaskFunc, or a default mask derived from the input filename or default mask constant).
+ * - Cleans up the PDF document handle in a finally block to ensure resources are released.
+ * - Optionally writes PNG files to disk when props.outputFolder is provided (creating the folder recursively). When saving,
+ *   each returned PngPageOutput will have its path property set to the written file path and its content written as a Buffer.
+ * - Optionally omits in-memory image content from the returned objects when props.returnPageContent === false.
+ *
+ * @param pdfFile - A filesystem path to a PDF (string), an ArrayBuffer-like object, or a Node Buffer containing PDF bytes.
+ * @param props - Optional conversion options (PdfToPngOptions):
+ *   - pagesToProcess?: number[]         — specific page numbers to render (1-based). Defaults to all pages.
+ *   - viewportScale?: number           — scale factor for rendering the page viewport. Defaults to library default.
+ *   - outputFileMask?: string          — base filename mask to use when input is not a path.
+ *   - outputFileMaskFunc?: (n) => string — function to produce the output filename for a given page number.
+ *   - outputFolder?: string            — folder (relative to process.cwd()) to write PNG files into. If omitted, files are not written.
+ *   - returnPageContent?: boolean      — when false, the returned PngPageOutput objects will not include the binary content.
+ *
+ * @returns A promise that resolves to an array of PngPageOutput objects (one per processed page). Each object contains
+ *   metadata such as the output filename, binary content (unless omitted via options), and, when files are written, the file path.
  *
  * @remarks
- * - If `pdfFile` is a string, it is treated as a file path and read from disk.
- * - The `props.pagesToProcess` option allows specifying which pages to convert (1-based indices).
- * - The `props.viewportScale` option controls the rendering scale of the PDF pages.
- * - The `props.outputFileMaskFunc` option allows customizing the output file name for each page.
- * - If `props.outputFolder` is provided, the PNG files are saved to the specified folder.
- * - The function processes pages in parallel for efficiency.
- * - All resources are cleaned up after processing.
+ * - Page numbers are 1-based; invalid page numbers (<= 0 or > document page count) are ignored.
+ * - Rendering of pages is performed in parallel; callers should be mindful of memory and CPU usage for large documents or high parallelism.
+ * - If pdfFile is a string path, the implementation will attempt to derive a default filename mask from that path.
+ * - The function will always attempt to clean up PDF-related resources even if rendering or writing fails.
  *
- * @throws Will throw if the PDF file cannot be read or processed.
+ * @throws Will throw if:
+ *   - The pdfFile cannot be read when given as a string path.
+ *   - The supplied buffer type cannot be normalized to an ArrayBuffer-like object.
+ *   - PDF document loading or page rendering fails.
+ *   - Writing output files to disk fails (when outputFolder is specified).
+ *
+ * @example
+ * // Convert all pages and save to "./out"
+ * await pdfToPng("/path/to/file.pdf", { outputFolder: "./out" });
+ *
+ * @see PdfToPngOptions, PngPageOutput, getPdfDocument
  */
 export async function pdfToPng(pdfFile: string | ArrayBufferLike | Buffer, props?: PdfToPngOptions): Promise<PngPageOutput[]> {
     // Read the PDF file and initialize the PDF document
@@ -72,9 +98,15 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike | Buffer, props
         await Promise.all(
             pngPagesOutput.map(async (pngPageOutput) => {
                 pngPageOutput.path = join(outputFolder, pngPageOutput.name);
-                await fsPromises.writeFile(pngPageOutput.path, pngPageOutput.content);
+                await fsPromises.writeFile(pngPageOutput.path, pngPageOutput.content as Buffer);
             }),
         );
+    }
+
+    if (props?.returnPageContent === false) {
+        for (const pngPageOutput of pngPagesOutput) {
+            delete pngPageOutput.content;
+        }
     }
 
     return pngPagesOutput;
