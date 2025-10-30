@@ -102,12 +102,14 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike | Buffer, props
                     throw new Error(`Cannot write PNG file "${pngPageOutput.path}" because content is undefined.`);
                 }
                 await fsPromises.writeFile(pngPageOutput.path, pngPageOutput.content as Buffer);
-
-                if (props?.returnPageContent === false) {
-                    delete pngPageOutput.content;
-                }
             }),
         );
+
+        if (props?.returnPageContent === false) {
+            for (const pngPageOutput of pngPagesOutput) {
+                delete pngPageOutput.content;
+            }
+        }
     }
 
     return pngPagesOutput;
