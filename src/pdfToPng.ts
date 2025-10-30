@@ -98,6 +98,9 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike | Buffer, props
         await Promise.all(
             pngPagesOutput.map(async (pngPageOutput) => {
                 pngPageOutput.path = join(outputFolder, pngPageOutput.name);
+                if (pngPageOutput.content === undefined) {
+                    throw new Error(`Cannot write PNG file "${pngPageOutput.path}" because content is undefined.`);
+                }
                 await fsPromises.writeFile(pngPageOutput.path, pngPageOutput.content as Buffer);
 
                 if (props?.returnPageContent === false) {
