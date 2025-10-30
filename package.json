@@ -31,6 +31,7 @@
     "prebuild": "npm run clean",
     "build": "tsc --pretty --project tsconfig.json",
     "build:docker": "tsc --pretty --project tsconfig.json",
+    "build:test": "tsc --pretty --noEmit --project tsconfig.json",
     "clean": "rimraf ./out ./coverage ./test-results",
     "docker:build": "docker build --compress -t test-pdf-to-png-converter .",
     "docker:run": "docker run --rm -it -v ${PWD}/test-results:/usr/pkg/test-results test-pdf-to-png-converter",
