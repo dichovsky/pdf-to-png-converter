@@ -105,6 +105,8 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike | Buffer, props
             }),
         );
 
+        // Note: Content deletion must occur after file writing to ensure the content is available
+        // for fsPromises.writeFile above. This ordering is intentional to prevent writing undefined content.
         if (props?.returnPageContent === false) {
             for (const pngPageOutput of pngPagesOutput) {
                 delete pngPageOutput.content;
