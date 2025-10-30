@@ -99,14 +99,12 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike | Buffer, props
             pngPagesOutput.map(async (pngPageOutput) => {
                 pngPageOutput.path = join(outputFolder, pngPageOutput.name);
                 await fsPromises.writeFile(pngPageOutput.path, pngPageOutput.content as Buffer);
+
+                if (props?.returnPageContent === false) {
+                    delete pngPageOutput.content;
+                }
             }),
         );
-    }
-
-    if (props?.returnPageContent === false) {
-        for (const pngPageOutput of pngPagesOutput) {
-            delete pngPageOutput.content;
-        }
     }
 
     return pngPagesOutput;
