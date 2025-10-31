@@ -82,7 +82,7 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike | Buffer, props
         const pngPageOutputs: PngPageOutput[] = await Promise.all(
             validPagesToProcess.map((pageNumber) => {
                 const pageName: string = props?.outputFileMaskFunc?.(pageNumber) ?? `${defaultMask}_page_${pageNumber}.png`;
-                return processPdfPage(pdfDocument, pageName, pageNumber, pageViewportScale);
+                return processPdfPage(pdfDocument, pageName, pageNumber, pageViewportScale, props?.returnPageContent ?? true);
             }),
         );
         pngPagesOutput.push(...pngPageOutputs);
@@ -104,12 +104,6 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike | Buffer, props
                 await fsPromises.writeFile(pngPageOutput.path, pngPageOutput.content as Buffer);
             }),
         );
-
-        if (props?.returnPageContent === false) {
-            for (const pngPageOutput of pngPagesOutput) {
-                delete pngPageOutput.content;
-            }
-        }
     }
 
     return pngPagesOutput;
@@ -147,7 +141,7 @@ async function getPdfDocument(pdfFileBuffer: ArrayBufferLike, props?: PdfToPngOp
  * @param pageViewportScale - The scale factor to apply to the page viewport for rendering.
  * @returns A promise that resolves to a `PngPageOutput` object containing the rendered PNG buffer and page metadata.
  */
-async function processPdfPage(pdf: PDFDocumentProxy, pageName: string, pageNumber: number, pageViewportScale: number) {
+async function processPdfPage(pdf: PDFDocumentProxy, pageName: string, pageNumber: number, pageViewportScale: number, returnPageContent: boolean) {
     const page = await pdf.getPage(pageNumber);
     const viewport = page.getViewport({ scale: pageViewportScale });
     const canvasFactory = pdf.canvasFactory ? (pdf.canvasFactory as NodeCanvasFactory) : new NodeCanvasFactory();
@@ -159,7 +153,7 @@ async function processPdfPage(pdf: PDFDocumentProxy, pageName: string, pageNumbe
         const pngPageOutput: PngPageOutput = {
             pageNumber,
             name: pageName,
-            content: canvas!.toBuffer('image/png'),
+            content: returnPageContent ? canvas!.toBuffer('image/png') : undefined,
             path: '',
             width: viewport.width,
             height: viewport.height,
