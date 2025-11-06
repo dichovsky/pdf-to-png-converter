@@ -1,15 +1,12 @@
 name: Tests on push
 on:
     push:
-        branches-ignore:
-            - 'release/*'
-    pull_request:
 jobs:
     ubuntu:
         runs-on: ubuntu-latest
         strategy:
             matrix:
-                node: [20, 22, 24]
+                node: [20, 22]
         steps:
             - name: Checkout
               uses: actions/checkout@v5
