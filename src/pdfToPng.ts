@@ -78,7 +78,7 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike, props?: PdfToP
             ? props.viewportScale 
             : PDF_TO_PNG_OPTIONS_DEFAULTS.viewportScale;
         const defaultMask: string = typeof pdfFile === 'string' 
-            ? parse(pdfFile as string).name 
+            ? parse(pdfFile).name 
             : PDF_TO_PNG_OPTIONS_DEFAULTS.outputFileMask;
         const pngPageOutputs: PngPageOutput[] = [];
         if (props?.processPagesInParallel === true) {
