@@ -8,6 +8,28 @@ test(`should convert PDF To PNG files`, async () => {
     const pdfFilePath: string = resolve('./test-data/large_pdf.pdf');
     const pngPages: PngPageOutput[] = await pdfToPng(pdfFilePath, {
         outputFolder: resolve('./test-results/pdf.to.file/actual'),
+        processPagesInParallel: false,
+    });
+
+    expect(pngPages.length).to.toBeGreaterThan(0);
+    for (const pngPage of pngPages) {
+        const expectedFilePath: string = resolve('./test-data/pdf.to.file/expected', pngPage.name);
+        const actualFileContent: Buffer = readFileSync(pngPage.path);
+        const compareResult: number = comparePNG({
+            actualFile: actualFileContent,
+            expectedFile: expectedFilePath,
+            createExpectedFileIfMissing: true,
+        });
+
+        expect(compareResult).to.equal(0);
+    }
+});
+
+test(`should convert PDF To PNG files in parallel mode`, async () => {
+    const pdfFilePath: string = resolve('./test-data/large_pdf.pdf');
+    const pngPages: PngPageOutput[] = await pdfToPng(pdfFilePath, {
+        outputFolder: resolve('./test-results/pdf.to.file/actual'),
+        processPagesInParallel: true,
     });
 
     expect(pngPages.length).to.toBeGreaterThan(0);
