@@ -1,9 +1,6 @@
 name: Tests on push
 on:
     push:
-        branches-ignore:
-            - 'release/*'
-    pull_request:
 jobs:
     ubuntu:
         runs-on: ubuntu-latest
