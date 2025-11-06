@@ -174,13 +174,32 @@ async function getPdfDocument(pdfFileBuffer: ArrayBufferLike, props?: PdfToPngOp
 }
 
 /**
- * Renders a specific page of a PDF document to a PNG image buffer.
+ * Renders a single page of a PDF document to an in-memory PNG (optionally) and returns page metadata.
  *
- * @param pdf - The PDF.js document proxy representing the loaded PDF.
- * @param pageName - The name to associate with the rendered page.
- * @param pageNumber - The 1-based index of the page to render.
- * @param pageViewportScale - The scale factor to apply to the page viewport for rendering.
- * @returns A promise that resolves to a `PngPageOutput` object containing the rendered PNG buffer and page metadata.
+ * This function:
+ * - Obtains the specified page from the provided PDF.js document (`PDFDocumentProxy`).
+ * - Creates a canvas and drawing context (using a `NodeCanvasFactory` provided on the `pdf` object or by instantiating a new one).
+ * - Renders the page into the canvas at the requested scale.
+ * - Optionally extracts a PNG buffer from the rendered canvas if `returnPageContent` is true.
+ * - Returns a `PngPageOutput` describing the page (including width, height, page number, name, and optional content).
+ * - Ensures resources are cleaned up (calls `page.cleanup()` and `canvasFactory.destroy(...)`) even if rendering fails.
+ *
+ * Remarks:
+ * - `pageNumber` is expected to be a 1-based page index as required by PDF.js `getPage`.
+ * - The returned `PngPageOutput.path` is intentionally set to an empty string and should be populated by the caller if a filesystem path is needed.
+ * - If `returnPageContent` is false, the `content` field of the returned object will be `undefined`.
+ * - Errors originating from `pdf.getPage(...)`, the render task, or canvas operations will propagate to the caller; resources are still cleaned up in such cases.
+ * - The function uses `page.getViewport({ scale: pageViewportScale })` so `width` and `height` reflect the viewport dimensions at the given scale.
+ *
+ * @param pdf - The PDF.js document proxy (`PDFDocumentProxy`) from which to obtain and render the page. May optionally expose a `canvasFactory` to control canvas creation/destruction.
+ * @param pageName - A human-readable name/identifier for the page (used in the returned `PngPageOutput.name`).
+ * @param pageNumber - The 1-based page index to render.
+ * @param pageViewportScale - The scale factor passed to `page.getViewport({ scale })` to control output resolution.
+ * @param returnPageContent - If true, the function will include a PNG buffer (`content`) in the returned `PngPageOutput`; otherwise `content` will be `undefined`.
+ *
+ * @returns A promise that resolves to a `PngPageOutput` containing page metadata and optionally the PNG image buffer.
+ *
+ * @throws If retrieving the page, creating the canvas/context, rendering the page, or converting the canvas to a PNG buffer fails.
  */
 async function processPdfPage(
     pdf: PDFDocumentProxy,
