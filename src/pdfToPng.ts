@@ -50,23 +50,10 @@ import type { PdfToPngOptions, PngPageOutput } from './types';
  *
  * @see PdfToPngOptions, PngPageOutput, getPdfDocument
  */
-export async function pdfToPng(pdfFile: string | ArrayBufferLike | Buffer, props?: PdfToPngOptions): Promise<PngPageOutput[]> {
+export async function pdfToPng(pdfFile: string | ArrayBufferLike, props?: PdfToPngOptions): Promise<PngPageOutput[]> {
     // Read the PDF file and initialize the PDF document
-    const isString: boolean = typeof pdfFile == 'string';
-    const pdfFileBuffer: ArrayBufferLike = isString
-        ? await (async () => {
-              const buffer = await fsPromises.readFile(pdfFile as string);
-              // Ensure we always return an ArrayBuffer
-              if (buffer instanceof ArrayBuffer) {
-                  return buffer;
-              } else if (Buffer.isBuffer(buffer)) {
-                  return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
-              } else {
-                  throw new Error('Unsupported buffer type');
-              }
-          })()
-        : (pdfFile as ArrayBufferLike);
-    const pdfDocument = await getPdfDocument(pdfFileBuffer, props);
+    const pdfFileBuffer: ArrayBufferLike = await getPdfFileBuffer(pdfFile);
+    const pdfDocument: PDFDocumentProxy = await getPdfDocument(pdfFileBuffer, props);
 
     // Get the pages to process based on the provided options, invalid pages will be filtered out
     const pagesToProcess: number[] = props?.pagesToProcess ?? Array.from({ length: pdfDocument.numPages }, (_, index) => index + 1);
@@ -75,10 +62,12 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike | Buffer, props
     // Process each page in parallel
     const pngPagesOutput: PngPageOutput[] = [];
     try {
-        const pageViewportScale: number =
-            props?.viewportScale !== undefined ? props.viewportScale : PDF_TO_PNG_OPTIONS_DEFAULTS.viewportScale;
-        const defaultMask: string = isString ? parse(pdfFile as string).name : PDF_TO_PNG_OPTIONS_DEFAULTS.outputFileMask;
-
+        const pageViewportScale: number = props?.viewportScale !== undefined 
+            ? props.viewportScale 
+            : PDF_TO_PNG_OPTIONS_DEFAULTS.viewportScale;
+        const defaultMask: string = typeof pdfFile === 'string' 
+            ? parse(pdfFile as string).name 
+            : PDF_TO_PNG_OPTIONS_DEFAULTS.outputFileMask;
         const pngPageOutputs: PngPageOutput[] = await Promise.all(
             validPagesToProcess.map((pageNumber) => {
                 const pageName: string = props?.outputFileMaskFunc?.(pageNumber) ?? `${defaultMask}_page_${pageNumber}.png`;
@@ -107,6 +96,58 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike | Buffer, props
     }
 
     return pngPagesOutput;
+}
+
+/**
+ * Reads or normalizes a PDF input into an ArrayBuffer-like object.
+ *
+ * This asynchronous utility accepts either a filesystem path to a PDF file (string)
+ * or an already-loaded ArrayBuffer-like instance. If given a path, it reads the file
+ * using fsPromises.readFile and normalizes the result to always return an ArrayBuffer-like
+ * instance. If the input is already an ArrayBuffer-like value, it is returned unchanged.
+ *
+ * Remarks:
+ * - When reading from the filesystem, Node.js Buffer instances are converted to a
+ *   platform-independent ArrayBuffer slice that represents the same bytes.
+ * - File read errors (for example, ENOENT or permission errors) are propagated from
+ *   fsPromises.readFile and should be handled by the caller.
+ * - If fsPromises.readFile returns a type that is neither an ArrayBuffer nor a Node Buffer,
+ *   this function throws an Error indicating an unsupported buffer type.
+ *
+ * @param pdfFile - Either a path to a PDF file (string) or an ArrayBuffer-like object
+ *                  containing the PDF data.
+ * @returns A Promise that resolves to an ArrayBuffer-like view containing the PDF bytes.
+ *
+ * @throws {Error} If the filesystem read yields an unsupported buffer type.
+ * @throws {Error} Propagates errors thrown by fsPromises.readFile (e.g., file not found,
+ *                 permission denied).
+ *
+ * @example
+ * // From a file path
+ * const buffer = await getPdfFileBuffer('/path/to/file.pdf');
+ *
+ * @example
+ * // From an existing ArrayBuffer
+ * const buffer = await getPdfFileBuffer(existingArrayBuffer);
+ *
+ * @async
+ */
+async function getPdfFileBuffer(pdfFile: string | ArrayBufferLike) {
+    const isString: boolean = typeof pdfFile === 'string';
+    const pdfFileBuffer: ArrayBufferLike = isString
+        ? await (async () => {
+            const buffer = await fsPromises.readFile(pdfFile as string);
+            // Ensure we always return an ArrayBuffer
+            if (buffer instanceof ArrayBuffer) {
+                return buffer;
+            } else if (Buffer.isBuffer(buffer)) {
+                return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+            } else {
+                throw new Error('Unsupported buffer type');
+            }
+        })()
+        : (pdfFile as ArrayBufferLike);
+    return pdfFileBuffer;
 }
 
 /**
@@ -141,7 +182,13 @@ async function getPdfDocument(pdfFileBuffer: ArrayBufferLike, props?: PdfToPngOp
  * @param pageViewportScale - The scale factor to apply to the page viewport for rendering.
  * @returns A promise that resolves to a `PngPageOutput` object containing the rendered PNG buffer and page metadata.
  */
-async function processPdfPage(pdf: PDFDocumentProxy, pageName: string, pageNumber: number, pageViewportScale: number, returnPageContent: boolean) {
+async function processPdfPage(
+    pdf: PDFDocumentProxy,
+    pageName: string,
+    pageNumber: number,
+    pageViewportScale: number,
+    returnPageContent: boolean,
+) {
     const page = await pdf.getPage(pageNumber);
     const viewport = page.getViewport({ scale: pageViewportScale });
     const canvasFactory = pdf.canvasFactory ? (pdf.canvasFactory as NodeCanvasFactory) : new NodeCanvasFactory();
