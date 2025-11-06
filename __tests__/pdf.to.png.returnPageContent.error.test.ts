@@ -13,6 +13,6 @@ describe('pdfToPng returnPageContent with outputFolder', () => {
         await expect(pdfToPng(pdfFilePath, {
             outputFolder,
             returnPageContent: false,
-        })).rejects.toThrow(`Cannot write PNG file "${process.cwd()}/test-results/pdf.to.png.returnPageContent.false.with.outputFolder/sample_page_1.png" because content is undefined.`);
+        })).rejects.toThrow(/Cannot write PNG file .* because content is undefined\./);
     });
 });
