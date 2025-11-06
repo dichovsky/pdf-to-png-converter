@@ -54,7 +54,7 @@ The output of the `pdfToPng` function is an array of objects with the following 
 {
     pageNumber: number; // Page number in PDF file
     name: string; // PNG page name (use outputFileMaskFunc to change it)
-    content?: Buffer; // PNG page Buffer content (optional, depends on `returnPageContent` option)
+    content?: Buffer; // PNG page Buffer content (undefined when `returnPageContent` is false)
     path: string; // Path to the rendered PNG page file (empty string if outputFolder is not provided)
     width: number; // PNG page width
     height: number; // PNG page height
