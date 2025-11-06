@@ -45,18 +45,18 @@
   },
   "dependencies": {
     "@napi-rs/canvas": "~0.1.81",
-    "pdfjs-dist": "~5.4.296"
+    "pdfjs-dist": "~5.4.394"
   },
   "devDependencies": {
-    "@types/node": "^24.9.2",
-    "@typescript-eslint/eslint-plugin": "^8.46.2",
-    "@typescript-eslint/parser": "^8.46.2",
-    "@vitest/coverage-v8": "^4.0.5",
-    "eslint": "^9.38.0",
+    "@types/node": "^24.10.0",
+    "@typescript-eslint/eslint-plugin": "^8.46.3",
+    "@typescript-eslint/parser": "^8.46.3",
+    "@vitest/coverage-v8": "^4.0.7",
+    "eslint": "^9.39.1",
     "png-visual-compare": "^3.2.0",
-    "rimraf": "^6.0.1",
+    "rimraf": "^6.1.0",
     "typescript": "^5.9.3",
-    "vitest": "^4.0.5"
+    "vitest": "^4.0.7"
   },
   "engines": {
     "node": ">=20"
