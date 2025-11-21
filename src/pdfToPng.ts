@@ -41,6 +41,7 @@ import type { PdfToPngOptions, PngPageOutput } from './types';
  * @param props - Optional conversion options (see PdfToPngOptions). Common options used:
  *   - pagesToProcess?: number[]         => Specific page numbers to convert (1-based).
  *   - processPagesInParallel?: boolean  => Whether to process pages concurrently.
+ *   - concurrencyLimit?: number         => Maximum number of pages to process concurrently (default: 4).
  *   - viewportScale?: number            => Scale factor for page rendering.
  *   - outputFileMaskFunc?: (page: number) => string => Custom naming function for each page output.
  *   - returnPageContent?: boolean       => Whether to include the PNG Buffer/Uint8Array in the returned output.
@@ -88,9 +89,9 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike, props?: PdfToP
         const pngPageOutputs: PngPageOutput[] = [];
         if (props?.processPagesInParallel === true) {
             // Limit concurrency to avoid memory issues with large PDFs
-            const CONCURRENCY_LIMIT = 4; // Adjust as needed or make configurable
-            for (let i = 0; i < validPagesToProcess.length; i += CONCURRENCY_LIMIT) {
-                const batch = validPagesToProcess.slice(i, i + CONCURRENCY_LIMIT);
+            const concurrencyLimit = props?.concurrencyLimit ?? PDF_TO_PNG_OPTIONS_DEFAULTS.concurrencyLimit;
+            for (let i = 0; i < validPagesToProcess.length; i += concurrencyLimit) {
+                const batch = validPagesToProcess.slice(i, i + concurrencyLimit);
                 const batchResults = await Promise.all(
                     batch.map(async (pageNumber) => {
                         const pageOutput = await processPdfPage(
