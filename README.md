@@ -41,6 +41,7 @@ test(`Convert PDF To PNG`, async () => {
         verbosityLevel: 0, // Verbosity level. ERRORS: 0, WARNINGS: 1, INFOS: 5. Default value is 0.
         returnPageContent: true, // When `false`, the `content` buffer will not be returned in the output, which can save memory. If `outputFolder` is provided, files are written before clearing content. Default value is true.
         processPagesInParallel: false, // How to process pages: 'parallel' or 'serial'. Default value is false (serial processing).
+        concurrencyLimit: 4, // Maximum number of pages to process concurrently (default: 4, min: 1). Higher values may increase memory usage. Only applies when processPagesInParallel is true.
     });
     // Further processing of pngPages
 });

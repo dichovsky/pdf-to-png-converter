@@ -34,13 +34,15 @@ import type { PdfToPngOptions, PngPageOutput } from './types';
  *   working directory and write each PNG file there. The `path` property of each returned `PngPageOutput`
  *   will be set to the written file path.
  * - If `props.returnPageContent` is false and `props.outputFolder` is provided, the file will be written to disk
- *   and then the content buffer will be cleared from memory to save resources.
+ *   using the content buffer, which will then be cleared from memory to save resources.
  *
  * Parameters:
  * @param pdfFile - Path to a PDF file or an ArrayBuffer-like containing PDF data.
  * @param props - Optional conversion options (see PdfToPngOptions). Common options used:
  *   - pagesToProcess?: number[]         => Specific page numbers to convert (1-based).
  *   - processPagesInParallel?: boolean  => Whether to process pages concurrently.
+ *   - concurrencyLimit?: number         => Maximum number of pages to process concurrently (default: 4, min: 1).
+ *                                          Higher values may increase memory usage. Only applies when processPagesInParallel is true.
  *   - viewportScale?: number            => Scale factor for page rendering.
  *   - outputFileMaskFunc?: (page: number) => string => Custom naming function for each page output.
  *   - returnPageContent?: boolean       => Whether to include the PNG Buffer/Uint8Array in the returned output.
@@ -85,15 +87,17 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike, props?: PdfToP
         const defaultMask: string = typeof pdfFile === 'string' 
             ? parse(pdfFile).name 
             : PDF_TO_PNG_OPTIONS_DEFAULTS.outputFileMask;
+        const pngPageOutputs: PngPageOutput[] = [];
+        // When an output folder is specified, content must always be retrieved
+        // (even if the user doesn't want it returned) so it can be saved to disk
         const shouldReturnContent = props?.outputFolder 
             ? true 
             : (props?.returnPageContent ?? true);
-        const pngPageOutputs: PngPageOutput[] = [];
         if (props?.processPagesInParallel === true) {
             // Limit concurrency to avoid memory issues with large PDFs
-            const CONCURRENCY_LIMIT = 4; // Adjust as needed or make configurable
-            for (let i = 0; i < validPagesToProcess.length; i += CONCURRENCY_LIMIT) {
-                const batch = validPagesToProcess.slice(i, i + CONCURRENCY_LIMIT);
+            const concurrencyLimit = props?.concurrencyLimit ?? PDF_TO_PNG_OPTIONS_DEFAULTS.concurrencyLimit;
+            for (let i = 0; i < validPagesToProcess.length; i += concurrencyLimit) {
+                const batch = validPagesToProcess.slice(i, i + concurrencyLimit);
                 const batchResults = await Promise.all(
                     batch.map(async (pageNumber) => {
                         const pageOutput = await processPdfPage(
@@ -101,7 +105,6 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike, props?: PdfToP
                             props?.outputFileMaskFunc?.(pageNumber) ?? `${defaultMask}_page_${pageNumber}.png`,
                             pageNumber,
                             pageViewportScale,
-                            // If we need to save to disk, we must get the content, even if the user didn't ask for it in the return
                             shouldReturnContent,
                         );
 

@@ -9,6 +9,7 @@ export const PDF_TO_PNG_OPTIONS_DEFAULTS = {
     outputFileMask: 'buffer',
     strictPagesToProcess: false,
     pdfFilePassword: undefined,
+    concurrencyLimit: 4,
 };
 
 export const DOCUMENT_INIT_PARAMS_DEFAULTS: DocumentInitParameters = {
