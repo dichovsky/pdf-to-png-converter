@@ -41,7 +41,8 @@ import type { PdfToPngOptions, PngPageOutput } from './types';
  * @param props - Optional conversion options (see PdfToPngOptions). Common options used:
  *   - pagesToProcess?: number[]         => Specific page numbers to convert (1-based).
  *   - processPagesInParallel?: boolean  => Whether to process pages concurrently.
- *   - concurrencyLimit?: number         => Maximum number of pages to process concurrently (default: 4).
+ *   - concurrencyLimit?: number         => Maximum number of pages to process concurrently (default: 4, min: 1).
+ *                                          Higher values may increase memory usage. Only applies when processPagesInParallel is true.
  *   - viewportScale?: number            => Scale factor for page rendering.
  *   - outputFileMaskFunc?: (page: number) => string => Custom naming function for each page output.
  *   - returnPageContent?: boolean       => Whether to include the PNG Buffer/Uint8Array in the returned output.
