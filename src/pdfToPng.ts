@@ -86,6 +86,11 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike, props?: PdfToP
             ? parse(pdfFile).name 
             : PDF_TO_PNG_OPTIONS_DEFAULTS.outputFileMask;
         const pngPageOutputs: PngPageOutput[] = [];
+        // When an output folder is specified, content must always be retrieved
+        // (even if the user doesn't want it returned) so it can be saved to disk
+        const shouldReturnContent = props?.outputFolder 
+            ? true 
+            : (props?.returnPageContent ?? true);
         if (props?.processPagesInParallel === true) {
             // Limit concurrency to avoid memory issues with large PDFs
             const CONCURRENCY_LIMIT = 4; // Adjust as needed or make configurable
@@ -98,8 +103,7 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike, props?: PdfToP
                             props?.outputFileMaskFunc?.(pageNumber) ?? `${defaultMask}_page_${pageNumber}.png`,
                             pageNumber,
                             pageViewportScale,
-                            // If we need to save to disk, we must get the content, even if the user didn't ask for it in the return
-                            props?.outputFolder ? true : (props?.returnPageContent ?? true),
+                            shouldReturnContent,
                         );
 
                         if (props?.outputFolder) {
@@ -121,7 +125,7 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike, props?: PdfToP
                     props?.outputFileMaskFunc?.(pageNumber) ?? `${defaultMask}_page_${pageNumber}.png`,
                     pageNumber,
                     pageViewportScale,
-                    props?.outputFolder ? true : (props?.returnPageContent ?? true),
+                    shouldReturnContent,
                 );
 
                 if (props?.outputFolder) {
