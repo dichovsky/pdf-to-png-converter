@@ -305,6 +305,7 @@ async function processPdfPage(
  */
 async function savePNGfile(pngPageOutput: PngPageOutput, outputFolder: string) {
     pngPageOutput.path = join(outputFolder, pngPageOutput.name);
+    /* istanbul ignore next */
     if (pngPageOutput.content === undefined) {
         throw new Error(`Cannot write PNG file "${pngPageOutput.path}" because content is undefined.`);
     }
