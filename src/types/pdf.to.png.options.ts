@@ -10,4 +10,5 @@ export type PdfToPngOptions = {
     verbosityLevel?: number;
     returnPageContent?: boolean;
     processPagesInParallel?: boolean;
+    concurrencyLimit?: number;
 };
