@@ -7,6 +7,70 @@ import { propsToPdfDocInitParams } from './propsToPdfDocInitParams';
 import type { PdfToPngOptions, PngPageOutput } from './types';
 
 /**
+ * Document information including page dimensions
+ */
+export type PdfDocumentInfo = {
+    numPages: number;
+    pages: Array<{
+        pageNumber: number;
+        width: number;
+        height: number;
+        rotation: number;
+    }>;
+};
+
+/**
+ * Gets PDF document information including page dimensions without converting to PNG.
+ *
+ * @param {string | ArrayBufferLike} pdfFile - The path to the PDF file or a buffer containing the PDF data.
+ * @param {PdfToPngOptions} [props] - Optional properties to customize the document loading process.
+ * @param {number} [props.viewportScale] - The scale to apply to the page viewport for dimension calculation.
+ * @returns {Promise<PdfDocumentInfo>} A promise that resolves to document information including page dimensions.
+ *
+ * @example
+ * ```typescript
+ * const docInfo = await getPdfDocumentInfo('/path/to/pdf/file.pdf', {
+ *   viewportScale: 2.0,
+ * });
+ * console.log(`Document has ${docInfo.numPages} pages`);
+ * console.log(`First page dimensions: ${docInfo.pages[0].width}x${docInfo.pages[0].height}`);
+ * ```
+ */
+export async function getPdfDocumentInfo(pdfFile: string | ArrayBufferLike, props?: PdfToPngOptions): Promise<PdfDocumentInfo> {
+    const pdfFileBuffer: ArrayBufferLike = await getPdfFileBuffer(pdfFile);
+    const pdfDocument = await getPdfDocument(pdfFileBuffer, props);
+
+    const pageViewportScale: number = props?.viewportScale !== undefined ? props.viewportScale : PDF_TO_PNG_OPTIONS_DEFAULTS.viewportScale;
+
+    try {
+        const pages = await Promise.all(
+            Array.from({ length: pdfDocument.numPages }, async (_, index) => {
+                const pageNumber = index + 1;
+                const page = await pdfDocument.getPage(pageNumber);
+                const viewport = page.getViewport({ scale: pageViewportScale });
+                
+                const pageInfo = {
+                    pageNumber,
+                    width: viewport.width,
+                    height: viewport.height,
+                    rotation: viewport.rotation,
+                };
+                
+                page.cleanup();
+                return pageInfo;
+            })
+        );
+
+        return {
+            numPages: pdfDocument.numPages,
+            pages,
+        };
+    } finally {
+        await pdfDocument.cleanup();
+    }
+}
+
+/**
  * Convert one or more pages from a PDF into PNG images.
  *
  * This function:
@@ -215,7 +279,7 @@ async function getPdfFileBuffer(pdfFile: string | ArrayBufferLike) {
  *
  * @throws Will throw if the PDF cannot be loaded or parsed.
  */
-async function getPdfDocument(pdfFileBuffer: ArrayBufferLike, props?: PdfToPngOptions): Promise<PDFDocumentProxy> {
+export async function getPdfDocument(pdfFileBuffer: ArrayBufferLike, props?: PdfToPngOptions): Promise<PDFDocumentProxy> {
     const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs');
     const documentInitParameters = propsToPdfDocInitParams(props);
     return await getDocument({
