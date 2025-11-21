@@ -39,7 +39,7 @@ test(`Convert PDF To PNG`, async () => {
         pagesToProcess: [1, 3, 11], // Subset of pages to convert (first page = 1), other pages will be skipped if specified.
         strictPagesToProcess: false, // When `true`, will throw an error if specified page number in pagesToProcess is invalid, otherwise will skip invalid page. Default value is false.
         verbosityLevel: 0, // Verbosity level. ERRORS: 0, WARNINGS: 1, INFOS: 5. Default value is 0.
-        returnPageContent: true, // When `false`, the `content` buffer will not be returned in the output, which can save memory. Default value is true.
+        returnPageContent: true, // When `false`, the `content` buffer will not be returned in the output, which can save memory. If `outputFolder` is provided, files are written before clearing content. Default value is true.
         processPagesInParallel: false, // How to process pages: 'parallel' or 'serial'. Default value is false (serial processing).
     });
     // Further processing of pngPages

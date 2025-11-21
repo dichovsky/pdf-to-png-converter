@@ -4,15 +4,20 @@ import { promises as fsPromises } from 'node:fs';
 import { join } from 'node:path';
 
 describe('pdfToPng returnPageContent with outputFolder', () => {
-    it('should throw an error when returnPageContent is false and outputFolder is provided', async () => {
+    it('should not throw an error when returnPageContent is false and outputFolder is provided', async () => {
         const pdfFilePath = 'test-data/sample.pdf';
         const outputFolder = 'test-results/pdf.to.png.returnPageContent.false.with.outputFolder';
 
         await fsPromises.mkdir(join(process.cwd(), outputFolder), { recursive: true });
 
-        await expect(pdfToPng(pdfFilePath, {
+        const pngPages = await pdfToPng(pdfFilePath, {
             outputFolder,
             returnPageContent: false,
-        })).rejects.toThrow(/Cannot write PNG file .* because content is undefined\./);
+        });
+
+        expect(pngPages).toHaveLength(2);
+        expect(pngPages[0].content).toBeUndefined();
+        expect(pngPages[0].path).toBeDefined();
+        expect(pngPages[0].path).not.toBe('');
     });
 });

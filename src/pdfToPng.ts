@@ -33,8 +33,8 @@ import type { PdfToPngOptions, PngPageOutput } from './types';
  * - If `props.outputFolder` is specified the function will create the folder (recursive) under the current
  *   working directory and write each PNG file there. The `path` property of each returned `PngPageOutput`
  *   will be set to the written file path.
- * - If `props.returnPageContent` is false and `props.outputFolder` is provided, writing will fail because
- *   file content will be undefined (the implementation throws in this case).
+ * - If `props.returnPageContent` is false and `props.outputFolder` is provided, the file will be written to disk
+ *   and then the content buffer will be cleared from memory to save resources.
  *
  * Parameters:
  * @param pdfFile - Path to a PDF file or an ArrayBuffer-like containing PDF data.
@@ -71,6 +71,11 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike, props?: PdfToP
     const pagesToProcess: number[] = props?.pagesToProcess ?? Array.from({ length: pdfDocument.numPages }, (_, index) => index + 1);
     const validPagesToProcess: number[] = pagesToProcess.filter((pageNumber) => pageNumber <= pdfDocument.numPages && pageNumber >= 1);
 
+    // Create output folder if specified
+    if (props?.outputFolder !== undefined) {
+        await fsPromises.mkdir(join(process.cwd(), props.outputFolder), { recursive: true });
+    }
+
     // Process each page
     const pngPagesOutput: PngPageOutput[] = [];
     try {
@@ -82,30 +87,50 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike, props?: PdfToP
             : PDF_TO_PNG_OPTIONS_DEFAULTS.outputFileMask;
         const pngPageOutputs: PngPageOutput[] = [];
         if (props?.processPagesInParallel === true) {
-            pngPageOutputs.push(
-                ...(await Promise.all(
-                    validPagesToProcess.map((pageNumber) =>
-                        processPdfPage(
+            // Limit concurrency to avoid memory issues with large PDFs
+            const CONCURRENCY_LIMIT = 4; // Adjust as needed or make configurable
+            for (let i = 0; i < validPagesToProcess.length; i += CONCURRENCY_LIMIT) {
+                const batch = validPagesToProcess.slice(i, i + CONCURRENCY_LIMIT);
+                const batchResults = await Promise.all(
+                    batch.map(async (pageNumber) => {
+                        const pageOutput = await processPdfPage(
                             pdfDocument,
                             props?.outputFileMaskFunc?.(pageNumber) ?? `${defaultMask}_page_${pageNumber}.png`,
                             pageNumber,
                             pageViewportScale,
-                            props?.returnPageContent ?? true,
-                        ),
-                    ),
-                )),
-            );
+                            // If we need to save to disk, we must get the content, even if the user didn't ask for it in the return
+                            props?.outputFolder ? true : (props?.returnPageContent ?? true),
+                        );
+
+                        if (props?.outputFolder) {
+                            await savePNGfile(pageOutput, join(process.cwd(), props.outputFolder));
+                            // If the user didn't want the content returned, clear it to save memory
+                            if (props?.returnPageContent === false) {
+                                pageOutput.content = undefined;
+                            }
+                        }
+                        return pageOutput;
+                    }),
+                );
+                pngPageOutputs.push(...batchResults);
+            }
         } else {
             for (const pageNumber of validPagesToProcess) {
-                pngPageOutputs.push(
-                    await processPdfPage(
-                        pdfDocument,
-                        props?.outputFileMaskFunc?.(pageNumber) ?? `${defaultMask}_page_${pageNumber}.png`,
-                        pageNumber,
-                        pageViewportScale,
-                        props?.returnPageContent ?? true,
-                    ),
+                const pageOutput = await processPdfPage(
+                    pdfDocument,
+                    props?.outputFileMaskFunc?.(pageNumber) ?? `${defaultMask}_page_${pageNumber}.png`,
+                    pageNumber,
+                    pageViewportScale,
+                    props?.outputFolder ? true : (props?.returnPageContent ?? true),
                 );
+
+                if (props?.outputFolder) {
+                    await savePNGfile(pageOutput, join(process.cwd(), props.outputFolder));
+                    if (props?.returnPageContent === false) {
+                        pageOutput.content = undefined;
+                    }
+                }
+                pngPageOutputs.push(pageOutput);
             }
         }
         pngPagesOutput.push(...pngPageOutputs);
@@ -113,18 +138,7 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike, props?: PdfToP
         await pdfDocument.cleanup();
     }
 
-    // Save the PNG files to the output folder
-    if (props?.outputFolder !== undefined) {
-        const outputFolder: string = join(process.cwd(), props.outputFolder);
-        await fsPromises.mkdir(outputFolder, { recursive: true });
-
-        // Limit concurrency to 4 files at a time for better performance
-        const CONCURRENCY_LIMIT = 4;
-        for (let i = 0; i < pngPagesOutput.length; i += CONCURRENCY_LIMIT) {
-            const batch = pngPagesOutput.slice(i, i + CONCURRENCY_LIMIT);
-            await Promise.all(batch.map((pngPageOutput) => savePNGfile(pngPageOutput, outputFolder)));
-        }
-    }
+    // Note: File saving is now handled within the loop above to allow for memory optimization
 
     return pngPagesOutput;
 }
