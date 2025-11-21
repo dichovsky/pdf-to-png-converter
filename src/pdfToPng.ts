@@ -34,7 +34,7 @@ import type { PdfToPngOptions, PngPageOutput } from './types';
  *   working directory and write each PNG file there. The `path` property of each returned `PngPageOutput`
  *   will be set to the written file path.
  * - If `props.returnPageContent` is false and `props.outputFolder` is provided, the file will be written to disk
- *   and then the content buffer will be cleared from memory to save resources.
+ *   using the content buffer, which will then be cleared from memory to save resources.
  *
  * Parameters:
  * @param pdfFile - Path to a PDF file or an ArrayBuffer-like containing PDF data.
