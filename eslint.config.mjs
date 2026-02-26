@@ -1,6 +1,7 @@
 import typescriptEslint from "@typescript-eslint/eslint-plugin";
 import tsParser from "@typescript-eslint/parser";
 import js from "@eslint/js";
+import { fileURLToPath } from "node:url";
 
 export default [
     {
@@ -14,7 +15,7 @@ export default [
                 ecmaVersion: "latest",
                 sourceType: "module",
                 project: true,
-                tsconfigRootDir: new URL(".", import.meta.url).pathname,
+                tsconfigRootDir: fileURLToPath(new URL(".", import.meta.url)),
             },
             globals: {
                 Buffer: "readonly",
