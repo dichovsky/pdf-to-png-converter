@@ -72,8 +72,11 @@ import type { PdfToPngOptions, PngPageOutput } from './interfaces';
  * const outputs = await pdfToPng("/path/to/doc.pdf", { returnPageContent: true });
  */
 export async function pdfToPng(pdfFile: string | ArrayBufferLike, props?: PdfToPngOptions): Promise<PngPageOutput[]> {
-    if (props?.viewportScale !== undefined && props.viewportScale <= 0) {
-        throw new Error(`viewportScale must be greater than 0, received: ${props.viewportScale}`);
+    if (props?.viewportScale !== undefined) {
+        const viewportScale = props.viewportScale;
+        if (typeof viewportScale !== 'number' || !Number.isFinite(viewportScale) || viewportScale <= 0) {
+            throw new Error(`viewportScale must be a finite number greater than 0, received: ${viewportScale}`);
+        }
     }
 
     // Read the PDF file and initialize the PDF document
