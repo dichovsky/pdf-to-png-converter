@@ -1,5 +1,5 @@
-import type { Canvas} from '@napi-rs/canvas';
-import { type SKRSContext2D } from '@napi-rs/canvas';
+import type { Canvas } from '@napi-rs/canvas';
+import type { SKRSContext2D } from '@napi-rs/canvas';
 
 /**
  * Holds a reference to an `@napi-rs/canvas` `Canvas` instance and its 2D rendering context.
