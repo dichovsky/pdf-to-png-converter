@@ -81,9 +81,7 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike, props?: PdfToP
     // Process each page
     const pngPagesOutput: PngPageOutput[] = [];
     try {
-        const pageViewportScale: number = props?.viewportScale !== undefined 
-            ? props.viewportScale 
-            : PDF_TO_PNG_OPTIONS_DEFAULTS.viewportScale;
+        const pageViewportScale: number = props?.viewportScale ?? PDF_TO_PNG_OPTIONS_DEFAULTS.viewportScale;
         const defaultMask: string = typeof pdfFile === 'string' 
             ? parse(pdfFile).name 
             : PDF_TO_PNG_OPTIONS_DEFAULTS.outputFileMask;
@@ -183,7 +181,7 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike, props?: PdfToP
  *
  * @async
  */
-async function getPdfFileBuffer(pdfFile: string | ArrayBufferLike) {
+async function getPdfFileBuffer(pdfFile: string | ArrayBufferLike): Promise<ArrayBufferLike> {
     const isString: boolean = typeof pdfFile === 'string';
     const pdfFileBuffer: ArrayBufferLike = isString
         ? await (async () => {
@@ -258,7 +256,7 @@ async function processPdfPage(
     pageNumber: number,
     pageViewportScale: number,
     returnPageContent: boolean,
-) {
+): Promise<PngPageOutput> {
     const page = await pdf.getPage(pageNumber);
     const viewport = page.getViewport({ scale: pageViewportScale });
     const canvasFactory = pdf.canvasFactory ? (pdf.canvasFactory as NodeCanvasFactory) : new NodeCanvasFactory();
@@ -303,7 +301,7 @@ async function processPdfPage(
  * @throws {NodeJS.ErrnoException} If the underlying file system write operation fails,
  *   the original error from `fsPromises.writeFile` will be propagated.
  */
-async function savePNGfile(pngPageOutput: PngPageOutput, outputFolder: string) {
+async function savePNGfile(pngPageOutput: PngPageOutput, outputFolder: string): Promise<void> {
     pngPageOutput.path = join(outputFolder, pngPageOutput.name);
     /* istanbul ignore next */
     if (pngPageOutput.content === undefined) {
