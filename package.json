@@ -1,6 +1,6 @@
 {
   "name": "pdf-to-png-converter",
-  "version": "3.13.1",
+  "version": "3.14.0",
   "description": "Node.js utility to convert PDF file/buffer pages to PNG files/buffers with no native dependencies.",
   "keywords": [
     "pdf",
@@ -22,8 +22,19 @@
   },
   "license": "MIT",
   "author": "Igor Magdich <magdich.igor@gmail.com>",
+  "funding": {
+    "type": "buymeacoffee",
+    "url": "https://buymeacoffee.com/dichovsky"
+  },
+  "sideEffects": false,
   "main": "out/index.js",
   "types": "out/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./out/index.d.ts",
+      "default": "./out/index.js"
+    }
+  },
   "files": [
     "out"
   ],

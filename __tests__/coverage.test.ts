@@ -20,6 +20,13 @@ describe('index', () => {
     it('should export pdfToPng function', () => {
         expect(index.pdfToPng).toBeDefined();
     });
+
+    it('should export VerbosityLevel enum', () => {
+        expect(index.VerbosityLevel).toBeDefined();
+        expect(index.VerbosityLevel.ERRORS).toBe(0);
+        expect(index.VerbosityLevel.WARNINGS).toBe(1);
+        expect(index.VerbosityLevel.INFOS).toBe(5);
+    });
 });
 
 describe('pdfToPng', () => {
@@ -42,5 +49,17 @@ describe('pdfToPng', () => {
         (fsPromises.readFile as Mock).mockResolvedValue({} as any);
 
         await expect(pdfToPng(pdfPath)).rejects.toThrow('Unsupported buffer type');
+    });
+
+    it('should throw for viewportScale of 0', async () => {
+        await expect(pdfToPng('test.pdf', { viewportScale: 0 })).rejects.toThrow(
+            'viewportScale must be a finite number greater than 0, received: 0',
+        );
+    });
+
+    it('should throw for negative viewportScale', async () => {
+        await expect(pdfToPng('test.pdf', { viewportScale: -1 })).rejects.toThrow(
+            'viewportScale must be a finite number greater than 0, received: -1',
+        );
     });
 });

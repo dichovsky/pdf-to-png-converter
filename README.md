@@ -127,7 +127,8 @@ Converts PDF pages to PNG images.
     
     // Output Control
     returnPageContent: boolean,      // Include PNG buffer in output (default: true)
-    
+    returnMetadataOnly: boolean,     // Return only page dimensions/rotation without rendering (default: false)
+
     // Logging
     verbosityLevel: number,          // 0=ERRORS, 1=WARNINGS, 5=INFOS (default: 0)
 }
@@ -221,6 +222,21 @@ pngPages.forEach(page => {
 });
 ```
 
+### Get Page Metadata Only
+
+```javascript
+// Inspect page dimensions and rotation without rendering any images
+const pages = await pdfToPng('document.pdf', {
+    returnMetadataOnly: true,
+});
+
+pages.forEach(page => {
+    console.log(`Page ${page.pageNumber}: ${page.width}x${page.height}px, rotation=${page.rotation}`);
+});
+```
+
+This is significantly faster than full rendering and useful for checking page counts, dimensions, or orientation before deciding how to process a document.
+
 ---
 
 ## Output Format
@@ -233,9 +249,10 @@ The `pdfToPng` function returns an array of page objects:
         pageNumber: 1,                      // Page number in the PDF
         name: 'document_page_1.png',        // PNG filename
         content: Buffer<...>,               // PNG image data (or undefined if returnPageContent=false)
-        path: '/output/document_page_1.png', // Full file path
+        path: '/output/document_page_1.png', // Full file path (empty string if no outputFolder)
         width: 612,                         // Image width in pixels
-        height: 792                         // Image height in pixels
+        height: 792,                        // Image height in pixels
+        rotation: 0                         // Page rotation in degrees (0, 90, 180, or 270)
     },
     // ... more pages
 ]
