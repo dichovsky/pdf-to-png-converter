@@ -9,8 +9,8 @@ import type { CanvasAndContext } from './interfaces';
  * This class satisfies that contract using the native `@napi-rs/canvas` package, which provides
  * a Node.js-compatible canvas without requiring a browser environment.
  *
- * An instance of this class is created per page render inside `processPdfPage` and is also
- * optionally attached to the `PDFDocumentProxy` as `canvasFactory` for reuse.
+ * Callers (such as `processPdfPage`) create instances of this class and pass them to pdfjs
+ * when rendering pages.
  */
 export class NodeCanvasFactory {
     /**
