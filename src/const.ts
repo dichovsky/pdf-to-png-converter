@@ -12,7 +12,6 @@ export const PDF_TO_PNG_OPTIONS_DEFAULTS = {
     enableXfa: true,
     /** Used as the output filename stem when the PDF is supplied as a buffer rather than a file path. */
     outputFileMask: 'buffer',
-    strictPagesToProcess: false,
     pdfFilePassword: undefined,
     concurrencyLimit: 4,
 };
