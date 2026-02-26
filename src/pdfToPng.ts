@@ -4,7 +4,7 @@ import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { PDF_TO_PNG_OPTIONS_DEFAULTS } from './const';
 import { NodeCanvasFactory } from './node.canvas.factory';
 import { propsToPdfDocInitParams } from './propsToPdfDocInitParams';
-import type { PdfToPngOptions, PngPageOutput } from './types';
+import type { PdfToPngOptions, PngPageOutput } from './interfaces';
 
 /**
  * Convert one or more pages from a PDF into PNG images.
@@ -13,7 +13,10 @@ import type { PdfToPngOptions, PngPageOutput } from './types';
  * - Loads the provided PDF (either a file path string or an ArrayBuffer-like object).
  * - Opens a PDFDocumentProxy and determines which pages to process.
  * - Filters out invalid page numbers (pages < 1 or > number of pages in the document).
- * - Renders each selected page to a PNG by calling an internal page-processing helper.
+ * - When `props.returnMetadataOnly` is true: returns page dimensions, rotation, name, and page number
+ *   for each selected page without creating a canvas or rendering; no files are written to disk.
+ * - When `props.returnMetadataOnly` is false (the default): renders each selected page to a PNG
+ *   by calling an internal page-processing helper.
  * - Ensures the PDF document is cleaned up (pdfDocument.cleanup()) even if an error occurs.
  * - Optionally writes resulting PNG files to disk if `props.outputFolder` is provided.
  *
@@ -28,11 +31,14 @@ import type { PdfToPngOptions, PngPageOutput } from './types';
  *   otherwise from `PDF_TO_PNG_OPTIONS_DEFAULTS.outputFileMask`. Each page name defaults to
  *   `${defaultMask}_page_${pageNumber}.png`, unless `props.outputFileMaskFunc` is provided and returns a name.
  * - By default the page renderer returns page content (`props.returnPageContent` defaults to true).
+ * - When `props.returnMetadataOnly` is true, no canvas is created and no image is rendered;
+ *   only `pageNumber`, `name`, `width`, `height`, and `rotation` are populated. `content` is
+ *   always `undefined` and no files are written to disk even if `outputFolder` is set.
  *
  * Side effects:
- * - If `props.outputFolder` is specified the function will create the folder (recursive) under the current
- *   working directory and write each PNG file there. The `path` property of each returned `PngPageOutput`
- *   will be set to the written file path.
+ * - If `props.outputFolder` is specified (and `returnMetadataOnly` is false) the function will create
+ *   the folder (recursive) under the current working directory and write each PNG file there.
+ *   The `path` property of each returned `PngPageOutput` will be set to the written file path.
  * - If `props.returnPageContent` is false and `props.outputFolder` is provided, the file will be written to disk
  *   using the content buffer, which will then be cleared from memory to save resources.
  *
@@ -45,7 +51,8 @@ import type { PdfToPngOptions, PngPageOutput } from './types';
  *                                          Higher values may increase memory usage. Only applies when processPagesInParallel is true.
  *   - viewportScale?: number            => Scale factor for page rendering.
  *   - outputFileMaskFunc?: (page: number) => string => Custom naming function for each page output.
- *   - returnPageContent?: boolean       => Whether to include the PNG Buffer/Uint8Array in the returned output.
+ *   - returnPageContent?: boolean       => Whether to include the PNG Buffer in the returned output.
+ *   - returnMetadataOnly?: boolean      => When true, skip rendering entirely and return only page metadata.
  *   - outputFolder?: string             => Relative folder (from process.cwd()) to write PNG files to.
  *
  * Returns:
@@ -65,6 +72,10 @@ import type { PdfToPngOptions, PngPageOutput } from './types';
  * const outputs = await pdfToPng("/path/to/doc.pdf", { returnPageContent: true });
  */
 export async function pdfToPng(pdfFile: string | ArrayBufferLike, props?: PdfToPngOptions): Promise<PngPageOutput[]> {
+    if (props?.viewportScale !== undefined && props.viewportScale <= 0) {
+        throw new Error(`viewportScale must be greater than 0, received: ${props.viewportScale}`);
+    }
+
     // Read the PDF file and initialize the PDF document
     const pdfFileBuffer: ArrayBufferLike = await getPdfFileBuffer(pdfFile);
     const pdfDocument: PDFDocumentProxy = await getPdfDocument(pdfFileBuffer, props);
@@ -72,9 +83,10 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike, props?: PdfToP
     // Get the pages to process based on the provided options, invalid pages will be filtered out
     const pagesToProcess: number[] = props?.pagesToProcess ?? Array.from({ length: pdfDocument.numPages }, (_, index) => index + 1);
     const validPagesToProcess: number[] = pagesToProcess.filter((pageNumber) => pageNumber <= pdfDocument.numPages && pageNumber >= 1);
+    const returnMetadataOnly: boolean = props?.returnMetadataOnly ?? false;
 
-    // Create output folder if specified
-    if (props?.outputFolder !== undefined) {
+    // Create output folder if specified (skip when returnMetadataOnly is true — no files will be written)
+    if (props?.outputFolder !== undefined && !returnMetadataOnly) {
         await fsPromises.mkdir(join(process.cwd(), props.outputFolder), { recursive: true });
     }
 
@@ -87,16 +99,19 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike, props?: PdfToP
             : PDF_TO_PNG_OPTIONS_DEFAULTS.outputFileMask;
         const pngPageOutputs: PngPageOutput[] = [];
         // When an output folder is specified, content must always be retrieved
-        // (even if the user doesn't want it returned) so it can be saved to disk
-        const shouldReturnContent = props?.outputFolder 
-            ? true 
-            : (props?.returnPageContent ?? true);
+        // (even if the user doesn't want it returned) so it can be saved to disk.
+        // When returnMetadataOnly is true, rendering is skipped entirely regardless.
+        const shouldReturnContent: boolean = returnMetadataOnly
+            ? false
+            : props?.outputFolder
+              ? true
+              : (props?.returnPageContent ?? true);
         if (props?.processPagesInParallel === true) {
             // Limit concurrency to avoid memory issues with large PDFs
-            const concurrencyLimit = props?.concurrencyLimit ?? PDF_TO_PNG_OPTIONS_DEFAULTS.concurrencyLimit;
+            const concurrencyLimit: number = props?.concurrencyLimit ?? PDF_TO_PNG_OPTIONS_DEFAULTS.concurrencyLimit;
             for (let i = 0; i < validPagesToProcess.length; i += concurrencyLimit) {
-                const batch = validPagesToProcess.slice(i, i + concurrencyLimit);
-                const batchResults = await Promise.all(
+                const batch: number[] = validPagesToProcess.slice(i, i + concurrencyLimit);
+                const batchResults: PngPageOutput[] = await Promise.all(
                     batch.map(async (pageNumber) => {
                         const pageOutput = await processPdfPage(
                             pdfDocument,
@@ -104,9 +119,10 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike, props?: PdfToP
                             pageNumber,
                             pageViewportScale,
                             shouldReturnContent,
+                            returnMetadataOnly,
                         );
 
-                        if (props?.outputFolder) {
+                        if (props?.outputFolder && !returnMetadataOnly) {
                             await savePNGfile(pageOutput, join(process.cwd(), props.outputFolder));
                             // If the user didn't want the content returned, clear it to save memory
                             if (props?.returnPageContent === false) {
@@ -126,9 +142,10 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike, props?: PdfToP
                     pageNumber,
                     pageViewportScale,
                     shouldReturnContent,
+                    returnMetadataOnly,
                 );
 
-                if (props?.outputFolder) {
+                if (props?.outputFolder && !returnMetadataOnly) {
                     await savePNGfile(pageOutput, join(process.cwd(), props.outputFolder));
                     if (props?.returnPageContent === false) {
                         pageOutput.content = undefined;
@@ -141,8 +158,6 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike, props?: PdfToP
     } finally {
         await pdfDocument.cleanup();
     }
-
-    // Note: File saving is now handled within the loop above to allow for memory optimization
 
     return pngPagesOutput;
 }
@@ -192,7 +207,7 @@ async function getPdfFileBuffer(pdfFile: string | ArrayBufferLike): Promise<Arra
               } else if (Buffer.isBuffer(buffer)) {
                   return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
               } else {
-                  throw new Error('Unsupported buffer type');
+                  throw new Error(`Unsupported buffer type: ${Object.prototype.toString.call(buffer)}`);
               }
           })()
         : (pdfFile as ArrayBufferLike);
@@ -227,24 +242,28 @@ async function getPdfDocument(pdfFileBuffer: ArrayBufferLike, props?: PdfToPngOp
  *
  * This function:
  * - Obtains the specified page from the provided PDF.js document (`PDFDocumentProxy`).
- * - Creates a canvas and drawing context (using a `NodeCanvasFactory` provided on the `pdf` object or by instantiating a new one).
- * - Renders the page into the canvas at the requested scale.
- * - Optionally extracts a PNG buffer from the rendered canvas if `returnPageContent` is true.
- * - Returns a `PngPageOutput` describing the page (including width, height, page number, name, and optional content).
+ * - When `returnMetadataOnly` is true: reads the viewport dimensions and page rotation, then returns
+ *   immediately without creating a canvas or rendering; `page.cleanup()` is still called.
+ * - When `returnMetadataOnly` is false: creates a canvas and drawing context, renders the page into the
+ *   canvas at the requested scale, optionally encodes to PNG buffer, then cleans up via `finally`.
+ * - Returns a `PngPageOutput` describing the page (including width, height, rotation, page number, name,
+ *   and optional content).
  * - Ensures resources are cleaned up (calls `page.cleanup()` and `canvasFactory.destroy(...)`) even if rendering fails.
  *
  * Remarks:
  * - `pageNumber` is expected to be a 1-based page index as required by PDF.js `getPage`.
  * - The returned `PngPageOutput.path` is intentionally set to an empty string and should be populated by the caller if a filesystem path is needed.
- * - If `returnPageContent` is false, the `content` field of the returned object will be `undefined`.
+ * - If `returnPageContent` is false (or `returnMetadataOnly` is true), the `content` field will be `undefined`.
  * - Errors originating from `pdf.getPage(...)`, the render task, or canvas operations will propagate to the caller; resources are still cleaned up in such cases.
  * - The function uses `page.getViewport({ scale: pageViewportScale })` so `width` and `height` reflect the viewport dimensions at the given scale.
+ * - `rotation` is taken from `page.rotate` — the intrinsic page rotation stored in the PDF (0, 90, 180, or 270).
  *
- * @param pdf - The PDF.js document proxy (`PDFDocumentProxy`) from which to obtain and render the page. May optionally expose a `canvasFactory` to control canvas creation/destruction.
+ * @param pdf - The PDF.js document proxy (`PDFDocumentProxy`) from which to obtain and render the page.
  * @param pageName - A human-readable name/identifier for the page (used in the returned `PngPageOutput.name`).
  * @param pageNumber - The 1-based page index to render.
  * @param pageViewportScale - The scale factor passed to `page.getViewport({ scale })` to control output resolution.
- * @param returnPageContent - If true, the function will include a PNG buffer (`content`) in the returned `PngPageOutput`; otherwise `content` will be `undefined`.
+ * @param returnPageContent - If true, the function will include a PNG buffer (`content`) in the returned `PngPageOutput`; otherwise `content` will be `undefined`. Ignored when `returnMetadataOnly` is true.
+ * @param returnMetadataOnly - If true, skip canvas creation and rendering entirely; return only dimensions and rotation.
  *
  * @returns A promise that resolves to a `PngPageOutput` containing page metadata and optionally the PNG image buffer.
  *
@@ -256,15 +275,34 @@ async function processPdfPage(
     pageNumber: number,
     pageViewportScale: number,
     returnPageContent: boolean,
+    returnMetadataOnly: boolean,
 ): Promise<PngPageOutput> {
     const page = await pdf.getPage(pageNumber);
     const viewport = page.getViewport({ scale: pageViewportScale });
+
+    if (returnMetadataOnly) {
+        try {
+            return {
+                pageNumber,
+                name: pageName,
+                content: undefined,
+                path: '',
+                width: viewport.width,
+                height: viewport.height,
+                rotation: page.rotate,
+            };
+        } finally {
+            page.cleanup();
+        }
+    }
+
     const canvasFactory = pdf.canvasFactory ? (pdf.canvasFactory as NodeCanvasFactory) : new NodeCanvasFactory();
 
     const { canvas, context } = canvasFactory.create(viewport.width, viewport.height);
 
     try {
         await page.render({ canvasContext: context, viewport, canvas }).promise;
+
         const pngPageOutput: PngPageOutput = {
             pageNumber,
             name: pageName,
@@ -272,6 +310,7 @@ async function processPdfPage(
             path: '',
             width: viewport.width,
             height: viewport.height,
+            rotation: page.rotate,
         };
         return pngPageOutput;
     } finally {

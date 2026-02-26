@@ -1,13 +1,23 @@
 import type * as pdfApiTypes from 'pdfjs-dist/types/src/display/api';
 import { DOCUMENT_INIT_PARAMS_DEFAULTS, PDF_TO_PNG_OPTIONS_DEFAULTS } from './const';
-import type { PdfToPngOptions } from './types/pdf.to.png.options';
+import type { PdfToPngOptions } from './interfaces/pdf.to.png.options';
 import { VerbosityLevel } from './types/verbosity.level';
 
 /**
- * Converts the given `PdfToPngOptions` object to a `pdfApiTypes.DocumentInitParameters` object.
- * If `props` is missing or partially specified, default values are applied for any missing properties.
- * @param props - The `PdfToPngOptions` object to convert.
- * @returns The resulting `pdfApiTypes.DocumentInitParameters` object.
+ * Maps a `PdfToPngOptions` object to a pdfjs `DocumentInitParameters` object.
+ *
+ * Starts from `DOCUMENT_INIT_PARAMS_DEFAULTS` (cMap paths and standard font data URL) and
+ * overlays the following fields from `props`, falling back to `PDF_TO_PNG_OPTIONS_DEFAULTS`
+ * for any property that is not set:
+ *
+ * - `verbosityLevel`  → `verbosity`  (default: `VerbosityLevel.ERRORS`)
+ * - `disableFontFace` → `disableFontFace` (default: `true`)
+ * - `useSystemFonts`  → `useSystemFonts`  (default: `false`)
+ * - `enableXfa`       → `enableXfa`       (default: `true`)
+ * - `pdfFilePassword` → `password`        (default: `undefined`)
+ *
+ * @param props - Optional `PdfToPngOptions` to convert. When `undefined`, all fields are set to their defaults.
+ * @returns A `DocumentInitParameters` object ready to be passed to pdfjs `getDocument()`.
  */
 export function propsToPdfDocInitParams(props?: PdfToPngOptions): pdfApiTypes.DocumentInitParameters {
     const pdfDocInitParams: pdfApiTypes.DocumentInitParameters = {
@@ -27,4 +37,3 @@ export function propsToPdfDocInitParams(props?: PdfToPngOptions): pdfApiTypes.Do
 
     return pdfDocInitParams;
 }
-
