@@ -53,13 +53,13 @@ describe('pdfToPng', () => {
 
     it('should throw for viewportScale of 0', async () => {
         await expect(pdfToPng('test.pdf', { viewportScale: 0 })).rejects.toThrow(
-            'viewportScale must be greater than 0, received: 0',
+            'viewportScale must be a finite number greater than 0, received: 0',
         );
     });
 
     it('should throw for negative viewportScale', async () => {
         await expect(pdfToPng('test.pdf', { viewportScale: -1 })).rejects.toThrow(
-            'viewportScale must be greater than 0, received: -1',
+            'viewportScale must be a finite number greater than 0, received: -1',
         );
     });
 });
