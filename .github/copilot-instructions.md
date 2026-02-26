@@ -66,8 +66,9 @@ src/
 ```typescript
 export { pdfToPng } from './pdfToPng';
 export type { PngPageOutput, PdfToPngOptions } from './interfaces';
+export { VerbosityLevel } from './types';
 ```
-`VerbosityLevel` and `CanvasAndContext` are not re-exported from `src/index.ts`; they are available from internal paths for internal use.
+`CanvasAndContext` is not re-exported from `src/index.ts`; it is available from internal paths for internal use.
 
 **Key private functions in `src/pdfToPng.ts`** (not exported):
 - `getPdfFileBuffer(pdfFile)` — file read + ArrayBuffer normalisation
