@@ -1,66 +1,251 @@
 # pdf-to-png-converter
 
-A Node.js utility to convert PDF file/buffer pages to PNG files/buffers without binary and OS dependencies. This utility is ideal for applications that need to process and convert PDF documents into image formats for easier viewing, sharing, or further image processing. It supports various options for rendering fonts, handling encrypted PDFs, and specifying output details, making it a versatile tool for developers working with PDF files in different environments.
+<p align="center">
+  <strong>🎯 Convert PDF pages to PNG images with zero native dependencies</strong>
+</p>
 
-[![Tests on push](https://github.com/dichovsky/pdf-to-png-converter/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/dichovsky/pdf-to-png-converter/actions/workflows/test.yml)
+<p align="center">
+  <a href="https://www.npmjs.com/package/pdf-to-png-converter">
+    <img src="https://img.shields.io/npm/v/pdf-to-png-converter.svg?style=flat-square" alt="npm version">
+  </a>
+  <a href="https://www.npmjs.com/package/pdf-to-png-converter">
+    <img src="https://img.shields.io/npm/dm/pdf-to-png-converter.svg?style=flat-square" alt="npm downloads">
+  </a>
+  <a href="https://github.com/dichovsky/pdf-to-png-converter/actions/workflows/test.yml">
+    <img src="https://github.com/dichovsky/pdf-to-png-converter/actions/workflows/test.yml/badge.svg?branch=main" alt="Tests">
+  </a>
+  <a href="https://github.com/dichovsky/pdf-to-png-converter/blob/main/LICENSE">
+    <img src="https://img.shields.io/github/license/dichovsky/pdf-to-png-converter?style=flat-square" alt="License">
+  </a>
+</p>
 
-## Getting Started
+---
 
-### Package Installation
+A high-performance Node.js library for converting PDF files and buffers to PNG images. Perfect for web applications, document processing pipelines, and image generation workflows.
 
-Installation:
+**Key Benefits:**
+- ✨ **Zero Native Binaries** - Pure JavaScript, works everywhere
+- 🚀 **High Performance** - Supports parallel page processing
+- 🔐 **Encrypted PDFs** - Handle password-protected documents
+- 📦 **Lightweight** - Minimal dependencies
+- 💪 **TypeScript Support** - Full type definitions included
+- 🎨 **Flexible Rendering** - Advanced font and rendering options
+
+## Table of Contents
+
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [API Reference](#api-reference)
+- [Examples](#examples)
+- [Output Format](#output-format)
+- [License](#license)
+
+---
+
+## Installation
+
+### npm
 
 ```sh
-npm install -D pdf-to-png-converter
+npm install pdf-to-png-converter
 ```
 
-The installation command uses the -D flag which is typically used for development dependencies. If this package is intended to be used in production, consider using --save instead.
+### Yarn
 
 ```sh
-npm install --save pdf-to-png-converter
+yarn add pdf-to-png-converter
 ```
 
-**Note:** This package requires Node.js version 20 or higher.
+> **Node.js Requirement:** Node.js 20 or higher is required.
 
-## Example
+---
+
+## Quick Start
+
+Convert a PDF file to PNG images in just a few lines:
 
 ```javascript
 const { pdfToPng } = require('pdf-to-png-converter');
 
-test(`Convert PDF To PNG`, async () => {
-    const pngPages = await pdfToPng(pdfFilePath, { // The function accepts PDF file path or a Buffer
-        disableFontFace: false, // When `false`, fonts will be rendered using a built-in font renderer that constructs the glyphs with primitive path commands. Default value is true.
-        useSystemFonts: false, // When `true`, fonts that aren't embedded in the PDF document will fallback to a system font. Default value is false.
-        enableXfa: false, // Render Xfa forms if any. Default value is false.
-        viewportScale: 2.0, // The desired scale of PNG viewport. Default value is 1.0 which means to display page on the existing canvas with 100% scale.
-        outputFolder: 'output/folder', // Folder to write output PNG files. If not specified, PNG output will be available only as a Buffer content, without saving to a file.
-        outputFileMaskFunc: (pageNumber) => `page_${pageNumber}.png`, // Output filename mask function. Example: (pageNumber) => `page_${pageNumber}.png`
-        pdfFilePassword: 'pa$$word', // Password for encrypted PDF.
-        pagesToProcess: [1, 3, 11], // Subset of pages to convert (first page = 1), other pages will be skipped if specified.
-        strictPagesToProcess: false, // When `true`, will throw an error if specified page number in pagesToProcess is invalid, otherwise will skip invalid page. Default value is false.
-        verbosityLevel: 0, // Verbosity level. ERRORS: 0, WARNINGS: 1, INFOS: 5. Default value is 0.
-        returnPageContent: true, // When `false`, the `content` buffer will not be returned in the output, which can save memory. If `outputFolder` is provided, files are written before clearing content. Default value is true.
-        processPagesInParallel: false, // How to process pages: 'parallel' or 'serial'. Default value is false (serial processing).
-        concurrencyLimit: 4, // Maximum number of pages to process concurrently (default: 4, min: 1). Higher values may increase memory usage. Only applies when processPagesInParallel is true.
-    });
-    // Further processing of pngPages
+const pngPages = await pdfToPng('document.pdf', {
+    outputFolder: './output',
+});
+
+console.log(`Converted ${pngPages.length} pages`);
+```
+
+Or with TypeScript:
+
+```typescript
+import { pdfToPng, type PngPageOutput } from 'pdf-to-png-converter';
+
+const pngPages: PngPageOutput[] = await pdfToPng('document.pdf', {
+    outputFolder: './output',
 });
 ```
 
-## Output
+---
 
-The output of the `pdfToPng` function is an array of objects with the following structure:
+## API Reference
+
+### `pdfToPng(input, options?)`
+
+Converts PDF pages to PNG images.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `input` | `string \| ArrayBufferLike` | PDF file path or buffer |
+| `options` | `PdfToPngOptions` | Optional configuration object |
+
+**Returns:** `Promise<PngPageOutput[]>` - Array of converted PNG pages
+
+### Options
 
 ```javascript
 {
-    pageNumber: number; // Page number in PDF file
-    name: string; // PNG page name (use outputFileMaskFunc to change it)
-    content?: Buffer; // PNG page Buffer content (undefined when `returnPageContent` is false)
-    path: string; // Path to the rendered PNG page file (empty string if outputFolder is not provided)
-    width: number; // PNG page width
-    height: number; // PNG page height
+    // Font & Rendering Options
+    disableFontFace: boolean,        // Disable font face rendering (default: true)
+    useSystemFonts: boolean,         // Use system fonts as fallback (default: false)
+    enableXfa: boolean,              // Render XFA forms (default: true)
+    
+    // Output Options
+    outputFolder?: string,           // Directory to save PNG files
+    outputFileMaskFunc?: (pageNumber: number) => string; // Custom filename function
+    
+    // Rendering Options
+    viewportScale: number,           // PNG scale/zoom level (default: 1.0)
+    
+    // Security
+    pdfFilePassword?: string,        // Password for encrypted PDFs
+    
+    // Processing
+    pagesToProcess?: number[],       // Pages to convert (1-indexed, e.g., [1, 3, 5])
+    processPagesInParallel: boolean, // Enable parallel processing (default: false)
+    concurrencyLimit: number,        // Max concurrent pages (default: 4)
+    
+    // Output Control
+    returnPageContent: boolean,      // Include PNG buffer in output (default: true)
+    
+    // Logging
+    verbosityLevel: number,          // 0=ERRORS, 1=WARNINGS, 5=INFOS (default: 0)
 }
 ```
+
+---
+
+## Examples
+
+### Basic Usage
+
+```javascript
+const { pdfToPng } = require('pdf-to-png-converter');
+
+(async () => {
+    const pngPages = await pdfToPng('document.pdf', {
+        outputFolder: './output',
+    });
+    console.log(`Successfully converted ${pngPages.length} pages`);
+})();
+```
+
+### Advanced Configuration
+
+```javascript
+const pngPages = await pdfToPng('document.pdf', {
+    // Rendering
+    viewportScale: 2.0,              // 2x zoom for higher resolution
+    disableFontFace: false,          // Use font face rendering
+    useSystemFonts: true,            // Fallback to system fonts
+    
+    // Output
+    outputFolder: './pdf-images',
+    outputFileMaskFunc: (pageNumber) => `page-${String(pageNumber).padStart(3, '0')}.png`,
+    returnPageContent: true,
+    
+    // Performance
+    processPagesInParallel: true,
+    concurrencyLimit: 8,
+    
+    // Logging
+    verbosityLevel: 1,               // Log warnings
+});
+```
+
+### Convert Specific Pages
+
+```javascript
+const pngPages = await pdfToPng('document.pdf', {
+    outputFolder: './output',
+    pagesToProcess: [1, 3, 5],       // Only convert first, third, and fifth pages
+});
+```
+
+### Handle Encrypted PDFs
+
+```javascript
+const pngPages = await pdfToPng('protected.pdf', {
+    outputFolder: './output',
+    pdfFilePassword: 'mypassword',
+});
+```
+
+### Convert from Buffer
+
+```javascript
+const fs = require('fs');
+const { pdfToPng } = require('pdf-to-png-converter');
+
+const pdfBuffer = fs.readFileSync('document.pdf');
+const pngPages = await pdfToPng(pdfBuffer, {
+    outputFolder: './output',
+    outputFileMaskFunc: (pageNumber) => `page_${pageNumber}.png`,
+});
+```
+
+### Memory-Efficient Processing
+
+```javascript
+// Without returning page content (saves memory for large PDFs)
+const pngPages = await pdfToPng('large-document.pdf', {
+    outputFolder: './output',
+    returnPageContent: false,        // Don't keep PNG buffers in memory
+    processPagesInParallel: true,    // Process multiple pages concurrently
+    concurrencyLimit: 4,
+});
+
+// Pages are written to disk, content property will be undefined
+pngPages.forEach(page => {
+    console.log(`Saved: ${page.path}`);
+});
+```
+
+---
+
+## Output Format
+
+The `pdfToPng` function returns an array of page objects:
+
+```javascript
+[
+    {
+        pageNumber: 1,                      // Page number in the PDF
+        name: 'document_page_1.png',        // PNG filename
+        content: Buffer<...>,               // PNG image data (or undefined if returnPageContent=false)
+        path: '/output/document_page_1.png', // Full file path
+        width: 612,                         // Image width in pixels
+        height: 792                         // Image height in pixels
+    },
+    // ... more pages
+]
+```
+
+---
+
+## License
+
+MIT © [dichovsky](https://github.com/dichovsky)
 
 ## Buy Me A Coffee
 

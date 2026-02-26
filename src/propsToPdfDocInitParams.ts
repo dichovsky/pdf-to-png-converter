@@ -15,25 +15,15 @@ export function propsToPdfDocInitParams(props?: PdfToPngOptions): pdfApiTypes.Do
     };
 
     // Map 'verbosityLevel' from PdfToPngOptions to 'verbosity' in DocumentInitParameters
-    pdfDocInitParams.verbosity = props?.verbosityLevel !== undefined
-        ? props.verbosityLevel
-        : VerbosityLevel.ERRORS;
+    pdfDocInitParams.verbosity = props?.verbosityLevel ?? VerbosityLevel.ERRORS;
 
-    pdfDocInitParams.disableFontFace = props?.disableFontFace !== undefined
-        ? props.disableFontFace
-        : PDF_TO_PNG_OPTIONS_DEFAULTS.disableFontFace;
+    pdfDocInitParams.disableFontFace = props?.disableFontFace ?? PDF_TO_PNG_OPTIONS_DEFAULTS.disableFontFace;
 
-    pdfDocInitParams.useSystemFonts = props?.useSystemFonts !== undefined
-        ? props.useSystemFonts
-        : PDF_TO_PNG_OPTIONS_DEFAULTS.useSystemFonts;
+    pdfDocInitParams.useSystemFonts = props?.useSystemFonts ?? PDF_TO_PNG_OPTIONS_DEFAULTS.useSystemFonts;
 
-    pdfDocInitParams.enableXfa = props?.enableXfa !== undefined
-        ? props.enableXfa
-        : PDF_TO_PNG_OPTIONS_DEFAULTS.enableXfa;
+    pdfDocInitParams.enableXfa = props?.enableXfa ?? PDF_TO_PNG_OPTIONS_DEFAULTS.enableXfa;
 
-    pdfDocInitParams.password = props?.pdfFilePassword !== undefined
-        ? props.pdfFilePassword
-        : PDF_TO_PNG_OPTIONS_DEFAULTS.pdfFilePassword;
+    pdfDocInitParams.password = props?.pdfFilePassword ?? PDF_TO_PNG_OPTIONS_DEFAULTS.pdfFilePassword;
 
     return pdfDocInitParams;
 }

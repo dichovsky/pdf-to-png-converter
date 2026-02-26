@@ -10,7 +10,7 @@ export class NodeCanvasFactory {
      * @returns A new canvas context with the specified width and height.
      * @throws An error if the width or height is less than or equal to zero.
      */
-    create(width: number, height: number): CanvasAndContext {
+    public create(width: number, height: number): CanvasAndContext {
         assert.ok(width > 0 && height > 0, 'Canvas width and height must be greater than zero');
         const canvas = new Canvas(width, height);
 
@@ -26,7 +26,7 @@ export class NodeCanvasFactory {
      * @param width - The new width of the canvas.
      * @param height - The new height of the canvas.
      */
-    reset(canvasAndContext: CanvasAndContext, width: number, height: number): void {
+    public reset(canvasAndContext: CanvasAndContext, width: number, height: number): void {
         assert.ok(canvasAndContext.canvas, 'Canvas object is required');
         assert.ok(width > 0 && height > 0, 'Canvas width and height must be greater than zero');
         canvasAndContext.canvas.width = width;
@@ -39,7 +39,7 @@ export class NodeCanvasFactory {
      * setting the canvas and context properties to undefined.
      * @param canvasAndContext - The canvas and its context to be destroyed.
      */
-    destroy(canvasAndContext: CanvasAndContext): void {
+    public destroy(canvasAndContext: CanvasAndContext): void {
         assert.ok(canvasAndContext.canvas, 'Canvas object is required');
         canvasAndContext.canvas.width = 0;
         canvasAndContext.canvas.height = 0;

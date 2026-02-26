@@ -1,23 +1,40 @@
 import type { DocumentInitParameters } from 'pdfjs-dist/types/src/display/api';
 import { normalizePath } from './normalizePath';
 
+/**
+ * Default values applied to `PdfToPngOptions` fields that are not explicitly set by the caller.
+ * These are also used as the source of truth for documented defaults in JSDoc comments on the type.
+ */
 export const PDF_TO_PNG_OPTIONS_DEFAULTS = {
     viewportScale: 1,
     disableFontFace: true,
     useSystemFonts: false,
     enableXfa: true,
+    /** Used as the output filename stem when the PDF is supplied as a buffer rather than a file path. */
     outputFileMask: 'buffer',
-    strictPagesToProcess: false,
     pdfFilePassword: undefined,
     concurrencyLimit: 4,
 };
 
+/**
+ * Default pdfjs `DocumentInitParameters` used when initialising a PDF document.
+ * - `cMapUrl` / `cMapPacked`: point to the pre-packed character maps bundled with `pdfjs-dist`,
+ *    required for rendering CJK and other non-Latin PDFs correctly.
+ * - `standardFontDataUrl`: path to the standard Type 1 / TrueType fonts bundled with `pdfjs-dist`,
+ *    used as fallbacks when a PDF does not embed its fonts.
+ *
+ * Both paths are resolved relative to `process.cwd()` via `normalizePath`.
+ */
 export const DOCUMENT_INIT_PARAMS_DEFAULTS: DocumentInitParameters = {
     cMapUrl: normalizePath('./node_modules/pdfjs-dist/cmaps/'),
     cMapPacked: true,
     standardFontDataUrl: normalizePath('./node_modules/pdfjs-dist/standard_fonts/'),
 };
 
+/**
+ * Filenames of the standard font files shipped with `pdfjs-dist` (Foxit and Liberation fonts).
+ * Used by tests to verify that the expected font assets are present after installation.
+ */
 export const STANDARD_FONTS = [
     'FoxitDingbats.pfb',
     'FoxitFixed.pfb',
@@ -37,6 +54,12 @@ export const STANDARD_FONTS = [
     'LiberationSans-Regular.ttf',
 ];
 
+/**
+ * Filenames of the pre-packed character map (CMap) files shipped with `pdfjs-dist`.
+ * CMaps are required for correct text extraction and rendering of CJK (Chinese, Japanese, Korean)
+ * and other multi-byte character encodings in PDFs.
+ * Used by tests to verify that the expected CMap assets are present after installation.
+ */
 export const STANDARD_CMAPS = [
     '78-EUC-H.bcmap',
     '78-EUC-V.bcmap',
