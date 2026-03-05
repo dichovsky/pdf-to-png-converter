@@ -1,5 +1,5 @@
 import { promises as fsPromises } from 'node:fs';
-import { join, parse } from 'node:path';
+import { join, parse, resolve, sep } from 'node:path';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { PDF_TO_PNG_OPTIONS_DEFAULTS } from './const';
 import { NodeCanvasFactory } from './node.canvas.factory';
@@ -344,8 +344,12 @@ async function processPdfPage(
  *   the original error from `fsPromises.writeFile` will be propagated.
  */
 async function savePNGfile(pngPageOutput: PngPageOutput, outputFolder: string): Promise<void> {
-    pngPageOutput.path = join(outputFolder, pngPageOutput.name);
-    /* istanbul ignore next */
+    const resolvedOutputFolder = resolve(outputFolder);
+    const resolvedFilePath = resolve(outputFolder, pngPageOutput.name);
+    if (!resolvedFilePath.startsWith(resolvedOutputFolder + sep)) {
+        throw new Error(`Output file name escapes the output folder: ${pngPageOutput.name}`);
+    }
+    pngPageOutput.path = resolvedFilePath;
     if (pngPageOutput.content === undefined) {
         throw new Error(`Cannot write PNG file "${pngPageOutput.path}" because content is undefined.`);
     }

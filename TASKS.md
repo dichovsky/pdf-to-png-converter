@@ -7,28 +7,6 @@
 
 ## Security
 
-### [P0] Validate output file names to prevent path-traversal attacks
-
-**Problem**
-`outputFileMaskFunc` is a caller-supplied callback whose return value is passed directly to `join(outputFolder, name)` inside `savePNGfile`. A malicious or buggy callback returning `../../etc/shadow.png` would write a file outside `outputFolder`, because `path.join` normalises `..` segments.
-
-**Impact**
-Arbitrary file write anywhere the Node.js process has permission to write. High severity in any scenario where the callback originates from untrusted input.
-
-**Solution**
-After computing the resolved output path, assert it starts with the resolved `outputFolder`:
-```typescript
-const resolved = resolve(outputFolder, pngPageOutput.name);
-if (!resolved.startsWith(resolve(outputFolder) + sep)) {
-    throw new Error(`Output file name escapes the output folder: ${pngPageOutput.name}`);
-}
-```
-
-**Files**
-- `src/pdfToPng.ts` (`savePNGfile` function)
-
----
-
 ### [P1] Pin GitHub Actions to commit SHAs instead of mutable version tags
 
 **Problem**
@@ -352,30 +330,6 @@ Call the appropriate one from the caller based on `returnMetadataOnly`.
 ---
 
 ## Testing
-
-### [P1] Add test for `outputFileMaskFunc` path-traversal rejection
-
-**Problem**
-Once the path-traversal guard is added (see Security section), there is no test asserting that a `outputFileMaskFunc` returning `../../evil.png` is rejected with an appropriate error.
-
-**Impact**
-The security control has no automated regression test; a future refactor could silently remove it.
-
-**Solution**
-Add a test case:
-```typescript
-await expect(
-    pdfToPng('./test-data/sample.pdf', {
-        outputFolder: './test-results/guard-test',
-        outputFileMaskFunc: () => '../../etc/evil.png',
-    })
-).rejects.toThrow('Output file name escapes the output folder');
-```
-
-**Files**
-- `__tests__/` (new test file or added to an existing relevant file)
-
----
 
 ### [P1] Remove or convert `__tests__/pdf.to.file.test.js` to TypeScript
 
