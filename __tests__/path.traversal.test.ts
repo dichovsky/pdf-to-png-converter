@@ -15,15 +15,17 @@ test('should reject outputFileMaskFunc returning a path-traversal filename', asy
 });
 
 test('should reject outputFileMaskFunc returning an absolute path outside outputFolder', async () => {
+    const absolutePathOutside = resolve(outputFolder, '..', 'evil.png');
     await expect(
         pdfToPng(pdfFilePath, {
             outputFolder,
-            outputFileMaskFunc: () => '/tmp/evil.png',
+            outputFileMaskFunc: () => absolutePathOutside,
         }),
     ).rejects.toThrow('Output file name escapes the output folder');
 });
 
 test('should accept outputFileMaskFunc returning a safe filename', async () => {
+    const resolvedOutputFolder = resolve(outputFolder);
     const pngPages = await pdfToPng(pdfFilePath, {
         outputFolder,
         outputFileMaskFunc: (pageNumber: number) => `safe_page_${pageNumber}.png`,
@@ -33,5 +35,6 @@ test('should accept outputFileMaskFunc returning a safe filename', async () => {
     expect(pngPages.length).toBeGreaterThan(0);
     for (const pngPage of pngPages) {
         expect(pngPage.path).toContain('safe_page_');
+        expect(pngPage.path.startsWith(resolvedOutputFolder)).toBe(true);
     }
 });

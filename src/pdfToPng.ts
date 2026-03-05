@@ -1,5 +1,5 @@
 import { promises as fsPromises } from 'node:fs';
-import { join, parse, resolve, sep } from 'node:path';
+import { join, parse, relative, resolve } from 'node:path';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { PDF_TO_PNG_OPTIONS_DEFAULTS } from './const';
 import { NodeCanvasFactory } from './node.canvas.factory';
@@ -346,7 +346,8 @@ async function processPdfPage(
 async function savePNGfile(pngPageOutput: PngPageOutput, outputFolder: string): Promise<void> {
     const resolvedOutputFolder = resolve(outputFolder);
     const resolvedFilePath = resolve(outputFolder, pngPageOutput.name);
-    if (!resolvedFilePath.startsWith(resolvedOutputFolder + sep)) {
+    const rel = relative(resolvedOutputFolder, resolvedFilePath);
+    if (rel.startsWith('..')) {
         throw new Error(`Output file name escapes the output folder: ${pngPageOutput.name}`);
     }
     pngPageOutput.path = resolvedFilePath;
