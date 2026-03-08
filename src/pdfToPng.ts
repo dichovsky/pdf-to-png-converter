@@ -1,5 +1,5 @@
 import { promises as fsPromises } from 'node:fs';
-import { isAbsolute, join, parse, relative, resolve } from 'node:path';
+import { dirname, isAbsolute, join, parse, relative, resolve, sep } from 'node:path';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { PDF_TO_PNG_OPTIONS_DEFAULTS } from './const';
 import { NodeCanvasFactory } from './node.canvas.factory';
@@ -323,6 +323,15 @@ async function processPdfPage(
 }
 
 /**
+ * Returns `true` when `rel` (a result of `path.relative()`) indicates that the path
+ * escapes its base directory — i.e. it is `'..'`, starts with `'..` + `sep` (traversal),
+ * or is absolute (cross-drive escape on Windows).
+ */
+function isEscapingRelativePath(rel: string): boolean {
+    return rel === '..' || rel.startsWith('..' + sep) || isAbsolute(rel);
+}
+
+/**
  * Write a PNG page to disk.
  *
  * This function sets `pngPageOutput.path` to the file path produced by joining
@@ -346,10 +355,22 @@ async function processPdfPage(
 async function savePNGfile(pngPageOutput: PngPageOutput, outputFolder: string): Promise<void> {
     const resolvedOutputFolder = resolve(outputFolder);
     const resolvedFilePath = resolve(outputFolder, pngPageOutput.name);
-    const rel = relative(resolvedOutputFolder, resolvedFilePath);
-    if (rel.startsWith('..') || isAbsolute(rel)) {
+
+    // Guard against path-traversal via .. segments or cross-drive absolute paths.
+    // Use a segment-aware check (rel === '..' or starts with '../') to avoid false positives
+    // on legitimate filenames that begin with '..', e.g. '..evil.png'.
+    if (isEscapingRelativePath(relative(resolvedOutputFolder, resolvedFilePath))) {
         throw new Error(`Output file name escapes the output folder: ${pngPageOutput.name}`);
     }
+
+    // Guard against symlink-based escapes: resolve symlinks in the output folder and in the
+    // file's parent directory, then re-check containment.
+    const realOutputFolder = await fsPromises.realpath(resolvedOutputFolder);
+    const realFileDir = await fsPromises.realpath(dirname(resolvedFilePath));
+    if (isEscapingRelativePath(relative(realOutputFolder, realFileDir))) {
+        throw new Error(`Output file name escapes the output folder: ${pngPageOutput.name}`);
+    }
+
     pngPageOutput.path = resolvedFilePath;
     if (pngPageOutput.content === undefined) {
         throw new Error(`Cannot write PNG file "${pngPageOutput.path}" because content is undefined.`);
