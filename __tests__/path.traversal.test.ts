@@ -24,6 +24,20 @@ test('should reject outputFileMaskFunc returning an absolute path outside output
     ).rejects.toThrow('Output file name escapes the output folder');
 });
 
+test('should accept outputFileMaskFunc returning a filename starting with .. (not a traversal)', async () => {
+    const resolvedOutputFolder = resolve(outputFolder);
+    const pngPages = await pdfToPng(pdfFilePath, {
+        outputFolder,
+        outputFileMaskFunc: (pageNumber: number) => `..evil_page_${pageNumber}.png`,
+        returnPageContent: false,
+    });
+
+    expect(pngPages.length).toBeGreaterThan(0);
+    for (const pngPage of pngPages) {
+        expect(pngPage.path.startsWith(resolvedOutputFolder)).toBe(true);
+    }
+});
+
 test('should accept outputFileMaskFunc returning a safe filename', async () => {
     const resolvedOutputFolder = resolve(outputFolder);
     const pngPages = await pdfToPng(pdfFilePath, {

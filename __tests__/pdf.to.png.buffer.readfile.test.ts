@@ -8,6 +8,7 @@ vi.mock('node:fs', () => ({
         readFile: vi.fn(),
         mkdir: vi.fn(),
         writeFile: vi.fn(),
+        realpath: vi.fn(),
     },
 }));
 
