@@ -3,3 +3,10 @@ test-results
 coverage
 out
 .vscode
+.env*
+.claude
+output
+tmp
+TASKS.md
+CLAUDE.md
+*.tgz

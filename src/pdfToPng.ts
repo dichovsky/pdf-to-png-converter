@@ -10,7 +10,7 @@ import type { PdfToPngOptions, PngPageOutput } from './interfaces';
  * Convert one or more pages from a PDF into PNG images.
  *
  * This function:
- * - Loads the provided PDF (either a file path string or an ArrayBuffer-like object).
+ * - Loads the provided PDF (a file path string, an `ArrayBufferLike`, a `Uint8Array`, or a Node.js `Buffer`).
  * - Opens a PDFDocumentProxy and determines which pages to process.
  * - Filters out invalid page numbers (pages < 1 or > number of pages in the document).
  * - When `props.returnMetadataOnly` is true: returns page dimensions, rotation, name, and page number
@@ -235,7 +235,7 @@ async function getPdfFileBuffer(pdfFile: string | ArrayBufferLike | Uint8Array):
 }
 
 /**
- * Loads a PDF document from a given ArrayBuffer and returns a PDF.js document proxy.
+ * Loads a PDF document from a given `Uint8Array` or `ArrayBufferLike` and returns a PDF.js document proxy.
  *
  * @param pdfFileBuffer - The buffer containing the PDF file data.
  * @param props - Optional configuration options for PDF loading.
@@ -268,8 +268,9 @@ async function getPdfDocument(pdfFileBuffer: Uint8Array | ArrayBufferLike, props
  * - Obtains the specified page from the provided PDF.js document (`PDFDocumentProxy`).
  * - When `returnMetadataOnly` is true: reads the viewport dimensions and page rotation, then returns
  *   immediately without creating a canvas or rendering; `page.cleanup()` is still called.
- * - When `returnMetadataOnly` is false: creates a canvas and drawing context, renders the page into the
- *   canvas at the requested scale, optionally encodes to PNG buffer, then cleans up via `finally`.
+ * - When `returnMetadataOnly` is false: verifies the canvas pixel area does not exceed
+ *   `MAX_CANVAS_PIXELS` (100,000,000 px) before allocation, then creates a canvas and drawing context,
+ *   renders the page at the requested scale, optionally encodes to PNG buffer, then cleans up via `finally`.
  * - Returns a `PngPageOutput` describing the page (including width, height, rotation, page number, name,
  *   and optional content).
  * - Ensures resources are cleaned up (calls `page.cleanup()` and `canvasFactory.destroy(...)`) even if rendering fails.
@@ -291,6 +292,7 @@ async function getPdfDocument(pdfFileBuffer: Uint8Array | ArrayBufferLike, props
  *
  * @returns A promise that resolves to a `PngPageOutput` containing page metadata and optionally the PNG image buffer.
  *
+ * @throws {Error} If the canvas pixel area (`viewport.width × viewport.height`) exceeds `MAX_CANVAS_PIXELS`.
  * @throws If retrieving the page, creating the canvas/context, rendering the page, or converting the canvas to a PNG buffer fails.
  */
 async function processPdfPage(

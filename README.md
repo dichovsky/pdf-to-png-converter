@@ -24,7 +24,7 @@
 A high-performance Node.js library for converting PDF files and buffers to PNG images. Perfect for web applications, document processing pipelines, and image generation workflows.
 
 **Key Benefits:**
-- ✨ **Zero Native Binaries** - Pure JavaScript, works everywhere
+- ✨ **No Build-Time Compilation** - Pre-built native binaries included, no `node-gyp` or compiler toolchain required
 - 🚀 **High Performance** - Supports parallel page processing
 - 🔐 **Encrypted PDFs** - Handle password-protected documents
 - 📦 **Lightweight** - Minimal dependencies
@@ -96,7 +96,7 @@ Converts PDF pages to PNG images.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `input` | `string \| ArrayBufferLike` | PDF file path or buffer |
+| `input` | `string \| ArrayBufferLike \| Uint8Array` | PDF file path, ArrayBuffer, or Uint8Array/Buffer |
 | `options` | `PdfToPngOptions` | Optional configuration object |
 
 **Returns:** `Promise<PngPageOutput[]>` - Array of converted PNG pages
@@ -115,15 +115,15 @@ Converts PDF pages to PNG images.
     outputFileMaskFunc?: (pageNumber: number) => string; // Custom filename function
     
     // Rendering Options
-    viewportScale: number,           // PNG scale/zoom level (default: 1.0)
-    
+    viewportScale: number,           // PNG scale/zoom level (default: 1.0, max: 1000)
+
     // Security
     pdfFilePassword?: string,        // Password for encrypted PDFs
-    
+
     // Processing
     pagesToProcess?: number[],       // Pages to convert (1-indexed, e.g., [1, 3, 5])
     processPagesInParallel: boolean, // Enable parallel processing (default: false)
-    concurrencyLimit: number,        // Max concurrent pages (default: 4)
+    concurrencyLimit: number,        // Max concurrent pages, positive integer (default: 4)
     
     // Output Control
     returnPageContent: boolean,      // Include PNG buffer in output (default: true)
