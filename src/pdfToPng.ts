@@ -73,12 +73,12 @@ import type { PdfToPngOptions, PngPageOutput } from './interfaces';
  * const outputs = await pdfToPng("/path/to/doc.pdf", { returnPageContent: true });
  */
 export async function pdfToPng(pdfFile: string | ArrayBufferLike | Uint8Array, props?: PdfToPngOptions): Promise<PngPageOutput[]> {
-    if (props?.viewportScale !== undefined) {
-        const viewportScale = props.viewportScale;
-        const MAX_VIEWPORT_SCALE = 1_000;
-        if (typeof viewportScale !== 'number' || !Number.isFinite(viewportScale) || viewportScale <= 0 || viewportScale > MAX_VIEWPORT_SCALE) {
-            throw new Error(`viewportScale must be a finite number greater than 0 and at most ${MAX_VIEWPORT_SCALE}, received: ${viewportScale}`);
-        }
+    // Capture and validate viewportScale before the first await so the validated value is
+    // immutable and cannot be bypassed by mutating `props` between validation and rendering.
+    const MAX_VIEWPORT_SCALE = 1_000;
+    const pageViewportScale: number = props?.viewportScale ?? PDF_TO_PNG_OPTIONS_DEFAULTS.viewportScale;
+    if (typeof pageViewportScale !== 'number' || !Number.isFinite(pageViewportScale) || pageViewportScale <= 0 || pageViewportScale > MAX_VIEWPORT_SCALE) {
+        throw new Error(`viewportScale must be a finite number greater than 0 and at most ${MAX_VIEWPORT_SCALE}, received: ${pageViewportScale}`);
     }
 
     // Fail fast: validate concurrencyLimit before any I/O so callers discover bad options immediately.
@@ -107,7 +107,6 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike | Uint8Array, p
     // Process each page
     const pngPagesOutput: PngPageOutput[] = [];
     try {
-        const pageViewportScale: number = props?.viewportScale ?? PDF_TO_PNG_OPTIONS_DEFAULTS.viewportScale;
         const defaultMask: string = typeof pdfFile === 'string' 
             ? parse(pdfFile).name 
             : PDF_TO_PNG_OPTIONS_DEFAULTS.outputFileMask;
