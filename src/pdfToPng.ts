@@ -381,19 +381,22 @@ async function savePNGfile(pngPageOutput: PngPageOutput, outputFolder: string): 
         throw new Error(`Output file name escapes the output folder: ${pngPageOutput.name}`);
     }
 
-    // Re-verify the output folder itself has not been swapped since the initial realpath check
-    // above. This second check immediately before writeFile narrows the TOCTOU race window.
-    // It does NOT fully eliminate the window — a sufficiently fast swap between this line and
-    // writeFile below could still succeed — but it raises the bar significantly for exploitation.
-    // Full elimination requires OS-level primitives (e.g. O_NOFOLLOW) unavailable in pure Node.js.
+    pngPageOutput.path = resolvedFilePath;
+    if (pngPageOutput.content === undefined) {
+        throw new Error(`Cannot write PNG file "${pngPageOutput.path}" because content is undefined.`);
+    }
+
+    // Re-verify the output folder immediately before writeFile to narrow the TOCTOU race window.
+    // Placing this check after all other validation means the gap between the check and the write
+    // is as small as possible. It does NOT fully eliminate the window — a sufficiently fast
+    // directory swap between this line and writeFile could still succeed — but it raises the bar
+    // for exploitation significantly. Full elimination requires O_NOFOLLOW on the open call, which
+    // cannot be applied portably via `fsPromises.writeFile` (it does not expose open flags) and
+    // would not protect directory-component races even where available.
     const realOutputFolderFinal = await fsPromises.realpath(resolvedOutputFolder);
     if (realOutputFolderFinal !== realOutputFolder) {
         throw new Error(`Output folder was modified during write: ${outputFolder}`);
     }
 
-    pngPageOutput.path = resolvedFilePath;
-    if (pngPageOutput.content === undefined) {
-        throw new Error(`Cannot write PNG file "${pngPageOutput.path}" because content is undefined.`);
-    }
     await fsPromises.writeFile(pngPageOutput.path, pngPageOutput.content as Buffer);
 }

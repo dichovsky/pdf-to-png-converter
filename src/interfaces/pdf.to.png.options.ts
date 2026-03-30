@@ -47,10 +47,12 @@ export interface PdfToPngOptions {
      * @remarks
      * **Security (TOCTOU):** The write-containment guard resolves symlinks and checks that the
      * output path stays within this folder, but a residual race window exists between the final
-     * check and the actual write. An attacker with local filesystem access could exploit this by
-     * atomically replacing the folder with a symlink during that window. To reduce exposure on
-     * multi-user or shared systems, ensure this directory is private and not writable by
-     * untrusted users.
+     * check and the actual write. A local attacker could exploit this via
+     * (a) atomically replacing the folder with a symlink during that window, or (b) creating or
+     * pre-populating a symlink at the destination filename inside this folder that redirects
+     * `writeFile()` elsewhere. To reduce exposure on multi-user or shared systems, ensure this
+     * directory is private, not writable by untrusted users, and does not contain untrusted,
+     * pre-existing symlinks at the filenames that will be written.
      */
     outputFolder?: string;
 
