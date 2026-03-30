@@ -74,8 +74,9 @@ import type { PdfToPngOptions, PngPageOutput } from './interfaces';
 export async function pdfToPng(pdfFile: string | ArrayBufferLike, props?: PdfToPngOptions): Promise<PngPageOutput[]> {
     if (props?.viewportScale !== undefined) {
         const viewportScale = props.viewportScale;
-        if (typeof viewportScale !== 'number' || !Number.isFinite(viewportScale) || viewportScale <= 0) {
-            throw new Error(`viewportScale must be a finite number greater than 0, received: ${viewportScale}`);
+        const MAX_VIEWPORT_SCALE = 1_000;
+        if (typeof viewportScale !== 'number' || !Number.isFinite(viewportScale) || viewportScale <= 0 || viewportScale > MAX_VIEWPORT_SCALE) {
+            throw new Error(`viewportScale must be a finite number greater than 0 and at most ${MAX_VIEWPORT_SCALE}, received: ${viewportScale}`);
         }
     }
 
@@ -112,6 +113,9 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike, props?: PdfToP
         if (props?.processPagesInParallel === true) {
             // Limit concurrency to avoid memory issues with large PDFs
             const concurrencyLimit: number = props?.concurrencyLimit ?? PDF_TO_PNG_OPTIONS_DEFAULTS.concurrencyLimit;
+            if (!Number.isInteger(concurrencyLimit) || concurrencyLimit < 1) {
+                throw new Error(`concurrencyLimit must be a positive integer >= 1, received: ${concurrencyLimit}`);
+            }
             for (let i = 0; i < validPagesToProcess.length; i += concurrencyLimit) {
                 const batch: number[] = validPagesToProcess.slice(i, i + concurrencyLimit);
                 const batchResults: PngPageOutput[] = await Promise.all(
