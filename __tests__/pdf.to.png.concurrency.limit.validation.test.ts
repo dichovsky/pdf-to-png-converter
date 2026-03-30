@@ -44,6 +44,8 @@ describe('pdfToPng concurrencyLimit validation', () => {
         const result = await pdfToPng(pdfFilePath, {
             processPagesInParallel: true,
             concurrencyLimit: 1,
+            returnMetadataOnly: true,
+            pagesToProcess: [1],
         });
         expect(result).toBeInstanceOf(Array);
         expect(result.length).toBeGreaterThan(0);
@@ -53,6 +55,8 @@ describe('pdfToPng concurrencyLimit validation', () => {
         const result = await pdfToPng(pdfFilePath, {
             processPagesInParallel: true,
             concurrencyLimit: 4,
+            returnMetadataOnly: true,
+            pagesToProcess: [1],
         });
         expect(result).toBeInstanceOf(Array);
         expect(result.length).toBeGreaterThan(0);

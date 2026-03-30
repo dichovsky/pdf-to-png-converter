@@ -96,7 +96,8 @@ export interface PdfToPngOptions {
 
     /**
      * Maximum number of pages rendered simultaneously when `processPagesInParallel` is `true`.
-     * Higher values increase throughput at the cost of memory. Minimum effective value is `1`.
+     * Must be a positive integer (`>= 1`). Non-integer or sub-1 values throw immediately (before any I/O).
+     * Higher values increase throughput at the cost of memory.
      * Only applies when `processPagesInParallel` is `true`.
      * Default: `4`.
      */
