@@ -40,7 +40,8 @@ export interface PdfToPngOptions {
     pdfFilePassword?: string;
 
     /**
-     * Folder path (relative to `process.cwd()`) where PNG files will be written.
+     * Folder path (relative or absolute) where PNG files will be written.
+     * Relative paths are resolved against `process.cwd()`.
      * The folder is created recursively if it does not exist.
      * When omitted, no files are written to disk.
      *

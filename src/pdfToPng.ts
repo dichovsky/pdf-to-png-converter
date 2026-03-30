@@ -390,9 +390,10 @@ async function savePNGfile(pngPageOutput: PngPageOutput, outputFolder: string): 
     // Placing this check after all other validation means the gap between the check and the write
     // is as small as possible. It does NOT fully eliminate the window — a sufficiently fast
     // directory swap between this line and writeFile could still succeed — but it raises the bar
-    // for exploitation significantly. Full elimination requires O_NOFOLLOW on the open call, which
-    // cannot be applied portably via `fsPromises.writeFile` (it does not expose open flags) and
-    // would not protect directory-component races even where available.
+    // for exploitation significantly. Completely eliminating this class of race would require
+    // enforcing no-follow semantics (for example via O_NOFOLLOW) on the underlying open(2) call,
+    // which cannot be done portably through `fsPromises.writeFile` and would not protect
+    // directory-component races even where available.
     const realOutputFolderFinal = await fsPromises.realpath(resolvedOutputFolder);
     if (realOutputFolderFinal !== realOutputFolder) {
         throw new Error(`Output folder was modified during write: ${outputFolder}`);
