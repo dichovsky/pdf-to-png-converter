@@ -43,7 +43,8 @@ import type { PdfToPngOptions, PngPageOutput } from './interfaces';
  *   using the content buffer, which will then be cleared from memory to save resources.
  *
  * Parameters:
- * @param pdfFile - Path to a PDF file or an ArrayBuffer-like containing PDF data.
+ * @param pdfFile - Path to a PDF file, an `ArrayBufferLike` (e.g. `ArrayBuffer`, `SharedArrayBuffer`),
+ *                  a `Uint8Array`, or a Node.js `Buffer` containing PDF data.
  * @param props - Optional conversion options (see PdfToPngOptions). Common options used:
  *   - pagesToProcess?: number[]         => Specific page numbers to convert (1-based).
  *   - processPagesInParallel?: boolean  => Whether to process pages concurrently.
@@ -71,7 +72,7 @@ import type { PdfToPngOptions, PngPageOutput } from './interfaces';
  * // Convert all pages and get buffers:
  * const outputs = await pdfToPng("/path/to/doc.pdf", { returnPageContent: true });
  */
-export async function pdfToPng(pdfFile: string | ArrayBufferLike, props?: PdfToPngOptions): Promise<PngPageOutput[]> {
+export async function pdfToPng(pdfFile: string | ArrayBufferLike | Uint8Array, props?: PdfToPngOptions): Promise<PngPageOutput[]> {
     if (props?.viewportScale !== undefined) {
         const viewportScale = props.viewportScale;
         if (typeof viewportScale !== 'number' || !Number.isFinite(viewportScale) || viewportScale <= 0) {
@@ -166,24 +167,27 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike, props?: PdfToP
 }
 
 /**
- * Reads or normalizes a PDF input into an ArrayBuffer-like object.
+ * Reads or normalizes a PDF input so it is ready to be passed to pdfjs.
  *
- * This asynchronous utility accepts either a filesystem path to a PDF file (string)
- * or an already-loaded ArrayBuffer-like instance. If given a path, it reads the file
- * using fsPromises.readFile and normalizes the result to always return an ArrayBuffer-like
- * instance. If the input is already an ArrayBuffer-like value, it is returned unchanged.
+ * Accepts a filesystem path, an `ArrayBufferLike` (e.g. `ArrayBuffer`, `SharedArrayBuffer`),
+ * or a `Uint8Array` / Node.js `Buffer`. Returns a `Uint8Array` or `ArrayBufferLike` that pdfjs
+ * can consume without an additional copy.
  *
  * Remarks:
- * - When reading from the filesystem, Node.js Buffer instances are converted to a
- *   platform-independent ArrayBuffer slice that represents the same bytes.
- * - File read errors (for example, ENOENT or permission errors) are propagated from
- *   fsPromises.readFile and should be handled by the caller.
- * - If fsPromises.readFile returns a type that is neither an ArrayBuffer nor a Node Buffer,
- *   this function throws an Error indicating an unsupported buffer type.
+ * - **String path:** calls `fsPromises.readFile` and normalizes the result.
+ *   - `ArrayBuffer` result: returned as-is (no copy).
+ *   - `Buffer` result: copied once into a standalone `Uint8Array` (avoids the pool-backed
+ *     `buffer.buffer.slice()` allocation; pdfjs rejects `Buffer` instances directly).
+ *   - Any other type: throws `Error('Unsupported buffer type: ...')`.
+ * - **`Buffer` / `Uint8Array` input:** `Buffer` is copied into a plain `Uint8Array` (same reason
+ *   as above). A `Uint8Array` that is not a `Buffer` is returned as-is.
+ * - **`ArrayBufferLike` input:** returned as-is; `getPdfDocument` wraps it in a zero-copy
+ *   `Uint8Array` view before handing it to pdfjs.
+ * - File read errors (e.g. ENOENT, permission denied) are propagated from `fsPromises.readFile`.
  *
- * @param pdfFile - Either a path to a PDF file (string) or an ArrayBuffer-like object
- *                  containing the PDF data.
- * @returns A Promise that resolves to an ArrayBuffer-like view containing the PDF bytes.
+ * @param pdfFile - A file path, `ArrayBufferLike`, or `Uint8Array` / `Buffer` containing PDF bytes.
+ * @returns A Promise resolving to a `Uint8Array` (for path and Buffer inputs) or the original
+ *          `ArrayBufferLike` (for ArrayBuffer/SharedArrayBuffer inputs).
  *
  * @throws {Error} If the filesystem read yields an unsupported buffer type.
  * @throws {Error} Propagates errors thrown by fsPromises.readFile (e.g., file not found,
@@ -199,7 +203,7 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike, props?: PdfToP
  *
  * @async
  */
-async function getPdfFileBuffer(pdfFile: string | ArrayBufferLike): Promise<Uint8Array | ArrayBufferLike> {
+async function getPdfFileBuffer(pdfFile: string | ArrayBufferLike | Uint8Array): Promise<Uint8Array | ArrayBufferLike> {
     if (typeof pdfFile === 'string') {
         const buffer = await fsPromises.readFile(pdfFile);
         // Normalise to a standalone Uint8Array so pdfjs can accept it directly (no copy at that point).
