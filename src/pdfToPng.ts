@@ -80,7 +80,7 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike, props?: PdfToP
     }
 
     // Read the PDF file and initialize the PDF document
-    const pdfFileBuffer: ArrayBufferLike = await getPdfFileBuffer(pdfFile);
+    const pdfFileBuffer: Uint8Array | ArrayBufferLike = await getPdfFileBuffer(pdfFile);
     const pdfDocument: PDFDocumentProxy = await getPdfDocument(pdfFileBuffer, props);
 
     // Get the pages to process based on the provided options, invalid pages will be filtered out
@@ -199,22 +199,26 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike, props?: PdfToP
  *
  * @async
  */
-async function getPdfFileBuffer(pdfFile: string | ArrayBufferLike): Promise<ArrayBufferLike> {
-    const isString: boolean = typeof pdfFile === 'string';
-    const pdfFileBuffer: ArrayBufferLike = isString
-        ? await (async () => {
-              const buffer = await fsPromises.readFile(pdfFile as string);
-              // Ensure we always return an ArrayBuffer
-              if (buffer instanceof ArrayBuffer) {
-                  return buffer;
-              } else if (Buffer.isBuffer(buffer)) {
-                  return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
-              } else {
-                  throw new Error(`Unsupported buffer type: ${Object.prototype.toString.call(buffer)}`);
-              }
-          })()
-        : (pdfFile as ArrayBufferLike);
-    return pdfFileBuffer;
+async function getPdfFileBuffer(pdfFile: string | ArrayBufferLike): Promise<Uint8Array | ArrayBufferLike> {
+    if (typeof pdfFile === 'string') {
+        const buffer = await fsPromises.readFile(pdfFile);
+        // Normalise to a standalone Uint8Array so pdfjs can accept it directly (no copy at that point).
+        // Node.js Buffers are pool-backed (buffer.byteLength !== buffer.buffer.byteLength), so we copy
+        // here once into a standalone Uint8Array, avoiding a separate ArrayBuffer.slice() allocation.
+        if (buffer instanceof ArrayBuffer) {
+            return buffer;
+        } else if (Buffer.isBuffer(buffer)) {
+            return new Uint8Array(buffer);
+        } else {
+            throw new Error(`Unsupported buffer type: ${Object.prototype.toString.call(buffer)}`);
+        }
+    }
+    // Direct ArrayBufferLike: if the caller passes a Buffer, convert to plain Uint8Array because
+    // pdfjs rejects Buffer instances and Buffer.byteLength !== Buffer.buffer.byteLength (pool-backed).
+    if (Buffer.isBuffer(pdfFile)) {
+        return new Uint8Array(pdfFile as Buffer);
+    }
+    return pdfFile;
 }
 
 /**
@@ -231,12 +235,16 @@ async function getPdfFileBuffer(pdfFile: string | ArrayBufferLike): Promise<Arra
  *
  * @throws Will throw if the PDF cannot be loaded or parsed.
  */
-async function getPdfDocument(pdfFileBuffer: ArrayBufferLike, props?: PdfToPngOptions): Promise<PDFDocumentProxy> {
+async function getPdfDocument(pdfFileBuffer: Uint8Array | ArrayBufferLike, props?: PdfToPngOptions): Promise<PDFDocumentProxy> {
     const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs');
     const documentInitParameters = propsToPdfDocInitParams(props);
+    // getPdfFileBuffer already normalises Buffer inputs to plain Uint8Array.
+    // - Uint8Array: use directly (standalone, byteLength === buffer.byteLength — pdfjs accepts as-is)
+    // - ArrayBufferLike: wrap as a view (new Uint8Array(arrayBuffer) is a view, not a copy)
+    const data: Uint8Array = pdfFileBuffer instanceof Uint8Array ? pdfFileBuffer : new Uint8Array(pdfFileBuffer);
     return await getDocument({
         ...documentInitParameters,
-        data: new Uint8Array(pdfFileBuffer),
+        data,
     }).promise;
 }
 
