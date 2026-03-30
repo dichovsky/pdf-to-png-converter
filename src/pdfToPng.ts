@@ -75,8 +75,18 @@ import type { PdfToPngOptions, PngPageOutput } from './interfaces';
 export async function pdfToPng(pdfFile: string | ArrayBufferLike | Uint8Array, props?: PdfToPngOptions): Promise<PngPageOutput[]> {
     if (props?.viewportScale !== undefined) {
         const viewportScale = props.viewportScale;
-        if (typeof viewportScale !== 'number' || !Number.isFinite(viewportScale) || viewportScale <= 0) {
-            throw new Error(`viewportScale must be a finite number greater than 0, received: ${viewportScale}`);
+        const MAX_VIEWPORT_SCALE = 1_000;
+        if (typeof viewportScale !== 'number' || !Number.isFinite(viewportScale) || viewportScale <= 0 || viewportScale > MAX_VIEWPORT_SCALE) {
+            throw new Error(`viewportScale must be a finite number greater than 0 and at most ${MAX_VIEWPORT_SCALE}, received: ${viewportScale}`);
+        }
+    }
+
+    // Fail fast: validate concurrencyLimit before any I/O so callers discover bad options immediately.
+    // Only relevant when processPagesInParallel is true; ignored otherwise.
+    if (props?.processPagesInParallel === true) {
+        const concurrencyLimitEarly: number = props.concurrencyLimit ?? PDF_TO_PNG_OPTIONS_DEFAULTS.concurrencyLimit;
+        if (!Number.isInteger(concurrencyLimitEarly) || concurrencyLimitEarly < 1) {
+            throw new Error(`concurrencyLimit must be a positive integer >= 1, received: ${concurrencyLimitEarly}`);
         }
     }
 
@@ -111,8 +121,8 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike | Uint8Array, p
               ? true
               : (props?.returnPageContent ?? true);
         if (props?.processPagesInParallel === true) {
-            // Limit concurrency to avoid memory issues with large PDFs
-            const concurrencyLimit: number = props?.concurrencyLimit ?? PDF_TO_PNG_OPTIONS_DEFAULTS.concurrencyLimit;
+            // concurrencyLimit was already validated above (fail-fast); safe to use directly.
+            const concurrencyLimit: number = props.concurrencyLimit ?? PDF_TO_PNG_OPTIONS_DEFAULTS.concurrencyLimit;
             for (let i = 0; i < validPagesToProcess.length; i += concurrencyLimit) {
                 const batch: number[] = validPagesToProcess.slice(i, i + concurrencyLimit);
                 const batchResults: PngPageOutput[] = await Promise.all(
