@@ -320,6 +320,17 @@ async function processPdfPage(
         }
     }
 
+    // Guard against canvas allocations that would cause OOM. Even a modest PDF page combined
+    // with a high viewportScale can produce an enormous pixel count: an A4 page at scale 1000
+    // yields ~5×10¹¹ pixels. This check fires before any allocation so the error is cheap.
+    const MAX_CANVAS_PIXELS = 100_000_000; // 100 MP at 4 bytes/px ≈ 400 MB
+    if (viewport.width * viewport.height > MAX_CANVAS_PIXELS) {
+        page.cleanup();
+        throw new Error(
+            `Canvas ${Math.round(viewport.width)}×${Math.round(viewport.height)} px exceeds the ${MAX_CANVAS_PIXELS.toLocaleString()} pixel limit. Reduce viewportScale.`,
+        );
+    }
+
     const canvasFactory = pdf.canvasFactory ? (pdf.canvasFactory as NodeCanvasFactory) : new NodeCanvasFactory();
 
     const { canvas, context } = canvasFactory.create(viewport.width, viewport.height);

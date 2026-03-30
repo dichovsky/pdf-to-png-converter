@@ -78,21 +78,38 @@ describe('pdfToPng', () => {
     });
 
     it('should not throw for viewportScale of 1000 (boundary — maximum valid value)', async () => {
-        (fsPromises.readFile as Mock).mockResolvedValue(new ArrayBuffer(8));
-        // The call will ultimately fail when trying to parse an empty ArrayBuffer as a PDF,
-        // but the viewportScale validation itself must not throw.
-        await expect(pdfToPng('test.pdf', { viewportScale: 1000 })).rejects.not.toThrow(
-            'viewportScale must be a finite number greater than 0 and at most 1000, received: 1000',
-        );
+        (fsPromises.readFile as Mock).mockResolvedValueOnce(new ArrayBuffer(8));
+        (getDocument as Mock).mockReturnValueOnce({ promise: Promise.reject(new Error('Mock PDF parse error')) });
+        // The call fails at PDF parsing — viewportScale validation must not throw first.
+        await expect(pdfToPng('test.pdf', { viewportScale: 1000 })).rejects.toThrow('Mock PDF parse error');
     });
 
     it('should not throw for viewportScale of 0.001 (very small but valid)', async () => {
-        (fsPromises.readFile as Mock).mockResolvedValue(new ArrayBuffer(8));
-        // The call will ultimately fail when trying to parse an empty ArrayBuffer as a PDF,
-        // but the viewportScale validation itself must not throw.
-        await expect(pdfToPng('test.pdf', { viewportScale: 0.001 })).rejects.not.toThrow(
-            'viewportScale must be a finite number greater than 0 and at most 1000, received: 0.001',
-        );
+        (fsPromises.readFile as Mock).mockResolvedValueOnce(new ArrayBuffer(8));
+        (getDocument as Mock).mockReturnValueOnce({ promise: Promise.reject(new Error('Mock PDF parse error')) });
+        // The call fails at PDF parsing — viewportScale validation must not throw first.
+        await expect(pdfToPng('test.pdf', { viewportScale: 0.001 })).rejects.toThrow('Mock PDF parse error');
+    });
+
+    it('should throw when canvas pixel area exceeds the limit', async () => {
+        // A page whose natural dimensions already exceed MAX_CANVAS_PIXELS regardless of scale.
+        const mockPage = {
+            getViewport: vi.fn().mockReturnValue({ width: 20_000, height: 20_000 }), // 400 MP > 100 MP limit
+            rotate: 0,
+            cleanup: vi.fn(),
+        };
+        const mockDocument = {
+            numPages: 1,
+            getPage: vi.fn().mockResolvedValue(mockPage),
+            cleanup: vi.fn(),
+            canvasFactory: null,
+        };
+
+        (fsPromises.readFile as Mock).mockResolvedValueOnce(new ArrayBuffer(8));
+        (getDocument as Mock).mockReturnValueOnce({ promise: Promise.resolve(mockDocument) });
+
+        await expect(pdfToPng('test.pdf')).rejects.toThrow('exceeds the');
+        expect(mockPage.cleanup).toHaveBeenCalled();
     });
 
     it('should throw when output folder realpath changes between initial check and final write', async () => {
