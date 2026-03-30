@@ -13,6 +13,7 @@
     "types": [
       "node"
     ],
+    "rootDir": "./src",
     "outDir": "./out",
     "strict": true,
     "esModuleInterop": true,
