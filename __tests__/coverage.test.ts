@@ -55,33 +55,33 @@ describe('pdfToPng', () => {
 
     it('should throw for viewportScale of 0', async () => {
         await expect(pdfToPng('test.pdf', { viewportScale: 0 })).rejects.toThrow(
-            'viewportScale must be a finite number greater than 0 and at most 1000, received: 0',
+            'viewportScale must be a finite number greater than 0 and at most 100, received: 0',
         );
     });
 
     it('should throw for negative viewportScale', async () => {
         await expect(pdfToPng('test.pdf', { viewportScale: -1 })).rejects.toThrow(
-            'viewportScale must be a finite number greater than 0 and at most 1000, received: -1',
+            'viewportScale must be a finite number greater than 0 and at most 100, received: -1',
         );
     });
 
-    it('should throw for viewportScale of 1001 (above maximum)', async () => {
-        await expect(pdfToPng('test.pdf', { viewportScale: 1001 })).rejects.toThrow(
-            'viewportScale must be a finite number greater than 0 and at most 1000, received: 1001',
+    it('should throw for viewportScale of 101 (above maximum)', async () => {
+        await expect(pdfToPng('test.pdf', { viewportScale: 101 })).rejects.toThrow(
+            'viewportScale must be a finite number greater than 0 and at most 100, received: 101',
         );
     });
 
     it('should throw for viewportScale of 1e6 (extremely large, OOM risk)', async () => {
         await expect(pdfToPng('test.pdf', { viewportScale: 1e6 })).rejects.toThrow(
-            'viewportScale must be a finite number greater than 0 and at most 1000, received: 1000000',
+            'viewportScale must be a finite number greater than 0 and at most 100, received: 1000000',
         );
     });
 
-    it('should not throw for viewportScale of 1000 (boundary — maximum valid value)', async () => {
+    it('should not throw for viewportScale of 100 (boundary — maximum valid value)', async () => {
         (fsPromises.readFile as Mock).mockResolvedValueOnce(new ArrayBuffer(8));
         (getDocument as Mock).mockReturnValueOnce({ promise: Promise.reject(new Error('Mock PDF parse error')) });
         // The call fails at PDF parsing — viewportScale validation must not throw first.
-        await expect(pdfToPng('test.pdf', { viewportScale: 1000 })).rejects.toThrow('Mock PDF parse error');
+        await expect(pdfToPng('test.pdf', { viewportScale: 100 })).rejects.toThrow('Mock PDF parse error');
     });
 
     it('should not throw for viewportScale of 0.001 (very small but valid)', async () => {

@@ -115,7 +115,7 @@ Converts PDF pages to PNG images.
     outputFileMaskFunc?: (pageNumber: number) => string; // Custom filename function
     
     // Rendering Options
-    viewportScale: number,           // PNG scale/zoom level (default: 1.0, max: 1000)
+    viewportScale: number,           // PNG scale/zoom level (default: 1.0, max: 100)
 
     // Security
     pdfFilePassword?: string,        // Password for encrypted PDFs

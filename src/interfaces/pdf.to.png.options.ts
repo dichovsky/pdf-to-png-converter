@@ -8,7 +8,7 @@ export interface PdfToPngOptions {
     /**
      * Scale factor applied to each page viewport before rendering.
      * Values above `1` produce larger, higher-resolution images; values below `1` produce smaller images.
-     * Must be a finite positive number. Maximum allowed value is `1000`; values above this limit throw
+     * Must be a finite positive number. Maximum allowed value is `100`; values above this limit throw
      * immediately to prevent runaway memory allocation (OOM) during canvas creation.
      * Default: `1`.
      */
