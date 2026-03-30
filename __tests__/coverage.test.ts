@@ -3,6 +3,7 @@ import type { Mock } from 'vitest';
 import { describe, expect, it, vi } from 'vitest';
 import * as index from '../src/index';
 import { pdfToPng } from '../src/pdfToPng';
+import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 
 vi.mock('node:fs', () => ({
     promises: {
@@ -62,5 +63,44 @@ describe('pdfToPng', () => {
         await expect(pdfToPng('test.pdf', { viewportScale: -1 })).rejects.toThrow(
             'viewportScale must be a finite number greater than 0, received: -1',
         );
+    });
+
+    it('should throw when output folder realpath changes between initial check and final write', async () => {
+        // Simulate a TOCTOU swap: realpath returns the same value for the initial containment
+        // checks (passes), then a different value for the final re-verification (triggers error).
+        const mockCanvas = { toBuffer: vi.fn().mockReturnValue(Buffer.alloc(0)) };
+        const mockCanvasFactory = {
+            create: vi.fn().mockReturnValue({ canvas: mockCanvas, context: {} }),
+            destroy: vi.fn(),
+        };
+        const mockPage = {
+            getViewport: vi.fn().mockReturnValue({ width: 10, height: 10 }),
+            render: vi.fn().mockReturnValue({ promise: Promise.resolve() }),
+            rotate: 0,
+            cleanup: vi.fn(),
+        };
+        const mockDocument = {
+            numPages: 1,
+            getPage: vi.fn().mockResolvedValue(mockPage),
+            cleanup: vi.fn(),
+            canvasFactory: mockCanvasFactory,
+        };
+
+        (fsPromises.readFile as Mock).mockResolvedValueOnce(new ArrayBuffer(8));
+        (getDocument as Mock).mockReturnValueOnce({ promise: Promise.resolve(mockDocument) });
+        (fsPromises.mkdir as Mock).mockResolvedValueOnce(undefined);
+        // 1st realpath: resolvedOutputFolder (containment check) — passes
+        // 2nd realpath: dirname(resolvedFilePath) (containment check) — passes
+        // 3rd realpath: resolvedOutputFolder (final TOCTOU re-check) — differs → throws
+        (fsPromises.realpath as Mock)
+            .mockResolvedValueOnce('/safe/output')
+            .mockResolvedValueOnce('/safe/output')
+            .mockResolvedValueOnce('/swapped/evil');
+
+        await expect(
+            pdfToPng('/path/to/test.pdf', { outputFolder: 'test-output' }),
+        ).rejects.toThrow('Output folder was modified during write');
+
+        expect(fsPromises.writeFile).not.toHaveBeenCalled();
     });
 });

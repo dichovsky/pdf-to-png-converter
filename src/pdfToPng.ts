@@ -363,6 +363,16 @@ function isEscapingRelativePath(rel: string): boolean {
  * @throws {Error} If `pngPageOutput.content` is `undefined`.
  * @throws {NodeJS.ErrnoException} If the underlying file system write operation fails,
  *   the original error from `fsPromises.writeFile` will be propagated.
+ *
+ * @remarks
+ * **TOCTOU limitation:** This function performs `realpath()` checks to guard against
+ * symlink-based path-traversal attacks, but a residual TOCTOU (Time-of-Check /
+ * Time-of-Use) race window exists between the final check and `writeFile`. A local
+ * attacker who can atomically swap the output directory for a symlink within that
+ * window could redirect the write. This is a fundamental POSIX filesystem limitation
+ * that cannot be fully eliminated in userspace JavaScript without OS-level primitives
+ * (e.g. `O_NOFOLLOW` via native bindings). On multi-user or shared systems, ensure
+ * the `outputFolder` is a private directory not writable by untrusted users.
  */
 async function savePNGfile(pngPageOutput: PngPageOutput, outputFolder: string): Promise<void> {
     const resolvedOutputFolder = resolve(outputFolder);
@@ -387,5 +397,19 @@ async function savePNGfile(pngPageOutput: PngPageOutput, outputFolder: string): 
     if (pngPageOutput.content === undefined) {
         throw new Error(`Cannot write PNG file "${pngPageOutput.path}" because content is undefined.`);
     }
+
+    // Re-verify the output folder immediately before writeFile to narrow the TOCTOU race window.
+    // Placing this check after all other validation means the gap between the check and the write
+    // is as small as possible. It does NOT fully eliminate the window — a sufficiently fast
+    // directory swap between this line and writeFile could still succeed — but it raises the bar
+    // for exploitation significantly. Completely eliminating this class of race would require
+    // enforcing no-follow semantics (for example via O_NOFOLLOW) on the underlying open(2) call,
+    // which cannot be done portably through `fsPromises.writeFile` and would not protect
+    // directory-component races even where available.
+    const realOutputFolderFinal = await fsPromises.realpath(resolvedOutputFolder);
+    if (realOutputFolderFinal !== realOutputFolder) {
+        throw new Error(`Output folder was modified during write: ${outputFolder}`);
+    }
+
     await fsPromises.writeFile(pngPageOutput.path, pngPageOutput.content as Buffer);
 }
