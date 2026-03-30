@@ -43,6 +43,14 @@ export interface PdfToPngOptions {
      * Folder path (relative to `process.cwd()`) where PNG files will be written.
      * The folder is created recursively if it does not exist.
      * When omitted, no files are written to disk.
+     *
+     * @remarks
+     * **Security (TOCTOU):** The write-containment guard resolves symlinks and checks that the
+     * output path stays within this folder, but a residual race window exists between the final
+     * check and the actual write. An attacker with local filesystem access could exploit this by
+     * atomically replacing the folder with a symlink during that window. To reduce exposure on
+     * multi-user or shared systems, ensure this directory is private and not writable by
+     * untrusted users.
      */
     outputFolder?: string;
 
