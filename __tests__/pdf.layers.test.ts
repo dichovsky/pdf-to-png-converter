@@ -10,7 +10,7 @@ test(`should convert PDF with layers`, async () => {
         outputFolder: resolve('./test-results/layers/actual'),
     });
 
-    expect(pngPages.length).to.toBeGreaterThan(0);
+    expect(pngPages.length).toBeGreaterThan(0);
     for (const pngPage of pngPages) {
         const expectedFilePath: string = resolve('./test-data/layers/expected', pngPage.name);
         const actualFileContent: Buffer = readFileSync(pngPage.path);
@@ -20,6 +20,6 @@ test(`should convert PDF with layers`, async () => {
             createExpectedFileIfMissing: true,
         });
 
-        expect(compareResult).to.equal(0);
+        expect(compareResult).toBe(0);
     }
 });

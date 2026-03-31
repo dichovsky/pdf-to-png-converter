@@ -12,7 +12,7 @@ test(`should convert specific PDF pages To PNG files`, async () => {
     });
 
     // Should skip page 99 since it's beyond PDF bounds
-    expect(pngPages.length).to.equal(3);
+    expect(pngPages.length).toBe(3);
 
     for (const pngPage of pngPages) {
         const expectedFilePath: string = resolve('./test-data/pdf.to.file/expected', pngPage.name);
@@ -23,6 +23,6 @@ test(`should convert specific PDF pages To PNG files`, async () => {
             createExpectedFileIfMissing: true,
         });
 
-        expect(compareResult).to.equal(0);
+        expect(compareResult).toBe(0);
     }
 });

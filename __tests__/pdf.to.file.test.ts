@@ -11,7 +11,7 @@ test(`should convert PDF To PNG files`, async () => {
         processPagesInParallel: false,
     });
 
-    expect(pngPages.length).to.toBeGreaterThan(0);
+    expect(pngPages.length).toBeGreaterThan(0);
     for (const pngPage of pngPages) {
         const expectedFilePath: string = resolve('./test-data/pdf.to.file/expected', pngPage.name);
         const actualFileContent: Buffer = readFileSync(pngPage.path);
@@ -21,7 +21,7 @@ test(`should convert PDF To PNG files`, async () => {
             createExpectedFileIfMissing: true,
         });
 
-        expect(compareResult).to.equal(0);
+        expect(compareResult).toBe(0);
     }
 });
 
@@ -29,7 +29,7 @@ test(`should convert TAMReview PDF to the expected number of PNG pages`, async (
     const pdfFilePath: string = resolve('./test-data/TAMReview.pdf');
     const pngPages: PngPageOutput[] = await pdfToPng(pdfFilePath);
 
-    expect(pngPages.length).to.equal(23);
+    expect(pngPages.length).toBe(23);
 });
 
 test(`should convert PDF To PNG files in parallel mode`, async () => {
@@ -39,7 +39,7 @@ test(`should convert PDF To PNG files in parallel mode`, async () => {
         processPagesInParallel: true,
     });
 
-    expect(pngPages.length).to.toBeGreaterThan(0);
+    expect(pngPages.length).toBeGreaterThan(0);
     for (const pngPage of pngPages) {
         const expectedFilePath: string = resolve('./test-data/pdf.to.file/expected', pngPage.name);
         const actualFileContent: Buffer = readFileSync(pngPage.path);
@@ -49,6 +49,6 @@ test(`should convert PDF To PNG files in parallel mode`, async () => {
             createExpectedFileIfMissing: true,
         });
 
-        expect(compareResult).to.equal(0);
+        expect(compareResult).toBe(0);
     }
 });

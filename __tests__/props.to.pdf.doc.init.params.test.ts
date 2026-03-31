@@ -164,16 +164,16 @@ for (const testData of testDataArray) {
     test(`should convert props to PdfDocInitParams when ${testData.id}`, async () => {
         const actualPdfDocInitParams: DocumentInitParameters = propsToPdfDocInitParams(testData.props);
 
-        expect(actualPdfDocInitParams).to.deep.equal(testData.expectedPdfDocInitParams);
+        expect(actualPdfDocInitParams).toEqual(testData.expectedPdfDocInitParams);
 
         const standardFonts = readdirSync(actualPdfDocInitParams.standardFontDataUrl as string, { recursive: true });
         standardFonts.sort();
         STANDARD_FONTS.sort();
-        expect(standardFonts).to.deep.equal(STANDARD_FONTS);
+        expect(standardFonts).toEqual(STANDARD_FONTS);
 
         const cMap = readdirSync(actualPdfDocInitParams.cMapUrl as string, { recursive: true });
         cMap.sort();
         STANDARD_CMAPS.sort();
-        expect(cMap).to.deep.equal(STANDARD_CMAPS);
+        expect(cMap).toEqual(STANDARD_CMAPS);
     });
 }

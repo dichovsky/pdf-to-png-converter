@@ -10,7 +10,7 @@ test(`should convert protected PDF To PNG`, async () => {
         pdfFilePassword: 'uES69xm545C/HP!',
     });
 
-    expect(pngPages.length).to.toBeGreaterThan(0);
+    expect(pngPages.length).toBeGreaterThan(0);
     for (const pngPage of pngPages) {
         const expectedFilePath: string = resolve('./test-data/protected.pdf/expected', pngPage.name);
         const compareResult: number = comparePNG({
@@ -19,6 +19,6 @@ test(`should convert protected PDF To PNG`, async () => {
             createExpectedFileIfMissing: true,
         });
 
-        expect(compareResult).to.equal(0);
+        expect(compareResult).toBe(0);
     }
 });

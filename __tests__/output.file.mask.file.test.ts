@@ -9,17 +9,17 @@ test(`should apply file mask if defined for pdf file path`, async () => {
         outputFileMaskFunc: (pageNumber: number) => `pdf_file_${pageNumber}.png`,
     });
 
-    expect(pngPages.length).to.toBeGreaterThan(0);
+    expect(pngPages.length).toBeGreaterThan(0);
     for (const [index, pngPage] of pngPages.entries()) {
-        expect(pngPage.name).to.equal(`pdf_file_${index + 1}.png`);
+        expect(pngPage.name).toBe(`pdf_file_${index + 1}.png`);
     }
 });
 
 test(`should apply default buffer name if outputFileMaskFunc is not defined for pdf buffer`, async () => {
     const pngPages: PngPageOutput[] = await pdfToPng(pdfFilePath);
 
-    expect(pngPages.length).to.toBeGreaterThan(0);
+    expect(pngPages.length).toBeGreaterThan(0);
     for (const [index, pngPage] of pngPages.entries()) {
-        expect(pngPage.name).to.equal(`${parse(pdfFilePath).name}_page_${index + 1}.png`);
+        expect(pngPage.name).toBe(`${parse(pdfFilePath).name}_page_${index + 1}.png`);
     }
 });

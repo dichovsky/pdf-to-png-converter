@@ -12,7 +12,7 @@ test(`should generate png from pdf buffer`, async () => {
         viewportScale: 2.0,
     });
 
-    expect(pngPages.length).to.equal(2);
+    expect(pngPages.length).toBe(2);
     for (const pngPage of pngPages) {
         const expectedFilePath: string = resolve('./test-data/sample/expected', pngPage.name);
         const actualFileContent: Buffer = readFileSync(pngPage.path);
@@ -22,6 +22,6 @@ test(`should generate png from pdf buffer`, async () => {
             createExpectedFileIfMissing: true,
         });
 
-        expect(compareResult).to.equal(0);
+        expect(compareResult).toBe(0);
     }
 });
