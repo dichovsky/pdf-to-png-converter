@@ -1,0 +1,5 @@
+services:
+  test:
+    build: .
+    volumes:
+      - ./test-results:/usr/pkg/test-results
