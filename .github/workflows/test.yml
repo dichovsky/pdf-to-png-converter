@@ -22,6 +22,8 @@ jobs:
               run: npm ci
             - name: Audit dependencies
               run: npm audit --audit-level=high
+            - name: Check licenses
+              run: npm run test:license
             - name: Build and lint
               run: npm run build:test && npm run lint
             - name: Test
