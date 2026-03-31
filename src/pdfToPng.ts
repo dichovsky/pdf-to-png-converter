@@ -1,7 +1,7 @@
 import { promises as fsPromises } from 'node:fs';
 import { dirname, isAbsolute, join, parse, relative, resolve, sep } from 'node:path';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
-import { PDF_TO_PNG_OPTIONS_DEFAULTS } from './const';
+import { MAX_CANVAS_PIXELS, MAX_VIEWPORT_SCALE, PDF_TO_PNG_OPTIONS_DEFAULTS } from './const';
 import { NodeCanvasFactory } from './node.canvas.factory';
 import { propsToPdfDocInitParams } from './propsToPdfDocInitParams';
 import type { PdfToPngOptions, PngPageOutput } from './interfaces';
@@ -75,7 +75,6 @@ import type { PdfToPngOptions, PngPageOutput } from './interfaces';
 export async function pdfToPng(pdfFile: string | ArrayBufferLike | Uint8Array, props?: PdfToPngOptions): Promise<PngPageOutput[]> {
     // Capture and validate viewportScale before the first await so the validated value is
     // immutable and cannot be bypassed by mutating `props` between validation and rendering.
-    const MAX_VIEWPORT_SCALE = 100;
     const pageViewportScale: number = props?.viewportScale ?? PDF_TO_PNG_OPTIONS_DEFAULTS.viewportScale;
     if (typeof pageViewportScale !== 'number' || !Number.isFinite(pageViewportScale) || pageViewportScale <= 0 || pageViewportScale > MAX_VIEWPORT_SCALE) {
         throw new Error(`viewportScale must be a finite number greater than 0 and at most ${MAX_VIEWPORT_SCALE}, received: ${pageViewportScale}`);
@@ -325,7 +324,6 @@ async function processPdfPage(
     // Guard against canvas allocations that would cause OOM. Even a modest PDF page combined
     // with a high viewportScale can produce an enormous pixel count: an A4 page at scale 100
     // yields ~5×10¹¹ pixels. This check fires before any allocation so the error is cheap.
-    const MAX_CANVAS_PIXELS = 100_000_000; // 100 MP at 4 bytes/px ≈ 400 MB
     if (viewport.width * viewport.height > MAX_CANVAS_PIXELS) {
         page.cleanup();
         throw new Error(

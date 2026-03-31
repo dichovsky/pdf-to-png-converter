@@ -2,6 +2,19 @@ import type { DocumentInitParameters } from 'pdfjs-dist/types/src/display/api';
 import { normalizePath } from './normalizePath';
 
 /**
+ * Maximum allowed value for `viewportScale`. Values above this limit would produce canvases
+ * so large (an A4 page at scale 100 already yields ~5×10⁹ pixels) that they risk OOM crashes
+ * before the pixel-count guard in `processPdfPage` can fire.
+ */
+export const MAX_VIEWPORT_SCALE = 100;
+
+/**
+ * Maximum canvas area in pixels. At 4 bytes per pixel, 100 MP ≈ 400 MB of raw bitmap memory.
+ * Any page whose viewport exceeds this limit will be rejected before canvas allocation.
+ */
+export const MAX_CANVAS_PIXELS = 100_000_000;
+
+/**
  * Default values applied to `PdfToPngOptions` fields that are not explicitly set by the caller.
  * These are also used as the source of truth for documented defaults in JSDoc comments on the type.
  */
