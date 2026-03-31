@@ -72,6 +72,45 @@ import type { PdfToPngOptions, PngPageOutput } from './interfaces';
  * // Convert all pages and get buffers:
  * const outputs = await pdfToPng("/path/to/doc.pdf", { returnPageContent: true });
  */
+/**
+ * Renders (or retrieves metadata for) a single PDF page, optionally saves it to disk,
+ * and optionally clears the content buffer from memory when the caller only needs the
+ * file on disk but not the in-memory bytes.
+ *
+ * Extracts the per-page render → save → maybe-clear logic that was previously duplicated
+ * verbatim in the parallel `Promise.all` branch and the sequential `for` loop.
+ *
+ * @param pdfDocument - The open PDF.js document proxy.
+ * @param pageName - Filename to assign to this page's output.
+ * @param pageNumber - 1-based page index.
+ * @param pageViewportScale - Render scale factor.
+ * @param shouldReturnContent - Whether to include the PNG buffer in the output.
+ * @param returnMetadataOnly - When true, skip rendering entirely.
+ * @param outputFolder - Absolute path to write PNG files; undefined means no file output.
+ * @param returnPageContent - The caller's original preference; used to decide whether to
+ *   clear `content` after writing to disk.
+ * @returns A `PngPageOutput` with `path` and optionally `content` populated.
+ */
+async function processAndSavePage(
+    pdfDocument: PDFDocumentProxy,
+    pageName: string,
+    pageNumber: number,
+    pageViewportScale: number,
+    shouldReturnContent: boolean,
+    returnMetadataOnly: boolean,
+    outputFolder: string | undefined,
+    returnPageContent: boolean | undefined,
+): Promise<PngPageOutput> {
+    const pageOutput = await processPdfPage(pdfDocument, pageName, pageNumber, pageViewportScale, shouldReturnContent, returnMetadataOnly);
+    if (outputFolder !== undefined && !returnMetadataOnly) {
+        await savePNGfile(pageOutput, outputFolder);
+        if (returnPageContent === false) {
+            pageOutput.content = undefined;
+        }
+    }
+    return pageOutput;
+}
+
 export async function pdfToPng(pdfFile: string | ArrayBufferLike | Uint8Array, props?: PdfToPngOptions): Promise<PngPageOutput[]> {
     // Capture and validate viewportScale before the first await so the validated value is
     // immutable and cannot be bypassed by mutating `props` between validation and rendering.
@@ -118,52 +157,44 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike | Uint8Array, p
             : props?.outputFolder
               ? true
               : (props?.returnPageContent ?? true);
+        const resolvedOutputFolder: string | undefined = props?.outputFolder
+            ? join(process.cwd(), props.outputFolder)
+            : undefined;
         if (props?.processPagesInParallel === true) {
             // concurrencyLimit was already validated above (fail-fast); safe to use directly.
             const concurrencyLimit: number = props.concurrencyLimit ?? PDF_TO_PNG_OPTIONS_DEFAULTS.concurrencyLimit;
             for (let i = 0; i < validPagesToProcess.length; i += concurrencyLimit) {
                 const batch: number[] = validPagesToProcess.slice(i, i + concurrencyLimit);
                 const batchResults: PngPageOutput[] = await Promise.all(
-                    batch.map(async (pageNumber) => {
-                        const pageOutput = await processPdfPage(
+                    batch.map((pageNumber) =>
+                        processAndSavePage(
                             pdfDocument,
                             props?.outputFileMaskFunc?.(pageNumber) ?? `${defaultMask}_page_${pageNumber}.png`,
                             pageNumber,
                             pageViewportScale,
                             shouldReturnContent,
                             returnMetadataOnly,
-                        );
-
-                        if (props?.outputFolder && !returnMetadataOnly) {
-                            await savePNGfile(pageOutput, join(process.cwd(), props.outputFolder));
-                            // If the user didn't want the content returned, clear it to save memory
-                            if (props?.returnPageContent === false) {
-                                pageOutput.content = undefined;
-                            }
-                        }
-                        return pageOutput;
-                    }),
+                            resolvedOutputFolder,
+                            props?.returnPageContent,
+                        ),
+                    ),
                 );
                 pngPageOutputs.push(...batchResults);
             }
         } else {
             for (const pageNumber of validPagesToProcess) {
-                const pageOutput = await processPdfPage(
-                    pdfDocument,
-                    props?.outputFileMaskFunc?.(pageNumber) ?? `${defaultMask}_page_${pageNumber}.png`,
-                    pageNumber,
-                    pageViewportScale,
-                    shouldReturnContent,
-                    returnMetadataOnly,
+                pngPageOutputs.push(
+                    await processAndSavePage(
+                        pdfDocument,
+                        props?.outputFileMaskFunc?.(pageNumber) ?? `${defaultMask}_page_${pageNumber}.png`,
+                        pageNumber,
+                        pageViewportScale,
+                        shouldReturnContent,
+                        returnMetadataOnly,
+                        resolvedOutputFolder,
+                        props?.returnPageContent,
+                    ),
                 );
-
-                if (props?.outputFolder && !returnMetadataOnly) {
-                    await savePNGfile(pageOutput, join(process.cwd(), props.outputFolder));
-                    if (props?.returnPageContent === false) {
-                        pageOutput.content = undefined;
-                    }
-                }
-                pngPageOutputs.push(pageOutput);
             }
         }
         pngPagesOutput.push(...pngPageOutputs);
