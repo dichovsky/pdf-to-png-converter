@@ -53,6 +53,18 @@ describe('pdfToPng', () => {
         await expect(pdfToPng(pdfPath)).rejects.toThrow('Unsupported buffer type');
     });
 
+    it('should throw for viewportScale of NaN', async () => {
+        await expect(pdfToPng('test.pdf', { viewportScale: NaN })).rejects.toThrow('viewportScale');
+    });
+
+    it('should throw for viewportScale of Infinity', async () => {
+        await expect(pdfToPng('test.pdf', { viewportScale: Infinity })).rejects.toThrow('viewportScale');
+    });
+
+    it('should throw for viewportScale of -Infinity', async () => {
+        await expect(pdfToPng('test.pdf', { viewportScale: -Infinity })).rejects.toThrow('viewportScale');
+    });
+
     it('should throw for viewportScale of 0', async () => {
         await expect(pdfToPng('test.pdf', { viewportScale: 0 })).rejects.toThrow(
             'viewportScale must be a finite number greater than 0 and at most 100, received: 0',
