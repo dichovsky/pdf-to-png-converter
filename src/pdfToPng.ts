@@ -106,7 +106,9 @@ async function processAndSavePage(
     outputFolder: string | undefined,
     returnPageContent: boolean | undefined,
 ): Promise<PngPageOutput> {
-    const pageOutput = await processPdfPage(pdfDocument, pageName, pageNumber, pageViewportScale, shouldReturnContent, returnMetadataOnly);
+    const pageOutput = returnMetadataOnly
+        ? await getPageMetadata(pdfDocument, pageName, pageNumber, pageViewportScale)
+        : await renderPdfPage(pdfDocument, pageName, pageNumber, pageViewportScale, shouldReturnContent);
     if (outputFolder !== undefined && !returnMetadataOnly) {
         await savePNGfile(pageOutput, outputFolder);
         if (returnPageContent === false) {
@@ -296,65 +298,70 @@ async function getPdfDocument(pdfFileBuffer: Uint8Array | ArrayBufferLike, props
 }
 
 /**
- * Renders a single page of a PDF document to an in-memory PNG (optionally) and returns page metadata.
+ * Returns dimension and rotation metadata for a single PDF page without rendering it.
  *
- * This function:
- * - Obtains the specified page from the provided PDF.js document (`PDFDocumentProxy`).
- * - When `returnMetadataOnly` is true: reads the viewport dimensions and page rotation, then returns
- *   immediately without creating a canvas or rendering; `page.cleanup()` is still called.
- * - When `returnMetadataOnly` is false: verifies the canvas pixel area does not exceed
- *   `MAX_CANVAS_PIXELS` (100,000,000 px) before allocation, then creates a canvas and drawing context,
- *   renders the page at the requested scale, optionally encodes to PNG buffer, then cleans up via `finally`.
- * - Returns a `PngPageOutput` describing the page (including width, height, rotation, page number, name,
- *   and optional content).
- * - Ensures resources are cleaned up (calls `page.cleanup()` and `canvasFactory.destroy(...)`) even if rendering fails.
+ * Obtains the page from the document proxy, reads the viewport at the requested scale,
+ * and returns a `PngPageOutput` with `content` always `undefined`. `page.cleanup()` is
+ * called in `finally` to release PDF.js resources.
  *
- * Remarks:
- * - `pageNumber` is expected to be a 1-based page index as required by PDF.js `getPage`.
- * - The returned `PngPageOutput.path` is intentionally set to an empty string and should be populated by the caller if a filesystem path is needed.
- * - If `returnPageContent` is false (or `returnMetadataOnly` is true), the `content` field will be `undefined`.
- * - Errors originating from `pdf.getPage(...)`, the render task, or canvas operations will propagate to the caller; resources are still cleaned up in such cases.
- * - The function uses `page.getViewport({ scale: pageViewportScale })` so `width` and `height` reflect the viewport dimensions at the given scale.
- * - `rotation` is taken from `page.rotate` — the intrinsic page rotation stored in the PDF (0, 90, 180, or 270).
- *
- * @param pdf - The PDF.js document proxy (`PDFDocumentProxy`) from which to obtain and render the page.
- * @param pageName - A human-readable name/identifier for the page (used in the returned `PngPageOutput.name`).
- * @param pageNumber - The 1-based page index to render.
- * @param pageViewportScale - The scale factor passed to `page.getViewport({ scale })` to control output resolution.
- * @param returnPageContent - If true, the function will include a PNG buffer (`content`) in the returned `PngPageOutput`; otherwise `content` will be `undefined`. Ignored when `returnMetadataOnly` is true.
- * @param returnMetadataOnly - If true, skip canvas creation and rendering entirely; return only dimensions and rotation.
- *
- * @returns A promise that resolves to a `PngPageOutput` containing page metadata and optionally the PNG image buffer.
- *
- * @throws {Error} If the canvas pixel area (`viewport.width × viewport.height`) exceeds `MAX_CANVAS_PIXELS`.
- * @throws If retrieving the page, creating the canvas/context, rendering the page, or converting the canvas to a PNG buffer fails.
+ * @param pdf - The PDF.js document proxy.
+ * @param pageName - Filename/identifier assigned to this page in the output.
+ * @param pageNumber - 1-based page index.
+ * @param pageViewportScale - Scale factor for `page.getViewport({ scale })`.
+ * @returns Metadata-only `PngPageOutput` (no canvas created, no PNG encoded).
  */
-async function processPdfPage(
+async function getPageMetadata(
+    pdf: PDFDocumentProxy,
+    pageName: string,
+    pageNumber: number,
+    pageViewportScale: number,
+): Promise<PngPageOutput> {
+    const page = await pdf.getPage(pageNumber);
+    const viewport = page.getViewport({ scale: pageViewportScale });
+    try {
+        return {
+            pageNumber,
+            name: pageName,
+            content: undefined,
+            path: '',
+            width: viewport.width,
+            height: viewport.height,
+            rotation: page.rotate,
+        };
+    } finally {
+        page.cleanup();
+    }
+}
+
+/**
+ * Renders a single PDF page to a PNG and returns the result.
+ *
+ * - Rejects the page before canvas allocation if `viewport.width × viewport.height`
+ *   exceeds `MAX_CANVAS_PIXELS` to prevent OOM crashes.
+ * - Creates a canvas via the document's `canvasFactory` (or a new `NodeCanvasFactory`).
+ * - Renders via `page.render()` and optionally encodes the result to a PNG `Buffer`.
+ * - Calls `page.cleanup()` and `canvasFactory.destroy()` in `finally` even on error.
+ *
+ * @param pdf - The PDF.js document proxy.
+ * @param pageName - Filename/identifier assigned to this page in the output.
+ * @param pageNumber - 1-based page index.
+ * @param pageViewportScale - Scale factor for `page.getViewport({ scale })`.
+ * @param returnPageContent - When `true`, encodes the canvas to PNG and returns the buffer
+ *   in `content`; otherwise `content` is `undefined`.
+ * @returns `PngPageOutput` with `path` set to `''` (populated by the caller if needed).
+ *
+ * @throws {Error} If the canvas pixel area exceeds `MAX_CANVAS_PIXELS`.
+ * @throws If page retrieval, canvas creation, rendering, or PNG encoding fails.
+ */
+async function renderPdfPage(
     pdf: PDFDocumentProxy,
     pageName: string,
     pageNumber: number,
     pageViewportScale: number,
     returnPageContent: boolean,
-    returnMetadataOnly: boolean,
 ): Promise<PngPageOutput> {
     const page = await pdf.getPage(pageNumber);
     const viewport = page.getViewport({ scale: pageViewportScale });
-
-    if (returnMetadataOnly) {
-        try {
-            return {
-                pageNumber,
-                name: pageName,
-                content: undefined,
-                path: '',
-                width: viewport.width,
-                height: viewport.height,
-                rotation: page.rotate,
-            };
-        } finally {
-            page.cleanup();
-        }
-    }
 
     // Guard against canvas allocations that would cause OOM. Even a modest PDF page combined
     // with a high viewportScale can produce an enormous pixel count: an A4 page at scale 100
@@ -367,13 +374,11 @@ async function processPdfPage(
     }
 
     const canvasFactory = pdf.canvasFactory ? (pdf.canvasFactory as NodeCanvasFactory) : new NodeCanvasFactory();
-
     const { canvas, context } = canvasFactory.create(viewport.width, viewport.height);
 
     try {
         await page.render({ canvasContext: context, viewport, canvas }).promise;
-
-        const pngPageOutput: PngPageOutput = {
+        return {
             pageNumber,
             name: pageName,
             content: returnPageContent ? canvas!.toBuffer('image/png') : undefined,
@@ -382,7 +387,6 @@ async function processPdfPage(
             height: viewport.height,
             rotation: page.rotate,
         };
-        return pngPageOutput;
     } finally {
         page.cleanup();
         canvasFactory.destroy({ canvas, context });
