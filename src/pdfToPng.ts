@@ -79,6 +79,37 @@ let pdfjsLib: typeof PdfjsModule | undefined;
  * const outputs = await pdfToPng("/path/to/doc.pdf", { returnPageContent: true });
  */
 /**
+ * Resolves the output filename for a single PDF page.
+ *
+ * If `outputFileMaskFunc` is provided it is called with the 1-based page number.
+ * The returned value must be a non-empty string containing the full filename
+ * (including `.png` extension); an empty string throws immediately so callers
+ * receive a clear error rather than a confusing filesystem failure.
+ *
+ * When `outputFileMaskFunc` is absent, the name defaults to
+ * `<defaultMask>_page_<pageNumber>.png`.
+ *
+ * @param pageNumber - 1-based page index.
+ * @param defaultMask - Fallback filename stem (PDF basename or `"buffer"`).
+ * @param outputFileMaskFunc - Optional caller-supplied naming function.
+ * @returns Non-empty filename string for the page.
+ *
+ * @throws {Error} If `outputFileMaskFunc` returns an empty string.
+ */
+function resolvePageName(pageNumber: number, defaultMask: string, outputFileMaskFunc: ((page: number) => string) | undefined): string {
+    if (outputFileMaskFunc === undefined) {
+        return `${defaultMask}_page_${pageNumber}.png`;
+    }
+    const name = outputFileMaskFunc(pageNumber);
+    if (!name) {
+        throw new Error(
+            `outputFileMaskFunc returned an empty filename for page ${pageNumber}. Provide a non-empty string including the .png extension.`,
+        );
+    }
+    return name;
+}
+
+/**
  * Renders (or retrieves metadata for) a single PDF page, optionally saves it to disk,
  * and optionally clears the content buffer from memory when the caller only needs the
  * file on disk but not the in-memory bytes.
@@ -175,7 +206,7 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike | Uint8Array, p
                     batch.map((pageNumber) =>
                         processAndSavePage(
                             pdfDocument,
-                            props?.outputFileMaskFunc?.(pageNumber) ?? `${defaultMask}_page_${pageNumber}.png`,
+                            resolvePageName(pageNumber, defaultMask, props?.outputFileMaskFunc),
                             pageNumber,
                             pageViewportScale,
                             shouldReturnContent,
@@ -192,7 +223,7 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike | Uint8Array, p
                 pngPageOutputs.push(
                     await processAndSavePage(
                         pdfDocument,
-                        props?.outputFileMaskFunc?.(pageNumber) ?? `${defaultMask}_page_${pageNumber}.png`,
+                        resolvePageName(pageNumber, defaultMask, props?.outputFileMaskFunc),
                         pageNumber,
                         pageViewportScale,
                         shouldReturnContent,
