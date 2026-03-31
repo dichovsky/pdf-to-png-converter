@@ -106,31 +106,31 @@ Converts PDF pages to PNG images.
 ```javascript
 {
     // Font & Rendering Options
-    disableFontFace: boolean,        // Disable font face rendering (default: true)
-    useSystemFonts: boolean,         // Use system fonts as fallback (default: false)
-    enableXfa: boolean,              // Render XFA forms (default: true)
-    
+    disableFontFace?: boolean,       // Disable font face rendering (default: true)
+    useSystemFonts?: boolean,        // Use system fonts as fallback (default: false)
+    enableXfa?: boolean,             // Render XFA forms (default: true)
+
     // Output Options
     outputFolder?: string,           // Directory to save PNG files
-    outputFileMaskFunc?: (pageNumber: number) => string; // Custom filename function
-    
+    outputFileMaskFunc?: (pageNumber: number) => string, // Custom filename function
+
     // Rendering Options
-    viewportScale: number,           // PNG scale/zoom level (default: 1.0, max: 100)
+    viewportScale?: number,          // PNG scale/zoom level (default: 1.0, max: 100)
 
     // Security
     pdfFilePassword?: string,        // Password for encrypted PDFs
 
     // Processing
     pagesToProcess?: number[],       // Pages to convert (1-indexed, e.g., [1, 3, 5])
-    processPagesInParallel: boolean, // Enable parallel processing (default: false)
-    concurrencyLimit: number,        // Max concurrent pages, positive integer (default: 4)
-    
+    processPagesInParallel?: boolean, // Enable parallel processing (default: false)
+    concurrencyLimit?: number,       // Max concurrent pages, positive integer (default: 4)
+
     // Output Control
-    returnPageContent: boolean,      // Include PNG buffer in output (default: true)
-    returnMetadataOnly: boolean,     // Return only page dimensions/rotation without rendering (default: false)
+    returnPageContent?: boolean,     // Include PNG buffer in output (default: true)
+    returnMetadataOnly?: boolean,    // Return only page dimensions/rotation without rendering (default: false)
 
     // Logging
-    verbosityLevel: number,          // 0=ERRORS, 1=WARNINGS, 5=INFOS (default: 0)
+    verbosityLevel?: number,         // 0=ERRORS, 1=WARNINGS, 5=INFOS (default: 0)
 }
 ```
 
