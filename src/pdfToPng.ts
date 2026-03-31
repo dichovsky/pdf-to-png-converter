@@ -143,12 +143,11 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike | Uint8Array, p
     }
 
     // Process each page
-    const pngPagesOutput: PngPageOutput[] = [];
+    const pngPageOutputs: PngPageOutput[] = [];
     try {
-        const defaultMask: string = typeof pdfFile === 'string' 
-            ? parse(pdfFile).name 
+        const defaultMask: string = typeof pdfFile === 'string'
+            ? parse(pdfFile).name
             : PDF_TO_PNG_OPTIONS_DEFAULTS.outputFileMask;
-        const pngPageOutputs: PngPageOutput[] = [];
         // When an output folder is specified, content must always be retrieved
         // (even if the user doesn't want it returned) so it can be saved to disk.
         // When returnMetadataOnly is true, rendering is skipped entirely regardless.
@@ -197,12 +196,11 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike | Uint8Array, p
                 );
             }
         }
-        pngPagesOutput.push(...pngPageOutputs);
     } finally {
         await pdfDocument.cleanup();
     }
 
-    return pngPagesOutput;
+    return pngPageOutputs;
 }
 
 /**
