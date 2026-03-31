@@ -6,6 +6,11 @@ import { NodeCanvasFactory } from './node.canvas.factory';
 import { propsToPdfDocInitParams } from './propsToPdfDocInitParams';
 import type { PdfToPngOptions, PngPageOutput } from './interfaces';
 
+/** Module-level cache for the pdfjs-dist dynamic import. V8 already caches dynamic imports
+ * internally, but making it explicit here avoids the module-resolution overhead on every call
+ * and makes the caching behaviour visible and testable. */
+let pdfjsLib: typeof import('pdfjs-dist/legacy/build/pdf.mjs') | undefined;
+
 /**
  * Convert one or more pages from a PDF into PNG images.
  *
@@ -277,7 +282,8 @@ async function getPdfFileBuffer(pdfFile: string | ArrayBufferLike | Uint8Array):
  * @throws Will throw if the PDF cannot be loaded or parsed.
  */
 async function getPdfDocument(pdfFileBuffer: Uint8Array | ArrayBufferLike, props?: PdfToPngOptions): Promise<PDFDocumentProxy> {
-    const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    pdfjsLib ??= await import('pdfjs-dist/legacy/build/pdf.mjs');
+    const { getDocument } = pdfjsLib;
     const documentInitParameters = propsToPdfDocInitParams(props);
     // getPdfFileBuffer already normalises Buffer inputs to plain Uint8Array.
     // - Uint8Array: use directly (standalone, byteLength === buffer.byteLength — pdfjs accepts as-is)
