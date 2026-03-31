@@ -61,4 +61,39 @@ describe('pdfToPng concurrencyLimit validation', () => {
         expect(result).toBeInstanceOf(Array);
         expect(result.length).toBeGreaterThan(0);
     });
+
+    it('should return all pages when concurrencyLimit is 1 on a multi-page PDF', async () => {
+        // concurrencyLimit: 1 forces one page per batch — exercises the slice loop boundary
+        const result = await pdfToPng(pdfFilePath, {
+            processPagesInParallel: true,
+            concurrencyLimit: 1,
+            returnMetadataOnly: true,
+        });
+        expect(result.length).toBe(2); // sample.pdf has 2 pages
+        expect(result[0].pageNumber).toBe(1);
+        expect(result[1].pageNumber).toBe(2);
+    });
+
+    it('should return all pages when concurrencyLimit exceeds the page count', async () => {
+        // concurrencyLimit: 100 on a 2-page PDF — entire PDF fits in a single batch
+        const result = await pdfToPng(pdfFilePath, {
+            processPagesInParallel: true,
+            concurrencyLimit: 100,
+            returnMetadataOnly: true,
+        });
+        expect(result.length).toBe(2); // sample.pdf has 2 pages
+        expect(result[0].pageNumber).toBe(1);
+        expect(result[1].pageNumber).toBe(2);
+    });
+
+    it('should return one page when processPagesInParallel is true with a single page requested', async () => {
+        // Single page in parallel mode — batch has exactly one element
+        const result = await pdfToPng(pdfFilePath, {
+            processPagesInParallel: true,
+            returnMetadataOnly: true,
+            pagesToProcess: [1],
+        });
+        expect(result.length).toBe(1);
+        expect(result[0].pageNumber).toBe(1);
+    });
 });
