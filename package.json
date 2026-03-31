@@ -29,6 +29,7 @@
     "url": "https://buymeacoffee.com/dichovsky"
   },
   "type": "commonjs",
+  "packageManager": "npm@11.12.1",
   "sideEffects": false,
   "main": "out/index.js",
   "types": "out/index.d.ts",
