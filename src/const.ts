@@ -1,5 +1,4 @@
 import type { DocumentInitParameters } from 'pdfjs-dist/types/src/display/api';
-import { normalizePath } from './normalizePath';
 
 /**
  * Maximum allowed value for `viewportScale`. Values above this limit would produce canvases
@@ -30,18 +29,29 @@ export const PDF_TO_PNG_OPTIONS_DEFAULTS = {
 };
 
 /**
+ * Relative paths to the pdfjs-dist asset directories.
+ * Stored as raw strings so they can be resolved against `process.cwd()` at call time
+ * (inside `propsToPdfDocInitParams`) rather than at module-load time. This ensures
+ * applications that call `process.chdir()` after importing the library still get
+ * correct paths.
+ */
+export const CMAP_RELATIVE_URL = './node_modules/pdfjs-dist/cmaps/';
+export const STANDARD_FONTS_RELATIVE_URL = './node_modules/pdfjs-dist/standard_fonts/';
+
+/**
  * Default pdfjs `DocumentInitParameters` used when initialising a PDF document.
  * - `cMapUrl` / `cMapPacked`: point to the pre-packed character maps bundled with `pdfjs-dist`,
  *    required for rendering CJK and other non-Latin PDFs correctly.
  * - `standardFontDataUrl`: path to the standard Type 1 / TrueType fonts bundled with `pdfjs-dist`,
  *    used as fallbacks when a PDF does not embed its fonts.
  *
- * Both paths are resolved relative to `process.cwd()` via `normalizePath`.
+ * Note: these values are raw relative paths. They are resolved to absolute paths at call time
+ * by `propsToPdfDocInitParams` via `normalizePath`.
  */
 export const DOCUMENT_INIT_PARAMS_DEFAULTS: DocumentInitParameters = {
-    cMapUrl: normalizePath('./node_modules/pdfjs-dist/cmaps/'),
+    cMapUrl: CMAP_RELATIVE_URL,
     cMapPacked: true,
-    standardFontDataUrl: normalizePath('./node_modules/pdfjs-dist/standard_fonts/'),
+    standardFontDataUrl: STANDARD_FONTS_RELATIVE_URL,
 };
 
 /**

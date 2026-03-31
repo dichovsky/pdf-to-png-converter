@@ -1,6 +1,7 @@
 import type * as pdfApiTypes from 'pdfjs-dist/types/src/display/api';
-import { DOCUMENT_INIT_PARAMS_DEFAULTS, PDF_TO_PNG_OPTIONS_DEFAULTS } from './const';
+import { CMAP_RELATIVE_URL, DOCUMENT_INIT_PARAMS_DEFAULTS, PDF_TO_PNG_OPTIONS_DEFAULTS, STANDARD_FONTS_RELATIVE_URL } from './const';
 import type { PdfToPngOptions } from './interfaces/pdf.to.png.options';
+import { normalizePath } from './normalizePath';
 import { VerbosityLevel } from './types/verbosity.level';
 
 /**
@@ -22,6 +23,10 @@ import { VerbosityLevel } from './types/verbosity.level';
 export function propsToPdfDocInitParams(props?: PdfToPngOptions): pdfApiTypes.DocumentInitParameters {
     const pdfDocInitParams: pdfApiTypes.DocumentInitParameters = {
         ...DOCUMENT_INIT_PARAMS_DEFAULTS,
+        // Resolve CMap and font paths at call time so that any process.chdir() call
+        // that happens between import and invocation is correctly reflected.
+        cMapUrl: normalizePath(CMAP_RELATIVE_URL),
+        standardFontDataUrl: normalizePath(STANDARD_FONTS_RELATIVE_URL),
     };
 
     // Map 'verbosityLevel' from PdfToPngOptions to 'verbosity' in DocumentInitParameters

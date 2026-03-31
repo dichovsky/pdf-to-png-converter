@@ -1,12 +1,15 @@
 import { readdirSync } from 'node:fs';
 import type { DocumentInitParameters } from 'pdfjs-dist/types/src/display/api';
 import { expect, test } from 'vitest';
-import { DOCUMENT_INIT_PARAMS_DEFAULTS, STANDARD_CMAPS, STANDARD_FONTS } from '../src/const';
+import { CMAP_RELATIVE_URL, STANDARD_CMAPS, STANDARD_FONTS, STANDARD_FONTS_RELATIVE_URL } from '../src/const';
 import { propsToPdfDocInitParams } from '../src/propsToPdfDocInitParams';
 import type { PdfToPngOptions } from '../src/interfaces/pdf.to.png.options.js';
+import { normalizePath } from '../src/normalizePath.js';
 
-const cMapUrl: string = DOCUMENT_INIT_PARAMS_DEFAULTS.cMapUrl as string;
-const standardFontDataUrl: string = DOCUMENT_INIT_PARAMS_DEFAULTS.standardFontDataUrl as string;
+// Resolved at test-run time so the expected values match what propsToPdfDocInitParams() returns
+// (which also resolves at call time). This avoids the module-load-time lock-in of the old approach.
+const cMapUrl: string = normalizePath(CMAP_RELATIVE_URL);
+const standardFontDataUrl: string = normalizePath(STANDARD_FONTS_RELATIVE_URL);
 
 const testDataArray: { id: string; props?: PdfToPngOptions; expectedPdfDocInitParams: DocumentInitParameters }[] = [
     {
