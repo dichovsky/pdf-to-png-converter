@@ -3,7 +3,7 @@ import type { DocumentInitParameters } from 'pdfjs-dist/types/src/display/api';
 import { expect, test } from 'vitest';
 import { DOCUMENT_INIT_PARAMS_DEFAULTS, STANDARD_CMAPS, STANDARD_FONTS } from '../src/const';
 import { propsToPdfDocInitParams } from '../src/propsToPdfDocInitParams';
-import { PdfToPngOptions } from '../src/types/pdf.to.png.options';
+import type { PdfToPngOptions } from '../src/interfaces/pdf.to.png.options.js';
 
 const cMapUrl: string = DOCUMENT_INIT_PARAMS_DEFAULTS.cMapUrl as string;
 const standardFontDataUrl: string = DOCUMENT_INIT_PARAMS_DEFAULTS.standardFontDataUrl as string;
