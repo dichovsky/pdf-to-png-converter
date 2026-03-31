@@ -1,3 +1,3 @@
-export { pdfToPng } from './pdfToPng';
-export type { PngPageOutput, PdfToPngOptions } from './interfaces';
-export { VerbosityLevel } from './types';
+export { pdfToPng } from './pdfToPng.js';
+export type { PngPageOutput, PdfToPngOptions } from './interfaces/index.js';
+export { VerbosityLevel } from './types/index.js';

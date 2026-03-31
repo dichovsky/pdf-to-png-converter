@@ -1,1 +1,1 @@
-export { VerbosityLevel } from './verbosity.level';
+export { VerbosityLevel } from './verbosity.level.js';
