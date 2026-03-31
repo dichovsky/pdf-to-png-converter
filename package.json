@@ -43,6 +43,7 @@
     "out"
   ],
   "scripts": {
+    "prepublishOnly": "npm test",
     "prebuild": "npm run clean",
     "build": "tsc --pretty --project tsconfig.json",
     "build:test": "tsc --pretty --noEmit --project tsconfig.json",
