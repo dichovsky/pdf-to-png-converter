@@ -1,5 +1,5 @@
 import { promises as fsPromises } from 'node:fs';
-import { dirname, isAbsolute, join, parse, relative, resolve, sep } from 'node:path';
+import { dirname, isAbsolute, join, parse, relative, sep } from 'node:path';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import type * as PdfjsModule from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { MAX_CANVAS_PIXELS, MAX_VIEWPORT_SCALE, PDF_TO_PNG_OPTIONS_DEFAULTS } from './const';
@@ -123,7 +123,9 @@ function resolvePageName(pageNumber: number, defaultMask: string, outputFileMask
  * @param pageViewportScale - Render scale factor.
  * @param shouldReturnContent - Whether to include the PNG buffer in the output.
  * @param returnMetadataOnly - When true, skip rendering entirely.
- * @param outputFolder - Absolute path to write PNG files; undefined means no file output.
+ * @param resolvedOutputFolder - Absolute path to write PNG files; `undefined` means no file output.
+ * @param realOutputFolder - Pre-computed `realpath` of `resolvedOutputFolder`, resolved once by
+ *   the caller before the page loop to avoid N redundant syscalls. `undefined` when no file output.
  * @param returnPageContent - The caller's original preference; used to decide whether to
  *   clear `content` after writing to disk.
  * @returns A `PngPageOutput` with `path` and optionally `content` populated.
@@ -135,14 +137,15 @@ async function processAndSavePage(
     pageViewportScale: number,
     shouldReturnContent: boolean,
     returnMetadataOnly: boolean,
-    outputFolder: string | undefined,
+    resolvedOutputFolder: string | undefined,
+    realOutputFolder: string | undefined,
     returnPageContent: boolean | undefined,
 ): Promise<PngPageOutput> {
     const pageOutput = returnMetadataOnly
         ? await getPageMetadata(pdfDocument, pageName, pageNumber, pageViewportScale)
         : await renderPdfPage(pdfDocument, pageName, pageNumber, pageViewportScale, shouldReturnContent);
-    if (outputFolder !== undefined && !returnMetadataOnly) {
-        await savePNGfile(pageOutput, outputFolder);
+    if (resolvedOutputFolder !== undefined && realOutputFolder !== undefined && !returnMetadataOnly) {
+        await savePNGfile(pageOutput, resolvedOutputFolder, realOutputFolder);
         if (returnPageContent === false) {
             pageOutput.content = undefined;
         }
@@ -183,10 +186,22 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike | Uint8Array, p
     const validPagesToProcess: number[] = pagesToProcess.filter((pageNumber) => pageNumber <= pdfDocument.numPages && pageNumber >= 1);
     const returnMetadataOnly: boolean = props?.returnMetadataOnly ?? false;
 
-    // Create output folder if specified (skip when returnMetadataOnly is true — no files will be written)
-    if (props?.outputFolder !== undefined && !returnMetadataOnly) {
-        await fsPromises.mkdir(join(process.cwd(), props.outputFolder), { recursive: true });
+    // Resolve output folder to an absolute path up-front so it can be shared between mkdir and the
+    // page loop. The realpath is computed once after mkdir to avoid N redundant syscalls in savePNGfile.
+    // When returnMetadataOnly is true no files are written, so the folder is never created or resolved.
+    const resolvedOutputFolder: string | undefined =
+        props?.outputFolder !== undefined && !returnMetadataOnly ? join(process.cwd(), props.outputFolder) : undefined;
+
+    // Create output folder if specified
+    if (resolvedOutputFolder !== undefined) {
+        await fsPromises.mkdir(resolvedOutputFolder, { recursive: true });
     }
+
+    // Resolve symlinks in the output folder once. Passing this cached value into savePNGfile avoids
+    // one realpath() call per page (saves N calls for an N-page PDF). The per-page TOCTOU check
+    // inside savePNGfile still calls realpath() independently so the security guarantee is unchanged.
+    const realOutputFolder: string | undefined =
+        resolvedOutputFolder !== undefined ? await fsPromises.realpath(resolvedOutputFolder) : undefined;
 
     // Process each page
     const pngPageOutputs: PngPageOutput[] = [];
@@ -196,7 +211,6 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike | Uint8Array, p
         // (even if the user doesn't want it returned) so it can be saved to disk.
         // When returnMetadataOnly is true, rendering is skipped entirely regardless.
         const shouldReturnContent: boolean = returnMetadataOnly ? false : props?.outputFolder ? true : (props?.returnPageContent ?? true);
-        const resolvedOutputFolder: string | undefined = props?.outputFolder ? join(process.cwd(), props.outputFolder) : undefined;
         if (props?.processPagesInParallel === true) {
             // concurrencyLimit was already validated above (fail-fast); safe to use directly.
             const concurrencyLimit: number = props.concurrencyLimit ?? PDF_TO_PNG_OPTIONS_DEFAULTS.concurrencyLimit;
@@ -212,6 +226,7 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike | Uint8Array, p
                             shouldReturnContent,
                             returnMetadataOnly,
                             resolvedOutputFolder,
+                            realOutputFolder,
                             props?.returnPageContent,
                         ),
                     ),
@@ -229,6 +244,7 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike | Uint8Array, p
                         shouldReturnContent,
                         returnMetadataOnly,
                         resolvedOutputFolder,
+                        realOutputFolder,
                         props?.returnPageContent,
                     ),
                 );
@@ -446,7 +462,12 @@ function isEscapingRelativePath(rel: string): boolean {
  * @param pngPageOutput - Object describing the PNG to write. Must have a `name`
  *   property and a `content` property containing the file data. `content` is
  *   expected to be a Buffer (the implementation casts it to `Buffer`).
- * @param outputFolder - Destination folder on disk where the PNG file will be saved.
+ * @param resolvedOutputFolder - Absolute, resolved destination folder path. The caller
+ *   (`pdfToPng`) already computed this via `join(cwd, props.outputFolder)`; no second
+ *   `resolve()` call is needed here.
+ * @param realOutputFolder - Pre-computed `realpath` of `resolvedOutputFolder`, resolved
+ *   once before the page loop by `pdfToPng`. Used for the initial symlink-escape check.
+ *   The final TOCTOU re-check inside this function still calls `realpath()` independently.
  *
  * @returns A Promise that resolves when the file has been successfully written.
  *
@@ -464,9 +485,9 @@ function isEscapingRelativePath(rel: string): boolean {
  * (e.g. `O_NOFOLLOW` via native bindings). On multi-user or shared systems, ensure
  * the `outputFolder` is a private directory not writable by untrusted users.
  */
-async function savePNGfile(pngPageOutput: PngPageOutput, outputFolder: string): Promise<void> {
-    const resolvedOutputFolder = resolve(outputFolder);
-    const resolvedFilePath = resolve(outputFolder, pngPageOutput.name);
+async function savePNGfile(pngPageOutput: PngPageOutput, resolvedOutputFolder: string, realOutputFolder: string): Promise<void> {
+    // resolvedOutputFolder is already absolute (computed by pdfToPng) — no resolve() needed.
+    const resolvedFilePath = join(resolvedOutputFolder, pngPageOutput.name);
 
     // Guard against path-traversal via .. segments or cross-drive absolute paths.
     // Use a segment-aware check (rel === '..' or starts with '../') to avoid false positives
@@ -475,9 +496,8 @@ async function savePNGfile(pngPageOutput: PngPageOutput, outputFolder: string): 
         throw new Error(`Output file name escapes the output folder: ${pngPageOutput.name}`);
     }
 
-    // Guard against symlink-based escapes: resolve symlinks in the output folder and in the
-    // file's parent directory, then re-check containment.
-    const realOutputFolder = await fsPromises.realpath(resolvedOutputFolder);
+    // Guard against symlink-based escapes: use the pre-computed realOutputFolder for the
+    // initial containment check, and resolve symlinks in the file's parent directory.
     const realFileDir = await fsPromises.realpath(dirname(resolvedFilePath));
     if (isEscapingRelativePath(relative(realOutputFolder, realFileDir))) {
         throw new Error(`Output file name escapes the output folder: ${pngPageOutput.name}`);
@@ -498,7 +518,7 @@ async function savePNGfile(pngPageOutput: PngPageOutput, outputFolder: string): 
     // directory-component races even where available.
     const realOutputFolderFinal = await fsPromises.realpath(resolvedOutputFolder);
     if (realOutputFolderFinal !== realOutputFolder) {
-        throw new Error(`Output folder was modified during write: ${outputFolder}`);
+        throw new Error(`Output folder was modified during write: ${resolvedOutputFolder}`);
     }
 
     await fsPromises.writeFile(pngPageOutput.path, pngPageOutput.content as Buffer);

@@ -148,17 +148,17 @@ describe('pdfToPng', () => {
         (fsPromises.readFile as Mock).mockResolvedValueOnce(new ArrayBuffer(8));
         (getDocument as Mock).mockReturnValueOnce({ promise: Promise.resolve(mockDocument) });
         (fsPromises.mkdir as Mock).mockResolvedValueOnce(undefined);
-        // 1st realpath: resolvedOutputFolder (containment check) — passes
-        // 2nd realpath: dirname(resolvedFilePath) (containment check) — passes
-        // 3rd realpath: resolvedOutputFolder (final TOCTOU re-check) — differs → throws
+        // 1st realpath: resolvedOutputFolder in pdfToPng (cached as realOutputFolder) — passes
+        // 2nd realpath: dirname(resolvedFilePath) in savePNGfile (symlink containment check) — passes
+        // 3rd realpath: resolvedOutputFolder in savePNGfile (final TOCTOU re-check) — differs → throws
         (fsPromises.realpath as Mock)
             .mockResolvedValueOnce('/safe/output')
             .mockResolvedValueOnce('/safe/output')
             .mockResolvedValueOnce('/swapped/evil');
 
-        await expect(
-            pdfToPng('/path/to/test.pdf', { outputFolder: 'test-output' }),
-        ).rejects.toThrow('Output folder was modified during write');
+        await expect(pdfToPng('/path/to/test.pdf', { outputFolder: 'test-output' })).rejects.toThrow(
+            'Output folder was modified during write',
+        );
 
         expect(fsPromises.writeFile).not.toHaveBeenCalled();
     });
