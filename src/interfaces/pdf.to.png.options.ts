@@ -65,12 +65,14 @@ export interface PdfToPngOptions {
      * (e.g. `(pageNumber) => \`page_${pageNumber}.png\``).
      * When omitted, names default to `<pdfBasename>_page_<pageNumber>.png`,
      * or `buffer_page_<pageNumber>.png` when the PDF is supplied as an `ArrayBufferLike`.
+     * @since 3.14.0
      */
     outputFileMaskFunc?: (pageNumber: number) => string;
 
     /**
      * 1-based page numbers to convert. Pages outside the valid range (1 to `numPages`) are silently ignored.
      * When omitted, all pages in the document are processed.
+     * @since 3.3.0
      */
     pagesToProcess?: number[];
 
@@ -97,6 +99,7 @@ export interface PdfToPngOptions {
      * This is significantly faster than full rendering and useful for inspecting page dimensions
      * and rotation without generating images.
      * Default: `false`.
+     * @since 3.14.0
      */
     returnMetadataOnly?: boolean;
 
@@ -104,6 +107,7 @@ export interface PdfToPngOptions {
      * When `true`, all selected pages are rendered concurrently using `Promise.all` in batches
      * controlled by `concurrencyLimit`. When `false`, pages are processed one at a time in order.
      * Default: `false`.
+     * @since 3.7.0
      */
     processPagesInParallel?: boolean;
 
@@ -113,6 +117,7 @@ export interface PdfToPngOptions {
      * Higher values increase throughput at the cost of memory.
      * Only applies when `processPagesInParallel` is `true`.
      * Default: `4`.
+     * @since 3.14.0
      */
     concurrencyLimit?: number;
 }
