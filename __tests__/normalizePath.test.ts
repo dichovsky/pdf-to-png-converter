@@ -44,3 +44,34 @@ if (process.platform === 'win32') {
         expect(normalizedPath).to.equal(`${__dirname[0]}:\\Windows\\`);
     });
 }
+
+test('should normalize path containing spaces', () => {
+    const path = '/path/to/my folder/with spaces';
+    const normalizedPath: string = normalizePath(path);
+    if (process.platform === 'win32') {
+        expect(normalizedPath).to.match(/my folder\\with spaces\\/);
+    } else {
+        expect(normalizedPath).to.equal('/path/to/my folder/with spaces/');
+    }
+});
+
+test('should normalize path containing parentheses and special characters', () => {
+    const path = '/path/to/folder (1)/output';
+    const normalizedPath: string = normalizePath(path);
+    if (process.platform === 'win32') {
+        expect(normalizedPath).to.match(/folder \(1\)\\output\\/);
+    } else {
+        expect(normalizedPath).to.equal('/path/to/folder (1)/output/');
+    }
+});
+
+test('should preserve spaces in path and ensure trailing separator', () => {
+    const path = '/my documents/pdf output';
+    const normalizedPath: string = normalizePath(path);
+    if (process.platform === 'win32') {
+        expect(normalizedPath.endsWith('\\')).toBe(true);
+    } else {
+        expect(normalizedPath).to.equal('/my documents/pdf output/');
+        expect(normalizedPath.endsWith('/')).toBe(true);
+    }
+});
