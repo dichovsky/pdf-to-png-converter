@@ -24,12 +24,14 @@
 A high-performance Node.js library for converting PDF files and buffers to PNG images. Perfect for web applications, document processing pipelines, and image generation workflows.
 
 **Key Benefits:**
-- ✨ **No Build-Time Compilation** - Pre-built native binaries included, no `node-gyp` or compiler toolchain required
+- ✨ **No Build-Time Compilation** - Pre-built native binaries included via `@napi-rs/canvas`, no `node-gyp` or compiler toolchain required
 - 🚀 **High Performance** - Supports parallel page processing
 - 🔐 **Encrypted PDFs** - Handle password-protected documents
 - 📦 **Lightweight** - Minimal dependencies
 - 💪 **TypeScript Support** - Full type definitions included
 - 🎨 **Flexible Rendering** - Advanced font and rendering options
+
+> **Note:** `@napi-rs/canvas` ships platform-specific pre-built native binaries (no compilation step). See the [@napi-rs/canvas repository](https://github.com/Brooooooklyn/canvas) for the full list of supported platforms.
 
 ## Table of Contents
 
@@ -77,10 +79,11 @@ console.log(`Converted ${pngPages.length} pages`);
 Or with TypeScript:
 
 ```typescript
-import { pdfToPng, type PngPageOutput } from 'pdf-to-png-converter';
+import { pdfToPng, VerbosityLevel, type PngPageOutput } from 'pdf-to-png-converter';
 
 const pngPages: PngPageOutput[] = await pdfToPng('document.pdf', {
     outputFolder: './output',
+    verbosityLevel: VerbosityLevel.ERRORS, // 0=ERRORS, 1=WARNINGS, 5=INFOS
 });
 ```
 
@@ -116,6 +119,8 @@ Converts PDF pages to PNG images.
 
     // Rendering Options
     viewportScale?: number,          // PNG scale/zoom level (default: 1.0, max: 100)
+                                     // Note: large pages can still hit the 100-million-pixel canvas limit
+                                     // at scales well below 100. Reduce viewportScale if you get an error.
 
     // Security
     pdfFilePassword?: string,        // Password for encrypted PDFs
@@ -131,6 +136,8 @@ Converts PDF pages to PNG images.
 
     // Logging
     verbosityLevel?: number,         // 0=ERRORS, 1=WARNINGS, 5=INFOS (default: 0)
+                                     // Use the VerbosityLevel enum for readable values:
+                                     // import { VerbosityLevel } from 'pdf-to-png-converter'
 }
 ```
 
@@ -248,11 +255,15 @@ The `pdfToPng` function returns an array of page objects:
     {
         pageNumber: 1,                      // Page number in the PDF
         name: 'document_page_1.png',        // PNG filename
-        content: Buffer<...>,               // PNG image data (or undefined if returnPageContent=false)
-        path: '/output/document_page_1.png', // Full file path (empty string if no outputFolder)
+        content: Buffer<...>,               // PNG image data
+                                            //   undefined if returnPageContent=false
+                                            //   undefined if returnMetadataOnly=true
+        path: '/output/document_page_1.png', // Full file path after writing to disk
+                                            //   empty string ('') if no outputFolder
+                                            //   empty string ('') if returnMetadataOnly=true
         width: 612,                         // Image width in pixels
         height: 792,                        // Image height in pixels
-        rotation: 0                         // Page rotation in degrees (0, 90, 180, or 270)
+        rotation: 0                         // Page rotation in degrees: 0, 90, 180, or 270
     },
     // ... more pages
 ]
