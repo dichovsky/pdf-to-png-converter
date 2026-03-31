@@ -24,3 +24,9 @@ jobs:
               run: npm run build:test && npm run lint
             - name: Test
               run: npm test
+            - name: Upload coverage
+              uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+              with:
+                  name: coverage-node-${{ matrix.node }}
+                  path: coverage/
+                  if-no-files-found: warn
