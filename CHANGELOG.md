@@ -55,7 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [3.15.0] — 2026-01-xx
+## [3.15.0] — 2026-03-31
 
 ### Fixed
 - `viewportScale` maximum limit updated to 100; error messages updated accordingly
@@ -68,7 +68,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [3.14.0] — 2024-xx-xx
+## [3.14.0] — 2026-02-26
 
 ### Added
 - `returnMetadataOnly` option: returns page dimensions and rotation without rendering
@@ -81,21 +81,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [3.7.0] — 2023-xx-xx
+## [3.7.0] — 2025-03-06
 
 ### Added
 - `processPagesInParallel` option using `Promise.all` with configurable concurrency
 
 ---
 
-## [3.3.0] — 2023-xx-xx
+## [3.3.0] — 2024-08-30
 
 ### Added
 - `pagesToProcess` option to convert specific pages
 
 ---
 
-## [3.0.0] — 2022-xx-xx
+## [3.0.0] — 2023-04-09
 
 ### Changed
 - Module type changed to CommonJS (`"type": "commonjs"`)
@@ -103,7 +103,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [1.0.0] — 2021-xx-xx
+## [1.0.0] — 2022-05-07
 
 ### Added
 - Initial stable release
