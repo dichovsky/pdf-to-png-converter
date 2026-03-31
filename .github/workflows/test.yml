@@ -1,6 +1,8 @@
 name: Tests on push
 on:
     push:
+permissions:
+    contents: read
 jobs:
     ubuntu:
         runs-on: [self-hosted, linux]
