@@ -25,6 +25,13 @@ test(`should convert PDF To PNG files`, async () => {
     }
 });
 
+test(`should convert TAMReview PDF to the expected number of PNG pages`, async () => {
+    const pdfFilePath: string = resolve('./test-data/TAMReview.pdf');
+    const pngPages: PngPageOutput[] = await pdfToPng(pdfFilePath);
+
+    expect(pngPages.length).to.equal(23);
+});
+
 test(`should convert PDF To PNG files in parallel mode`, async () => {
     const pdfFilePath: string = resolve('./test-data/large_pdf.pdf');
     const pngPages: PngPageOutput[] = await pdfToPng(pdfFilePath, {
