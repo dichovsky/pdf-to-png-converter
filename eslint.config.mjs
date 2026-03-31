@@ -32,9 +32,10 @@ export default [
         rules: {
             ...js.configs.recommended.rules,
             ...typescriptEslint.configs.recommended.rules,
-            // Disabled rules
-            "@typescript-eslint/no-var-requires": 0,
-            "@typescript-eslint/no-explicit-any": 0,
+            // Enforce no CommonJS require() in TypeScript source — the package uses nodenext modules
+            "@typescript-eslint/no-var-requires": "error",
+            // Flag any usage so it is visible in CI; does not hard-block
+            "@typescript-eslint/no-explicit-any": "warn",
             // Strict TypeScript rules
             "@typescript-eslint/explicit-function-return-type": [
                 "warn",

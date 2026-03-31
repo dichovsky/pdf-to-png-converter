@@ -1,6 +1,7 @@
 import { promises as fsPromises } from 'node:fs';
 import { dirname, isAbsolute, join, parse, relative, resolve, sep } from 'node:path';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
+import type * as PdfjsModule from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { MAX_CANVAS_PIXELS, MAX_VIEWPORT_SCALE, PDF_TO_PNG_OPTIONS_DEFAULTS } from './const';
 import { NodeCanvasFactory } from './node.canvas.factory';
 import { propsToPdfDocInitParams } from './propsToPdfDocInitParams';
@@ -9,7 +10,7 @@ import type { PdfToPngOptions, PngPageOutput } from './interfaces';
 /** Module-level cache for the pdfjs-dist dynamic import. V8 already caches dynamic imports
  * internally, but making it explicit here avoids the module-resolution overhead on every call
  * and makes the caching behaviour visible and testable. */
-let pdfjsLib: typeof import('pdfjs-dist/legacy/build/pdf.mjs') | undefined;
+let pdfjsLib: typeof PdfjsModule | undefined;
 
 /**
  * Convert one or more pages from a PDF into PNG images.
@@ -122,8 +123,15 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike | Uint8Array, p
     // Capture and validate viewportScale before the first await so the validated value is
     // immutable and cannot be bypassed by mutating `props` between validation and rendering.
     const pageViewportScale: number = props?.viewportScale ?? PDF_TO_PNG_OPTIONS_DEFAULTS.viewportScale;
-    if (typeof pageViewportScale !== 'number' || !Number.isFinite(pageViewportScale) || pageViewportScale <= 0 || pageViewportScale > MAX_VIEWPORT_SCALE) {
-        throw new Error(`viewportScale must be a finite number greater than 0 and at most ${MAX_VIEWPORT_SCALE}, received: ${pageViewportScale}`);
+    if (
+        typeof pageViewportScale !== 'number' ||
+        !Number.isFinite(pageViewportScale) ||
+        pageViewportScale <= 0 ||
+        pageViewportScale > MAX_VIEWPORT_SCALE
+    ) {
+        throw new Error(
+            `viewportScale must be a finite number greater than 0 and at most ${MAX_VIEWPORT_SCALE}, received: ${pageViewportScale}`,
+        );
     }
 
     // Fail fast: validate concurrencyLimit before any I/O so callers discover bad options immediately.
@@ -152,20 +160,12 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike | Uint8Array, p
     // Process each page
     const pngPageOutputs: PngPageOutput[] = [];
     try {
-        const defaultMask: string = typeof pdfFile === 'string'
-            ? parse(pdfFile).name
-            : PDF_TO_PNG_OPTIONS_DEFAULTS.outputFileMask;
+        const defaultMask: string = typeof pdfFile === 'string' ? parse(pdfFile).name : PDF_TO_PNG_OPTIONS_DEFAULTS.outputFileMask;
         // When an output folder is specified, content must always be retrieved
         // (even if the user doesn't want it returned) so it can be saved to disk.
         // When returnMetadataOnly is true, rendering is skipped entirely regardless.
-        const shouldReturnContent: boolean = returnMetadataOnly
-            ? false
-            : props?.outputFolder
-              ? true
-              : (props?.returnPageContent ?? true);
-        const resolvedOutputFolder: string | undefined = props?.outputFolder
-            ? join(process.cwd(), props.outputFolder)
-            : undefined;
+        const shouldReturnContent: boolean = returnMetadataOnly ? false : props?.outputFolder ? true : (props?.returnPageContent ?? true);
+        const resolvedOutputFolder: string | undefined = props?.outputFolder ? join(process.cwd(), props.outputFolder) : undefined;
         if (props?.processPagesInParallel === true) {
             // concurrencyLimit was already validated above (fail-fast); safe to use directly.
             const concurrencyLimit: number = props.concurrencyLimit ?? PDF_TO_PNG_OPTIONS_DEFAULTS.concurrencyLimit;
