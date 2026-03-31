@@ -14,6 +14,7 @@ jobs:
                   node-version: '24.x'
                   registry-url: 'https://registry.npmjs.org'
             - run: npm ci
+            - run: npm audit --audit-level=high
             - run: npm run build
             - run: npm test
             - run: npm publish
