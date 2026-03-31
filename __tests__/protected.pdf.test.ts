@@ -14,7 +14,7 @@ test(`should convert protected PDF To PNG`, async () => {
     for (const pngPage of pngPages) {
         const expectedFilePath: string = resolve('./test-data/protected.pdf/expected', pngPage.name);
         const compareResult: number = comparePNG({
-            actualFile: pngPage.content,
+            actualFile: pngPage.content!,
             expectedFile: expectedFilePath,
             createExpectedFileIfMissing: true,
         });

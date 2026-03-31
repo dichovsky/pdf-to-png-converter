@@ -25,7 +25,7 @@ jobs:
             - name: Check licenses
               run: npm run test:license
             - name: Build and lint
-              run: npm run build:test && npm run lint
+              run: npm run build:test:all && npm run lint
             - name: Test
               run: npm test
             - name: Upload coverage
