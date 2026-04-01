@@ -1,6 +1,5 @@
 node_modules
 test-results
-coverage
 out
 .vscode
 .env*

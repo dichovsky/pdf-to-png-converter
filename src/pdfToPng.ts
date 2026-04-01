@@ -486,6 +486,12 @@ function isEscapingRelativePath(rel: string): boolean {
  * the `outputFolder` is a private directory not writable by untrusted users.
  */
 async function savePNGfile(pngPageOutput: PngPageOutput, resolvedOutputFolder: string, realOutputFolder: string): Promise<void> {
+    // Reject absolute filenames immediately: path.join() silently strips the leading separator
+    // from an absolute segment, making it appear to be inside the output folder when it isn't.
+    if (isAbsolute(pngPageOutput.name)) {
+        throw new Error(`Output file name escapes the output folder: ${pngPageOutput.name}`);
+    }
+
     // resolvedOutputFolder is already absolute (computed by pdfToPng) — no resolve() needed.
     const resolvedFilePath = join(resolvedOutputFolder, pngPageOutput.name);
 
