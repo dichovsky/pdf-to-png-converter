@@ -33,6 +33,9 @@
   "sideEffects": false,
   "main": "out/index.js",
   "types": "out/index.d.ts",
+  "bin": {
+    "pdf-to-png-converter": "./out/cli.js"
+  },
   "exports": {
     ".": {
       "types": "./out/index.d.ts",
