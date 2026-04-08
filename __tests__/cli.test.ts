@@ -149,14 +149,6 @@ describe('CLI run()', () => {
         expect(exitSpy).toHaveBeenCalledTimes(1);
     });
 
-    it('exits 1 when --output-folder is missing and --return-metadata-only is not set', async () => {
-        setArgv('test.pdf');
-        await run();
-        expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('--output-folder is required'));
-        expect(exitSpy).toHaveBeenCalledWith(1);
-        expect(exitSpy).toHaveBeenCalledTimes(1);
-    });
-
     // ── Numeric option validation ──────────────────────────────────────────────
 
     it('exits 1 when --viewport-scale is not a valid number', async () => {
@@ -248,7 +240,7 @@ describe('CLI run()', () => {
             processPagesInParallel: true,
             concurrencyLimit: 2,
             returnMetadataOnly: undefined,
-            returnPageContent: false,
+            returnPageContent: undefined,
         });
         expect(logSpy).toHaveBeenCalledWith('Processing PDF: test.pdf');
         expect(logSpy).toHaveBeenCalledWith('Output folder: /out');
@@ -269,6 +261,21 @@ describe('CLI run()', () => {
                 enableXfa: true,
             }),
         );
+    });
+
+    it('passes --return-page-content flag through to pdfToPng', async () => {
+        setArgv('test.pdf', '--output-folder', '/out', '--return-page-content');
+        await run();
+        expect(pdfToPng).toHaveBeenCalledWith('test.pdf', expect.objectContaining({ returnPageContent: true }));
+        expect(exitSpy).not.toHaveBeenCalled();
+    });
+
+    it('calls pdfToPng without --output-folder (buffer / in-memory mode)', async () => {
+        setArgv('test.pdf');
+        await run();
+        expect(pdfToPng).toHaveBeenCalledTimes(1);
+        expect(pdfToPng).toHaveBeenCalledWith('test.pdf', expect.objectContaining({ outputFolder: undefined }));
+        expect(exitSpy).not.toHaveBeenCalled();
     });
 
     it('does not log processing info in --silent mode', async () => {

@@ -22,6 +22,7 @@ Options:
   --pages-to-process <n,m,...>      Comma-separated list of 1-based page numbers
   --verbosity-level <number>        pdfjs verbosity level (0=errors, 1=warnings, 5=infos)
   --return-metadata-only            Return page metadata without rendering images
+  --return-page-content             Include rendered PNG buffers in the returned results
   --process-pages-in-parallel       Process pages concurrently
   --concurrency-limit <number>      Maximum number of pages rendered simultaneously
   --silent                          Suppress output unless there is an error
@@ -43,6 +44,7 @@ const CLI_OPTIONS = {
     'pages-to-process': { type: 'string' },
     'verbosity-level': { type: 'string' },
     'return-metadata-only': { type: 'boolean' },
+    'return-page-content': { type: 'boolean' },
     'process-pages-in-parallel': { type: 'boolean' },
     'concurrency-limit': { type: 'string' },
     silent: { type: 'boolean' },
@@ -146,13 +148,6 @@ export async function run(): Promise<void> {
         return;
     }
 
-    if (!values['output-folder'] && !values['return-metadata-only']) {
-        console.error('Error: --output-folder is required unless --return-metadata-only is specified.');
-        console.error(HELP_TEXT);
-        process.exit(1);
-        return;
-    }
-
     // ── Validate numeric options up-front for actionable error messages ───────
 
     let viewportScale: number | undefined;
@@ -221,10 +216,9 @@ export async function run(): Promise<void> {
         pagesToProcess,
         verbosityLevel,
         returnMetadataOnly: values['return-metadata-only'],
+        returnPageContent: values['return-page-content'],
         processPagesInParallel: values['process-pages-in-parallel'],
         concurrencyLimit,
-        // CLI writes to disk — no need to buffer PNG bytes in memory after each page is saved.
-        returnPageContent: false,
     };
 
     log(`Processing PDF: ${pdfFilePath}`);
