@@ -1,4 +1,5 @@
-FROM node:22.19.0-slim AS test
+ARG NODE_VERSION=24
+FROM node:${NODE_VERSION}-slim AS test
 WORKDIR /usr/pkg/
 COPY package*.json ./
 RUN npm ci

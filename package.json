@@ -50,7 +50,7 @@
     "build:test": "tsc --pretty --noEmit --project tsconfig.json",
     "build:test:all": "tsc --pretty --noEmit --project tsconfig.test.json",
     "clean": "rimraf ./out ./test-results",
-    "docker:build": "docker build --compress -t test-pdf-to-png-converter .",
+    "docker:build": "docker build --build-arg NODE_VERSION=$(cat .nvmrc) --compress -t test-pdf-to-png-converter .",
     "docker:run": "docker run --rm -it -v ${PWD}/test-results:/usr/pkg/test-results test-pdf-to-png-converter",
     "docker:test": "vitest run --coverage",
     "lint": "eslint .",
