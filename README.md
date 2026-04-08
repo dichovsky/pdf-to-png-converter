@@ -99,7 +99,7 @@ npx pdf-to-png-converter my-document.pdf --output-folder ./output
 ```
 
 **Options:**
-- `--output-folder <dir>`: Directory to save PNG files (required unless `--return-metadata-only` is passed).
+- `--output-folder <dir>`: Directory to save PNG files.
 - `--viewport-scale <number>`: Scale factor applied to each page viewport.
 - `--use-system-fonts`: Attempt to use fonts installed on the host system.
 - `--disable-font-face <true|false>`: Do not load embedded fonts.
@@ -108,6 +108,7 @@ npx pdf-to-png-converter my-document.pdf --output-folder ./output
 - `--pages-to-process <n,m,...>`: Comma-separated list of 1-based page numbers.
 - `--verbosity-level <number>`: pdfjs verbosity level (0=errors, 1=warnings, 5=infos).
 - `--return-metadata-only`: Return page metadata without rendering images.
+- `--return-page-content`: Include rendered PNG buffers in the returned results.
 - `--process-pages-in-parallel`: Process pages concurrently.
 - `--concurrency-limit <number>`: Maximum number of pages rendered simultaneously.
 - `--silent`: Suppress normal output messages unless there is an error.

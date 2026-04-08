@@ -46,13 +46,6 @@ describe('CLI Options Parser', () => {
         expect(exitSpy).toHaveBeenCalledWith(1);
     });
 
-    it('should fail if no output folder is provided (and not metadata only)', async () => {
-        process.argv = ['node', 'cli.js', 'test.pdf'];
-        await cli.run();
-        expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('--output-folder is required'));
-        expect(exitSpy).toHaveBeenCalledWith(1);
-    });
-
     it('should call pdfToPng with parsed arguments', async () => {
         process.argv = [
             'node',
@@ -86,12 +79,41 @@ describe('CLI Options Parser', () => {
             verbosityLevel: 1,
             processPagesInParallel: true,
             concurrencyLimit: 2,
-            returnPageContent: false, // expected default via CLI
+            returnPageContent: undefined,
             enableXfa: undefined,
             pdfFilePassword: undefined,
             returnMetadataOnly: undefined,
         });
         expect(logSpy).toHaveBeenCalledWith('Processing PDF: test.pdf');
+    });
+
+    it('should pass --return-page-content flag to pdfToPng', async () => {
+        process.argv = ['node', 'cli.js', 'test.pdf', '--output-folder', '/out', '--return-page-content'];
+
+        await cli.run();
+
+        expect(pdfToPng).toHaveBeenCalledTimes(1);
+        expect(pdfToPng).toHaveBeenCalledWith('test.pdf', expect.objectContaining({ returnPageContent: true }));
+    });
+
+    it('should call pdfToPng without output folder (buffer mode)', async () => {
+        process.argv = ['node', 'cli.js', 'test.pdf'];
+
+        await cli.run();
+
+        expect(pdfToPng).toHaveBeenCalledTimes(1);
+        expect(pdfToPng).toHaveBeenCalledWith('test.pdf', expect.objectContaining({ outputFolder: undefined }));
+    });
+
+    it('should output JSON and not require output folder when --return-metadata-only is passed', async () => {
+        process.argv = ['node', 'cli.js', 'test.pdf', '--return-metadata-only'];
+
+        await cli.run();
+
+        expect(pdfToPng).toHaveBeenCalledTimes(1);
+        expect(pdfToPng).toHaveBeenCalledWith('test.pdf', expect.objectContaining({ returnMetadataOnly: true }));
+        expect(logSpy).toHaveBeenCalledWith('Metadata extraction complete:');
+        expect(logSpy).toHaveBeenCalledWith(JSON.stringify([], null, 2));
     });
 
     it('should support --silent mode', async () => {

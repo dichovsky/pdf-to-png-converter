@@ -19,6 +19,7 @@ Options:
   --pages-to-process <n,m,...>      Comma-separated list of 1-based page numbers
   --verbosity-level <number>        pdfjs verbosity level (0=errors, 1=warnings, 5=infos)
   --return-metadata-only            Return page metadata without rendering images
+  --return-page-content             Include rendered PNG buffers in the returned results
   --process-pages-in-parallel       Process pages concurrently
   --concurrency-limit <number>      Maximum number of pages rendered simultaneously
   --silent                          Suppress output unless there is an error
@@ -53,43 +54,48 @@ function getVersion(): string {
 }
 
 async function run(): Promise<void> {
-    let args;
-    try {
-        args = parseArgs({
-            options: {
-                'output-folder': { type: 'string' },
-                'viewport-scale': { type: 'string' },
-                'use-system-fonts': { type: 'boolean' },
-                'disable-font-face': { type: 'string' },
-                'enable-xfa': { type: 'string' },
-                'pdf-file-password': { type: 'string' },
-                'pages-to-process': { type: 'string' },
-                'verbosity-level': { type: 'string' },
-                'return-metadata-only': { type: 'boolean' },
-                'process-pages-in-parallel': { type: 'boolean' },
-                'concurrency-limit': { type: 'string' },
-                silent: { type: 'boolean' },
-                version: { type: 'boolean' },
-                help: { type: 'boolean' },
-            },
-            allowPositionals: true,
-        });
-    } catch (err: unknown) {
-        console.error(err instanceof Error ? err.message : String(err));
-        console.error(HELP_TEXT);
-        process.exit(1);
-    }
+    const args = ((): ReturnType<typeof parseArgs> => {
+        try {
+            return parseArgs({
+                options: {
+                    'output-folder': { type: 'string' },
+                    'viewport-scale': { type: 'string' },
+                    'use-system-fonts': { type: 'boolean' },
+                    'disable-font-face': { type: 'string' },
+                    'enable-xfa': { type: 'string' },
+                    'pdf-file-password': { type: 'string' },
+                    'pages-to-process': { type: 'string' },
+                    'verbosity-level': { type: 'string' },
+                    'return-metadata-only': { type: 'boolean' },
+                    'return-page-content': { type: 'boolean' },
+                    'process-pages-in-parallel': { type: 'boolean' },
+                    'concurrency-limit': { type: 'string' },
+                    silent: { type: 'boolean' },
+                    version: { type: 'boolean' },
+                    help: { type: 'boolean' },
+                },
+                allowPositionals: true,
+            });
+        } catch (err: unknown) {
+            console.error(err instanceof Error ? err.message : String(err));
+            console.error(HELP_TEXT);
+            process.exit(1);
+            throw err; // unreachable; satisfies return type
+        }
+    })();
 
     const { values, positionals } = args;
 
     if (values.help) {
         console.log(HELP_TEXT);
         process.exit(0);
+        return;
     }
 
     if (values.version) {
         console.log(`v${getVersion()}`);
         process.exit(0);
+        return;
     }
 
     const pdfFilePath = positionals[0];
@@ -98,12 +104,7 @@ async function run(): Promise<void> {
         console.error('Error: <pdf-file-path> is required.');
         console.error(HELP_TEXT);
         process.exit(1);
-    }
-
-    if (!values['output-folder'] && !values['return-metadata-only']) {
-        console.error('Error: --output-folder is required unless --return-metadata-only is specified.');
-        console.error(HELP_TEXT);
-        process.exit(1);
+        return;
     }
 
     const log = (...msgs: unknown[]): void => {
@@ -112,31 +113,31 @@ async function run(): Promise<void> {
 
     try {
         const options: PdfToPngOptions = {
-            outputFolder: values['output-folder'],
-            useSystemFonts: values['use-system-fonts'],
-            pdfFilePassword: values['pdf-file-password'],
-            returnMetadataOnly: values['return-metadata-only'],
-            processPagesInParallel: values['process-pages-in-parallel'],
-            returnPageContent: false, // CLI shouldn't waste memory buffering PNGs to array when writing to disk
+            outputFolder: values['output-folder'] as string | undefined,
+            useSystemFonts: values['use-system-fonts'] as boolean | undefined,
+            pdfFilePassword: values['pdf-file-password'] as string | undefined,
+            returnMetadataOnly: values['return-metadata-only'] as boolean | undefined,
+            returnPageContent: values['return-page-content'] as boolean | undefined,
+            processPagesInParallel: values['process-pages-in-parallel'] as boolean | undefined,
         };
 
         if (values['viewport-scale'] !== undefined) {
-            options.viewportScale = parseFloat(values['viewport-scale']);
+            options.viewportScale = parseFloat(values['viewport-scale'] as string);
         }
         if (values['disable-font-face'] !== undefined) {
-            options.disableFontFace = parseBoolean(values['disable-font-face']);
+            options.disableFontFace = parseBoolean(values['disable-font-face'] as string);
         }
         if (values['enable-xfa'] !== undefined) {
-            options.enableXfa = parseBoolean(values['enable-xfa']);
+            options.enableXfa = parseBoolean(values['enable-xfa'] as string);
         }
         if (values['pages-to-process'] !== undefined) {
-            options.pagesToProcess = parseNumberList(values['pages-to-process']);
+            options.pagesToProcess = parseNumberList(values['pages-to-process'] as string);
         }
         if (values['verbosity-level'] !== undefined) {
-            options.verbosityLevel = parseInt(values['verbosity-level'], 10);
+            options.verbosityLevel = parseInt(values['verbosity-level'] as string, 10);
         }
         if (values['concurrency-limit'] !== undefined) {
-            options.concurrencyLimit = parseInt(values['concurrency-limit'], 10);
+            options.concurrencyLimit = parseInt(values['concurrency-limit'] as string, 10);
         }
 
         log(`Processing PDF: ${pdfFilePath}`);
@@ -153,14 +154,13 @@ async function run(): Promise<void> {
             log(`Successfully processed ${results.length} page(s).`);
         }
     } catch (err: unknown) {
-        console.error('Error rendering PDF:');
+        console.error('Error:');
         console.error(err instanceof Error ? err.message : String(err));
         process.exit(1);
     }
 }
 
-// eslint-disable-next-line no-undef
-if (typeof require !== 'undefined' && require.main === module) {
+if (process.argv[1] === __filename) {
     void run();
 }
 
