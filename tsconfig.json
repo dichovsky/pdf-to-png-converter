@@ -3,13 +3,13 @@
   "_version": "22.0.0",
   "compilerOptions": {
     "lib": [
-      "ES2025",
+      "ES2024",
       "ESNext.Array",
       "ESNext.Collection",
       "ESNext.Iterator"
     ],
     "module": "nodenext",
-    "target": "ES2025",
+    "target": "ES2024",
     "types": [
       "node"
     ],

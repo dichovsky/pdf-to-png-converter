@@ -37,6 +37,7 @@ A high-performance Node.js library for converting PDF files and buffers to PNG i
 
 - [Installation](#installation)
 - [Quick Start](#quick-start)
+- [CLI Usage](#cli-usage)
 - [API Reference](#api-reference)
 - [Examples](#examples)
 - [Output Format](#output-format)
@@ -86,6 +87,33 @@ const pngPages: PngPageOutput[] = await pdfToPng('document.pdf', {
     verbosityLevel: VerbosityLevel.ERRORS, // 0=ERRORS, 1=WARNINGS, 5=INFOS
 });
 ```
+
+---
+
+## CLI Usage
+
+You can use the converter directly from the terminal without writing code:
+
+```sh
+npx pdf-to-png-converter my-document.pdf --output-folder ./output
+```
+
+**Options:**
+- `--output-folder <dir>`: Directory to save PNG files.
+- `--viewport-scale <number>`: Scale factor applied to each page viewport.
+- `--use-system-fonts`: Attempt to use fonts installed on the host system.
+- `--disable-font-face <true|false>`: Do not load embedded fonts.
+- `--enable-xfa <true|false>`: Process XFA form data.
+- `--pdf-file-password <pwd>`: Password for encrypted PDFs.
+- `--pages-to-process <n,m,...>`: Comma-separated list of 1-based page numbers.
+- `--verbosity-level <number>`: pdfjs verbosity level (0=errors, 1=warnings, 5=infos).
+- `--return-metadata-only`: Return page metadata without rendering images.
+- `--return-page-content`: Include rendered PNG buffers in the returned results. By default the CLI discards in-memory buffers after writing to disk (or when no output folder is set) to avoid unnecessary memory usage. Pass this flag to retain them.
+- `--process-pages-in-parallel`: Process pages concurrently.
+- `--concurrency-limit <number>`: Maximum number of pages rendered simultaneously.
+- `--silent`: Suppress normal output messages unless there is an error.
+- `--version`: Show package version.
+- `--help`: Show help text.
 
 ---
 
