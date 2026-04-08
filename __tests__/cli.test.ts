@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from 'vitest';
 import fs from 'node:fs';
 import * as cli from '../src/cli.js';
 import { HELP_TEXT, parseBoolean, parseNumberList, run } from '../src/cli.js';
@@ -69,9 +69,9 @@ describe('parseNumberList', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('CLI run()', () => {
-    let exitSpy: ReturnType<typeof vi.spyOn<typeof process, 'exit'>>;
-    let logSpy: ReturnType<typeof vi.spyOn<typeof console, 'log'>>;
-    let errorSpy: ReturnType<typeof vi.spyOn<typeof console, 'error'>>;
+    let exitSpy: MockInstance;
+    let logSpy: MockInstance;
+    let errorSpy: MockInstance;
     let originalArgv: string[];
 
     beforeEach(() => {
