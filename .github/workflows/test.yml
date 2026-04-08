@@ -8,6 +8,7 @@ jobs:
     ubuntu:
         runs-on: [self-hosted, linux]
         strategy:
+            fail-fast: false
             matrix:
                 node: [20, 22, 24]
         steps:
