@@ -22,7 +22,7 @@ Options:
   --pages-to-process <n,m,...>      Comma-separated list of 1-based page numbers
   --verbosity-level <number>        pdfjs verbosity level (0=errors, 1=warnings, 5=infos)
   --return-metadata-only            Return page metadata without rendering images
-  --return-page-content             Include rendered PNG buffers in the returned results
+  --return-page-content             Retain rendered PNG buffers in results (default: false)
   --process-pages-in-parallel       Process pages concurrently
   --concurrency-limit <number>      Maximum number of pages rendered simultaneously
   --silent                          Suppress output unless there is an error
@@ -78,8 +78,10 @@ export function parseBoolean(val: string | undefined): boolean | undefined {
 export function parseNumberList(val: string | undefined): number[] | undefined {
     if (val === undefined) return undefined;
     return val.split(',').map((token) => {
-        const parsed = parseInt(token.trim(), 10);
-        if (isNaN(parsed)) throw new Error(`Invalid integer in list: "${token.trim()}".`);
+        const trimmed = token.trim();
+        if (trimmed === '') throw new Error('Invalid integer in list: empty value.');
+        const parsed = Number(trimmed);
+        if (!Number.isInteger(parsed)) throw new Error(`Invalid integer in list: "${trimmed}".`);
         return parsed;
     });
 }
@@ -152,8 +154,8 @@ export async function run(): Promise<void> {
 
     let viewportScale: number | undefined;
     if (values['viewport-scale'] !== undefined) {
-        viewportScale = parseFloat(values['viewport-scale']);
-        if (isNaN(viewportScale)) {
+        viewportScale = Number(values['viewport-scale']);
+        if (!Number.isFinite(viewportScale)) {
             console.error('Error: --viewport-scale must be a valid number.');
             process.exit(1);
             return;
@@ -162,8 +164,8 @@ export async function run(): Promise<void> {
 
     let verbosityLevel: number | undefined;
     if (values['verbosity-level'] !== undefined) {
-        verbosityLevel = parseInt(values['verbosity-level'], 10);
-        if (isNaN(verbosityLevel)) {
+        verbosityLevel = Number(values['verbosity-level']);
+        if (!Number.isInteger(verbosityLevel)) {
             console.error('Error: --verbosity-level must be a valid integer.');
             process.exit(1);
             return;
@@ -172,8 +174,8 @@ export async function run(): Promise<void> {
 
     let concurrencyLimit: number | undefined;
     if (values['concurrency-limit'] !== undefined) {
-        concurrencyLimit = parseInt(values['concurrency-limit'], 10);
-        if (isNaN(concurrencyLimit)) {
+        concurrencyLimit = Number(values['concurrency-limit']);
+        if (!Number.isInteger(concurrencyLimit)) {
             console.error('Error: --concurrency-limit must be a valid integer.');
             process.exit(1);
             return;
@@ -216,7 +218,7 @@ export async function run(): Promise<void> {
         pagesToProcess,
         verbosityLevel,
         returnMetadataOnly: values['return-metadata-only'],
-        returnPageContent: values['return-page-content'],
+        returnPageContent: values['return-page-content'] ?? false,
         processPagesInParallel: values['process-pages-in-parallel'],
         concurrencyLimit,
     };
@@ -242,7 +244,11 @@ export async function run(): Promise<void> {
     }
 }
 
-/* v8 ignore next 3 */
-if (process.argv[1] === __filename) {
-    void run();
+/* v8 ignore next 6 */
+try {
+    if (fs.realpathSync(process.argv[1]) === fs.realpathSync(__filename)) {
+        void run();
+    }
+} catch {
+    // realpathSync can fail (e.g. path does not exist) — skip auto-execution
 }

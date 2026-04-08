@@ -108,7 +108,7 @@ npx pdf-to-png-converter my-document.pdf --output-folder ./output
 - `--pages-to-process <n,m,...>`: Comma-separated list of 1-based page numbers.
 - `--verbosity-level <number>`: pdfjs verbosity level (0=errors, 1=warnings, 5=infos).
 - `--return-metadata-only`: Return page metadata without rendering images.
-- `--return-page-content`: Include rendered PNG buffers in the returned results.
+- `--return-page-content`: Include rendered PNG buffers in the returned results. By default the CLI discards in-memory buffers after writing to disk (or when no output folder is set) to avoid unnecessary memory usage. Pass this flag to retain them.
 - `--process-pages-in-parallel`: Process pages concurrently.
 - `--concurrency-limit <number>`: Maximum number of pages rendered simultaneously.
 - `--silent`: Suppress normal output messages unless there is an error.

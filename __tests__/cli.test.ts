@@ -62,6 +62,14 @@ describe('parseNumberList', () => {
     it('throws when a token is not a valid integer', () => {
         expect(() => parseNumberList('1,abc,3')).toThrow('Invalid integer in list: "abc"');
     });
+
+    it('throws when a token is a float (not an integer)', () => {
+        expect(() => parseNumberList('1,1.5,3')).toThrow('Invalid integer in list: "1.5"');
+    });
+
+    it('throws when a token is empty', () => {
+        expect(() => parseNumberList('1,,3')).toThrow('Invalid integer in list: empty value.');
+    });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -159,6 +167,14 @@ describe('CLI run()', () => {
         expect(pdfToPng).not.toHaveBeenCalled();
     });
 
+    it('exits 1 when --viewport-scale is a partially-valid string (e.g. "2x")', async () => {
+        setArgv('test.pdf', '--output-folder', '/out', '--viewport-scale', '2x');
+        await run();
+        expect(errorSpy).toHaveBeenCalledWith('Error: --viewport-scale must be a valid number.');
+        expect(exitSpy).toHaveBeenCalledWith(1);
+        expect(pdfToPng).not.toHaveBeenCalled();
+    });
+
     it('exits 1 when --verbosity-level is not a valid integer', async () => {
         setArgv('test.pdf', '--output-folder', '/out', '--verbosity-level', 'abc');
         await run();
@@ -167,8 +183,40 @@ describe('CLI run()', () => {
         expect(pdfToPng).not.toHaveBeenCalled();
     });
 
+    it('exits 1 when --verbosity-level is a partially-valid string (e.g. "1x")', async () => {
+        setArgv('test.pdf', '--output-folder', '/out', '--verbosity-level', '1x');
+        await run();
+        expect(errorSpy).toHaveBeenCalledWith('Error: --verbosity-level must be a valid integer.');
+        expect(exitSpy).toHaveBeenCalledWith(1);
+        expect(pdfToPng).not.toHaveBeenCalled();
+    });
+
+    it('exits 1 when --verbosity-level is a float (e.g. "1.5")', async () => {
+        setArgv('test.pdf', '--output-folder', '/out', '--verbosity-level', '1.5');
+        await run();
+        expect(errorSpy).toHaveBeenCalledWith('Error: --verbosity-level must be a valid integer.');
+        expect(exitSpy).toHaveBeenCalledWith(1);
+        expect(pdfToPng).not.toHaveBeenCalled();
+    });
+
     it('exits 1 when --concurrency-limit is not a valid integer', async () => {
         setArgv('test.pdf', '--output-folder', '/out', '--concurrency-limit', 'abc');
+        await run();
+        expect(errorSpy).toHaveBeenCalledWith('Error: --concurrency-limit must be a valid integer.');
+        expect(exitSpy).toHaveBeenCalledWith(1);
+        expect(pdfToPng).not.toHaveBeenCalled();
+    });
+
+    it('exits 1 when --concurrency-limit is a float (e.g. "2.5")', async () => {
+        setArgv('test.pdf', '--output-folder', '/out', '--concurrency-limit', '2.5');
+        await run();
+        expect(errorSpy).toHaveBeenCalledWith('Error: --concurrency-limit must be a valid integer.');
+        expect(exitSpy).toHaveBeenCalledWith(1);
+        expect(pdfToPng).not.toHaveBeenCalled();
+    });
+
+    it('exits 1 when --concurrency-limit is a partially-valid string (e.g. "2x")', async () => {
+        setArgv('test.pdf', '--output-folder', '/out', '--concurrency-limit', '2x');
         await run();
         expect(errorSpy).toHaveBeenCalledWith('Error: --concurrency-limit must be a valid integer.');
         expect(exitSpy).toHaveBeenCalledWith(1);
@@ -240,7 +288,7 @@ describe('CLI run()', () => {
             processPagesInParallel: true,
             concurrencyLimit: 2,
             returnMetadataOnly: undefined,
-            returnPageContent: undefined,
+            returnPageContent: false,
         });
         expect(logSpy).toHaveBeenCalledWith('Processing PDF: test.pdf');
         expect(logSpy).toHaveBeenCalledWith('Output folder: /out');
