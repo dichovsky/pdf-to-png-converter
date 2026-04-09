@@ -1,23 +1,31 @@
-name: Publish NPM Package
+name: Publish Package
 on:
-    release:
-        types: [created]
+  release:
+    types: [published]
+
 permissions:
-    contents: read
+  contents: read
+  id-token: write
+
+concurrency:
+  group: publish-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
 jobs:
-    build:
-        runs-on: [self-hosted, linux]
+  publish:
+    if: ${{ !github.event.release.prerelease }}
+    runs-on: [self-hosted, linux]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f  # v6
+        with:
+            node-version-file: .nvmrc
+            cache: 'npm'
+            registry-url: 'https://registry.npmjs.org'
+      - run: npm ci
+      - run: npm audit --audit-level=high
+      - run: npm run build
+      - run: npm publish --provenance
         env:
-            NODE_ENV: production
-        steps:
-            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
-            - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f  # v6
-              with:
-                  node-version-file: .nvmrc
-                  registry-url: 'https://registry.npmjs.org'
-            - run: npm ci
-            - run: npm audit --audit-level=high
-            - run: npm run build
-            - run: npm publish
-              env:
-                  NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
