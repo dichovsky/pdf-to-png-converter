@@ -2,23 +2,14 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Commands
+## Quick Reference
 
 ```bash
-npm run build          # Compile TypeScript to ./out/ (runs clean first via prebuild)
-npm run build:test     # Type-check without emitting files
-npm run clean          # Delete ./out, ./coverage, ./test-results
-npm test               # Build then run all tests with v8 coverage (vitest)
-npm run lint           # ESLint (src/**/*.ts only; .js and .d.ts are ignored)
-
-# Run a single test file
-npx vitest run __tests__/pdf.to.png.buffer.readfile.test.ts
-
-# Docker
-npm run docker:build   # Build Docker image
-npm run docker:run     # Run tests inside container, mount ./test-results
-npm run test:docker    # clean + docker:build + docker:run
-npm run test:license   # Check all production deps use permitted SPDX licenses
+npm run build:test     # Type-check without emitting — run after edits
+npm run test:fast      # Fast iteration: no coverage, dot reporter (preferred for agent loops)
+npx vitest run __tests__/<file>.test.ts  # Single test file
+npm run lint           # ESLint src/**/*.ts
+npm test               # Full: clean + build + tests + coverage (CI / pre-publish)
 ```
 
 ## Architecture
@@ -44,26 +35,13 @@ Published to npm as `pdf-to-png-converter`. Entry: `out/index.js`, types: `out/i
 
 ## Source Structure
 
-```
-src/
-├── index.ts                  # Public API — re-exports only
-├── pdfToPng.ts               # All conversion logic (exported + private helpers)
-├── node.canvas.factory.ts    # NodeCanvasFactory — pdfjs canvas contract via @napi-rs/canvas
-├── propsToPdfDocInitParams.ts # Maps PdfToPngOptions → pdfjs DocumentInitParameters
-├── const.ts                  # PDF_TO_PNG_OPTIONS_DEFAULTS, DOCUMENT_INIT_PARAMS_DEFAULTS
-├── normalizePath.ts          # resolve() + normalize() + trailing slash
-├── interfaces/               # CanvasAndContext, PdfToPngOptions, PngPageOutput
-└── types/
-    └── verbosity.level.ts    # VerbosityLevel enum — ERRORS=0, WARNINGS=1, INFOS=5
-```
-
-**Public API:**
-```typescript
-export { pdfToPng } from './pdfToPng';
-export type { PngPageOutput, PdfToPngOptions } from './interfaces';
-export { VerbosityLevel } from './types';
-```
-`CanvasAndContext` is not re-exported from `src/index.ts`.
+Public API: `src/index.ts` (re-exports only). Key modules:
+- `src/pdfToPng.ts` — all conversion logic (~490 lines); helpers approx at: `resolvePageName` ~L82, `processAndSavePage` ~L116, `pdfToPng` (exported) ~L139, `getPdfFileBuffer` ~L280, `getPdfDocument` ~L316, `getPageMetadata` ~L343, `renderPdfPage` ~L386, `savePNGfile` ~L471
+- `src/node.canvas.factory.ts` — NodeCanvasFactory (pdfjs canvas contract via @napi-rs/canvas)
+- `src/propsToPdfDocInitParams.ts` — maps PdfToPngOptions → pdfjs DocumentInitParameters
+- `src/const.ts` — runtime constants only (≤60 lines); test-only asset lists are in `__tests__/test-data-constants.ts`
+- `src/interfaces/` — PdfToPngOptions, PngPageOutput, CanvasAndContext
+- `src/types/verbosity.level.ts` — VerbosityLevel enum (ERRORS=0, WARNINGS=1, INFOS=5)
 
 ## Defaults (`src/const.ts`)
 
@@ -92,21 +70,14 @@ Always extend `PDF_TO_PNG_OPTIONS_DEFAULTS` using `??` — never hardcode defaul
 - Unused variables/parameters must be prefixed with `_`
 - All class members need explicit accessibility modifiers (`public`, `private`, etc.)
 - All functions in `src/` need explicit return types (`@typescript-eslint/explicit-function-return-type`)
-- `tsconfig.json`: `target: es2022`, `strict: true`, `declaration: true`, `outDir: ./out`, `include: ./src/**/*` only
 - One file per entity. All object-shape types use `interface`, not `type alias`
 
-## ESLint Key Rules (enforced on `src/**/*.ts`)
+## ESLint (non-obvious rules enforced on `src/**/*.ts`)
 
-- `@typescript-eslint/no-floating-promises: error` — always `await` promises or explicitly void them
-- `@typescript-eslint/consistent-type-imports: warn` — use `import type` for type-only imports
-- `@typescript-eslint/explicit-function-return-type: warn` — explicit return types on all `src/` functions
-- `@typescript-eslint/explicit-member-accessibility: warn` — `public`/`private` on all class members
-- `@typescript-eslint/prefer-nullish-coalescing: warn` — prefer `??` over `||` for defaults
-- Test files (`__tests__/**/*.ts`) are linted with relaxed rules
-
-## Formatting
-
-4-space indent, single quotes, trailing commas everywhere, 140-char line width, always parentheses around arrow function params.
+- `no-floating-promises: error` — always `await` or `void` promises
+- `consistent-type-imports: warn` — use `import type` for type-only imports
+- `prefer-nullish-coalescing: warn` — prefer `??` over `||` for defaults
+- Test files (`__tests__/**/*.ts`) have relaxed rules (no return type or member accessibility requirements)
 
 ## Testing
 
@@ -152,8 +123,3 @@ vi.mock('pdfjs-dist/legacy/build/pdf.mjs', () => ({ getDocument: vi.fn() }));
 - **`path` field:** `''` when `outputFolder` is not set or `returnMetadataOnly` is true; absolute file path after writing
 - **CMap / font paths:** resolved via `normalizePath()` relative to `process.cwd()` pointing to `node_modules/pdfjs-dist/cmaps/` and `node_modules/pdfjs-dist/standard_fonts/`
 - **Dynamic import:** pdfjs is dynamically imported inside `getPdfDocument()` on each call, not at module top level
-
-## GitHub Actions
-
-- **`test.yml`** — runs on every push: Ubuntu, Node 24; steps: `npm ci` → `npm run build:test && npm run lint` → `npm test`
-- **`publish.yml`** — runs on GitHub release: Ubuntu, Node 24; steps: `npm ci` → `npm run build` → `npm publish` (uses `NPM_TOKEN` secret)

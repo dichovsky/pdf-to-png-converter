@@ -13,70 +13,19 @@ import type { PdfToPngOptions, PngPageOutput } from './interfaces';
 let pdfjsLib: typeof PdfjsModule | undefined;
 
 /**
- * Convert one or more pages from a PDF into PNG images.
+ * Converts one or more pages of a PDF into PNG images.
  *
- * This function:
- * - Loads the provided PDF (a file path string, an `ArrayBufferLike`, a `Uint8Array`, or a Node.js `Buffer`).
- * - Opens a PDFDocumentProxy and determines which pages to process.
- * - Filters out invalid page numbers (pages < 1 or > number of pages in the document).
- * - When `props.returnMetadataOnly` is true: returns page dimensions, rotation, name, and page number
- *   for each selected page without creating a canvas or rendering; no files are written to disk.
- * - When `props.returnMetadataOnly` is false (the default): renders each selected page to a PNG
- *   by calling an internal page-processing helper.
- * - Ensures the PDF document is cleaned up (pdfDocument.cleanup()) even if an error occurs.
- * - Optionally writes resulting PNG files to disk if `props.outputFolder` is provided.
- *
- * Behavior details:
- * - pagesToProcess: if not provided, defaults to all pages in the document (1..numPages).
- * - Invalid page numbers in `props.pagesToProcess` are silently ignored.
- * - Page processing can be done in parallel when `props.processPagesInParallel === true` (uses Promise.all),
- *   otherwise pages are processed sequentially.
- * - The viewport scale used for rendering defaults to `PDF_TO_PNG_OPTIONS_DEFAULTS.viewportScale`
- *   unless `props.viewportScale` is specified.
- * - The default output file name mask is taken from the input path's basename when `pdfFile` is a string,
- *   otherwise from `PDF_TO_PNG_OPTIONS_DEFAULTS.outputFileMask`. Each page name defaults to
- *   `${defaultMask}_page_${pageNumber}.png`, unless `props.outputFileMaskFunc` is provided and returns a name.
- * - By default the page renderer returns page content (`props.returnPageContent` defaults to true).
- * - When `props.returnMetadataOnly` is true, no canvas is created and no image is rendered;
- *   only `pageNumber`, `name`, `width`, `height`, and `rotation` are populated. `content` is
- *   always `undefined` and no files are written to disk even if `outputFolder` is set.
- *
- * Side effects:
- * - If `props.outputFolder` is specified (and `returnMetadataOnly` is false) the function will create
- *   the folder (recursive) under the current working directory and write each PNG file there.
- *   The `path` property of each returned `PngPageOutput` will be set to the written file path.
- * - If `props.returnPageContent` is false and `props.outputFolder` is provided, the file will be written to disk
- *   using the content buffer, which will then be cleared from memory to save resources.
- *
- * Parameters:
- * @param pdfFile - Path to a PDF file, an `ArrayBufferLike` (e.g. `ArrayBuffer`, `SharedArrayBuffer`),
- *                  a `Uint8Array`, or a Node.js `Buffer` containing PDF data.
- * @param props - Optional conversion options (see PdfToPngOptions). Common options used:
- *   - pagesToProcess?: number[]         => Specific page numbers to convert (1-based).
- *   - processPagesInParallel?: boolean  => Whether to process pages concurrently.
- *   - concurrencyLimit?: number         => Maximum number of pages to process concurrently (default: 4, min: 1).
- *                                          Higher values may increase memory usage. Only applies when processPagesInParallel is true.
- *   - viewportScale?: number            => Scale factor for page rendering.
- *   - outputFileMaskFunc?: (page: number) => string => Custom naming function for each page output.
- *   - returnPageContent?: boolean       => Whether to include the PNG Buffer in the returned output.
- *   - returnMetadataOnly?: boolean      => When true, skip rendering entirely and return only page metadata.
- *   - outputFolder?: string             => Relative folder (from process.cwd()) to write PNG files to.
- *
- * Returns:
- * @returns Promise<PngPageOutput[]> - A Promise that resolves to an array of PngPageOutput objects,
- *   one per successfully processed page (in the same order as the validated pagesToProcess).
- *   Each output typically includes at least `name` and, if requested, `content`. If `outputFolder` was provided,
- *   `path` will be set to the written file location.
- *
- * Errors:
- * @throws - Propagates errors from reading the PDF, opening the PDF document, rendering pages,
- *   or writing files to disk. In particular, an error is thrown when attempting to write a PNG file
- *   whose `content` is undefined.
- *
- * Example:
+ * @param pdfFile - File path, `ArrayBufferLike`, `Uint8Array`, or Node.js `Buffer` containing PDF data.
+ * @param props - Conversion options (see `PdfToPngOptions`). Key options:
+ *   - `pagesToProcess` — 1-based page numbers; defaults to all pages; out-of-range numbers silently ignored.
+ *   - `returnMetadataOnly` — skips rendering; returns only dimensions/rotation; no files written.
+ *   - `outputFolder` — relative path from `process.cwd()` to write PNG files; triggers internal content retrieval.
+ *   - `processPagesInParallel` / `concurrencyLimit` — parallel batching via `Promise.all` (default limit: 4).
+ *   - See CLAUDE.md § Architecture for `outputFolder + returnPageContent + returnMetadataOnly` interaction.
+ * @returns Array of `PngPageOutput`, one per processed page, in document order.
+ * @throws Propagates errors from PDF reading, parsing, rendering, or file writes.
  * @example
- * // Convert all pages and get buffers:
- * const outputs = await pdfToPng("/path/to/doc.pdf", { returnPageContent: true });
+ * const outputs = await pdfToPng('/path/to/doc.pdf', { returnPageContent: true });
  */
 /**
  * Resolves the output filename for a single PDF page.

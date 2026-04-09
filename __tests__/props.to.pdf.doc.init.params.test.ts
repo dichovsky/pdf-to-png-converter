@@ -1,7 +1,8 @@
 import { readdirSync } from 'node:fs';
 import type { DocumentInitParameters } from 'pdfjs-dist/types/src/display/api';
 import { expect, test } from 'vitest';
-import { CMAP_RELATIVE_URL, STANDARD_CMAPS, STANDARD_FONTS, STANDARD_FONTS_RELATIVE_URL } from '../src/const';
+import { CMAP_RELATIVE_URL, STANDARD_FONTS_RELATIVE_URL } from '../src/const';
+import { STANDARD_CMAPS, STANDARD_FONTS } from './test-data-constants';
 import { propsToPdfDocInitParams } from '../src/propsToPdfDocInitParams';
 import type { PdfToPngOptions } from '../src/interfaces/pdf.to.png.options.js';
 import { normalizePath } from '../src/normalizePath.js';

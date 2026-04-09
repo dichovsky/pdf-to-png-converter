@@ -49,8 +49,8 @@ src/
 ├── pdfToPng.ts               # All conversion logic (exported + private helpers)
 ├── node.canvas.factory.ts    # NodeCanvasFactory class — pdfjs canvas contract
 ├── propsToPdfDocInitParams.ts # Maps PdfToPngOptions → pdfjs DocumentInitParameters
-├── const.ts                  # PDF_TO_PNG_OPTIONS_DEFAULTS, DOCUMENT_INIT_PARAMS_DEFAULTS,
-│                             #   STANDARD_FONTS, STANDARD_CMAPS
+├── const.ts                  # PDF_TO_PNG_OPTIONS_DEFAULTS, DOCUMENT_INIT_PARAMS_DEFAULTS
+│                             #   (STANDARD_FONTS, STANDARD_CMAPS → __tests__/test-data-constants.ts)
 ├── normalizePath.ts          # resolve() + normalize() + trailing slash
 ├── interfaces/               # Object-shape interfaces (exported publicly or internally)
 │   ├── index.ts              # Barrel: re-exports all three interfaces

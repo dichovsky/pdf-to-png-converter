@@ -58,8 +58,9 @@
     "docker:run": "docker run --rm -it -v ${PWD}/test-results:/usr/pkg/test-results test-pdf-to-png-converter",
     "docker:test": "vitest run --coverage",
     "lint": "eslint .",
-    "pretest": "npm run build",
+    "pretest": "npm run clean && npm run build:test && npm run lint && npm run test:license",
     "test": "vitest run --coverage",
+    "test:fast": "vitest run --reporter=dot --no-coverage",
     "test:docker": "npm run clean && npm run docker:build && npm run docker:run",
     "test:license": "license-checker --production --onlyAllow \"ISC; MIT; MIT OR X11; BSD; Apache-2.0; Unlicense\"",
     "prepare": "husky"
