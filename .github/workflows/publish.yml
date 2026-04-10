@@ -26,6 +26,6 @@ jobs:
       - run: npm ci
       - run: npm audit --audit-level=high
       - run: npm run build
-      - run: npm publish --provenance
+      - run: npm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
