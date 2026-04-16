@@ -13,17 +13,16 @@
     "types": [
       "node"
     ],
-    "rootDir": "./src",
-    "outDir": "./out",
+    "rootDir": ".",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "moduleResolution": "node16",
-    "declaration": true,
-    "incremental": true,
-    "tsBuildInfoFile": "./out/.tsbuildinfo"
+    "declaration": false,
+    "noEmit": true
   },
   "include": [
-    "./src/**/*"
+    "./src/**/*",
+    "./__tests__/**/*"
   ]
 }
