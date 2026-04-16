@@ -49,7 +49,7 @@ function resolvePageName(pageNumber: number, defaultMask: string, outputFileMask
     if (outputFileMaskFunc === undefined) {
         return `${defaultMask}_page_${pageNumber}.png`;
     }
-    const name = outputFileMaskFunc(pageNumber);
+    const name: string = outputFileMaskFunc(pageNumber);
     if (!name) {
         throw new Error(
             `outputFileMaskFunc returned an empty filename for page ${pageNumber}. Provide a non-empty string including the .png extension.`,

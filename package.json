@@ -50,9 +50,8 @@
   "scripts": {
     "prepublishOnly": "npm test && npm run build",
     "prebuild": "npm run clean",
-    "build": "tsc --pretty --project tsconfig.json",
+    "build": "tsc --pretty --project tsconfig.prod.json",
     "build:test": "tsc --pretty --noEmit --project tsconfig.json",
-    "build:test:all": "tsc --pretty --noEmit --project tsconfig.test.json",
     "clean": "rimraf ./out ./test-results",
     "docker:build": "docker build --build-arg NODE_VERSION=$(cat .nvmrc) --compress -t test-pdf-to-png-converter .",
     "docker:run": "docker run --rm -it -v ${PWD}/test-results:/usr/pkg/test-results test-pdf-to-png-converter",
@@ -66,21 +65,21 @@
     "prepare": "husky"
   },
   "dependencies": {
-    "@napi-rs/canvas": "~0.1.97",
+    "@napi-rs/canvas": "~0.1.98",
     "pdfjs-dist": "~5.6.205"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^25.6.0",
-    "@typescript-eslint/eslint-plugin": "^8.58.1",
-    "@typescript-eslint/parser": "^8.58.1",
+    "@typescript-eslint/eslint-plugin": "^8.58.2",
+    "@typescript-eslint/parser": "^8.58.2",
     "@vitest/coverage-v8": "^4.1.4",
     "eslint": "^10.2.0",
     "husky": "^9.1.7",
     "license-checker": "^25.0.1",
     "lint-staged": "^16.4.0",
     "png-visual-compare": "^5.1.0",
-    "prettier": "3.8.2",
+    "prettier": "^3.8.3",
     "rimraf": "^6.1.3",
     "typescript": "^6.0.2",
     "vitest": "^4.1.4"

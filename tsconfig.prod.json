@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "./src",
+    "outDir": "./out",
+    "noEmit": false,
+    "declaration": true,
+    "incremental": true,
+    "tsBuildInfoFile": "./out/.tsbuildinfo"
+  },
+  "include": [
+    "./src/**/*"
+  ]
+}

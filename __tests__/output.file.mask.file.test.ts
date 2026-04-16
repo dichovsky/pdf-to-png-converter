@@ -15,6 +15,14 @@ test(`should apply file mask if defined for pdf file path`, async () => {
     }
 });
 
+test(`should throw if outputFileMaskFunc returns an empty string`, async () => {
+    await expect(
+        pdfToPng(pdfFilePath, {
+            outputFileMaskFunc: () => '',
+        }),
+    ).rejects.toThrow('outputFileMaskFunc returned an empty filename for page 1');
+});
+
 test(`should apply default buffer name if outputFileMaskFunc is not defined for pdf buffer`, async () => {
     const pngPages: PngPageOutput[] = await pdfToPng(pdfFilePath);
 
