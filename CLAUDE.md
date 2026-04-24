@@ -123,3 +123,17 @@ vi.mock('pdfjs-dist/legacy/build/pdf.mjs', () => ({ getDocument: vi.fn() }));
 - **`path` field:** `''` when `outputFolder` is not set or `returnMetadataOnly` is true; absolute file path after writing
 - **CMap / font paths:** resolved via `normalizePath()` relative to `process.cwd()` pointing to `node_modules/pdfjs-dist/cmaps/` and `node_modules/pdfjs-dist/standard_fonts/`
 - **Dynamic import:** pdfjs is dynamically imported inside `getPdfDocument()` on each call, not at module top level
+
+## Mistake Logging
+
+Log one compact event per mistake (20-40 tokens, no filler):
+
+```text
+Ctx:
+Err:
+Cause:
+Fix:
+Rule:
+```
+
+Store project-specific mistakes in `.claude/memory`; generalizable rules in global memory.
