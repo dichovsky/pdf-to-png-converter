@@ -136,4 +136,4 @@ Fix:
 Rule:
 ```
 
-Store project-specific mistakes in `.claude/memory`; generalizable rules in global memory.
+Store project-specific mistakes in a local-only `.claude/memory` folder (create it locally if needed; do not commit it). Store generalizable rules in global memory.
