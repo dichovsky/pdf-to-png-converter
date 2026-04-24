@@ -2,201 +2,307 @@
 
 This backlog captures architectural, typing, maintainability, reliability, performance, and security findings from a deep review of the current TypeScript codebase.
 
+> **AI-agent execution notes (apply to every item below)**
+>
+> These items are intended to be implemented by an AI coding agent. The following ground rules apply across all items and should be treated as hard constraints:
+>
+> - Every acceptance criterion must be verifiable by running `npm test`, `npm run lint`, or `npm run build:test`. Do not add acceptance criteria that require human judgment or review gates.
+> - Replace all "consider", "evaluate", and "investigate" language with a committed decision and a concrete action.
+> - Name the exact source files, exported functions, and (where possible) line numbers where each change starts.
+> - For breaking API changes, state the semver impact (`major` / `minor` / `patch`) explicitly; the agent must update `CHANGELOG.md` and `README.md` accordingly.
+> - Decompose any item that touches more than three files simultaneously into sub-items before assigning it.
+> - Do not add estimation language (story points, hours, T-shirt sizes).
+> - Preserve the "Technical rationale" sections — the agent uses them to make locally correct decisions when the spec is underspecified.
+
+---
+
 ## P1
 
 ### [ ] ARCH-001 Fix absolute `outputFolder` resolution
-- **Problem:** `src/pdfToPng.ts` builds `resolvedOutputFolder` with `join(process.cwd(), props.outputFolder)`. This breaks the documented contract that `outputFolder` may be relative or absolute, because absolute inputs are rewritten under the current working directory instead of being preserved.
-- **Technical rationale:** This is a correctness bug, not a cosmetic issue. It can silently write files to the wrong location and makes the API behavior depend on an implementation detail of `path.join()`.
+- **Problem:** In `src/pdfToPng.ts` (line 142), `resolvedOutputFolder` is built with `join(process.cwd(), props.outputFolder)`. This silently rewrites absolute paths under `process.cwd()`, breaking the documented contract that `outputFolder` may be relative or absolute.
+- **Technical rationale:** This is a correctness bug. It can write files to the wrong location and makes behavior depend on an implementation detail of `path.join()`.
 - **Implementation direction:**
-  1. Replace `join(process.cwd(), props.outputFolder)` with `resolve(props.outputFolder)` or an explicit `isAbsolute()` branch.
-  2. Normalize the resolved path once and pass the canonical absolute path through the pipeline.
-  3. Update any path-security logic that assumes the current implementation.
+  1. On line 142 of `src/pdfToPng.ts`, replace `join(process.cwd(), props.outputFolder)` with `resolve(props.outputFolder)`. The `resolve` import already exists on line 2 of that file — no new import is needed.
+  2. Update the JSDoc comment on `savePNGfile` (currently around line 444) that says "caller already computed via `join(cwd, props.outputFolder)`" to reflect the change to `resolve()`.
+  3. Do not change any other call sites — `resolvedOutputFolder` is consumed only by `fsPromises.mkdir`, `fsPromises.realpath`, and `processAndSavePage → savePNGfile`, all of which accept an absolute path.
 - **Acceptance criteria:**
-  1. Passing a relative `outputFolder` still resolves from `process.cwd()`.
-  2. Passing an absolute `outputFolder` writes to that exact directory.
-  3. Add tests covering both relative and absolute destinations.
+  1. `await pdfToPng('test-data/large_pdf.pdf', { outputFolder: '/tmp/absolute-out' })` writes files to `/tmp/absolute-out/` exactly, not to `<cwd>/tmp/absolute-out/`.
+  2. `await pdfToPng('test-data/large_pdf.pdf', { outputFolder: 'relative-out' })` still writes to `<cwd>/relative-out/`.
+  3. A new test in `__tests__/pdf.to.png.absolute.output.folder.test.ts` covers both cases and passes.
+  4. `npm test` passes with no changes to any other source file.
 
 ### [ ] ARCH-002 Introduce a single option normalization and validation layer
-- **Problem:** Validation and defaulting are split across `src/cli.ts`, `src/pdfToPng.ts`, and documentation. This creates drift and leaves gaps such as weak validation for `pagesToProcess`, `verbosityLevel`, and `outputFolder`.
+- **Problem:** Validation and defaulting are split across `src/cli.ts` (lines 155–200) and `src/pdfToPng.ts` (lines 108–127), leaving gaps: `pagesToProcess` accepts `0` and negative numbers, `verbosityLevel` accepts any integer, and `outputFolder: ''` silently resolves to `process.cwd()`.
 - **Technical rationale:** A single normalization boundary reduces duplicated rules, makes behavior consistent across API and CLI entry points, and creates a stable seam for testing.
 - **Implementation direction:**
-  1. Add `normalizePdfToPngOptions()` that accepts raw API/CLI options and returns a canonical, fully validated object.
-  2. Move defaults from ad hoc `??` expressions into that function.
-  3. Reject invalid values early: empty `outputFolder`, non-integer page numbers, unsupported verbosity values, invalid filenames, invalid concurrency.
-  4. Reuse this normalization in both `pdfToPng()` and the CLI execution path.
+  1. Create `src/normalizePdfToPngOptions.ts`. Export one function: `normalizePdfToPngOptions(props: PdfToPngOptions | undefined): NormalizedPdfToPngOptions`. Define the internal `NormalizedPdfToPngOptions` interface in the same file — do not add it to the public `src/index.ts` barrel.
+  2. Move the `viewportScale` validation block (lines 108–118 of `src/pdfToPng.ts`) and the `concurrencyLimit` validation block (lines 122–127) into `normalizePdfToPngOptions`.
+  3. Add to `normalizePdfToPngOptions`: throw `Error('outputFolder must not be empty')` when `outputFolder` is `''` or whitespace-only; throw `Error('verbosityLevel must be 0, 1, or 5')` for any value not in `{0, 1, 5}`; throw `Error('pagesToProcess contains invalid page number: <n>')` for any entry `<= 0`.
+  4. In `pdfToPng()`, call `normalizePdfToPngOptions(props)` immediately after the function signature and replace all subsequent `props?.xxx ?? PDF_TO_PNG_OPTIONS_DEFAULTS.xxx` expressions with references to the returned normalized object.
+  5. In `src/cli.ts`, the `run()` function's numeric-validation blocks (lines 155–200) may be simplified to delegate to `normalizePdfToPngOptions` — or left as-is if they produce clearer CLI error messages; either is acceptable.
 - **Acceptance criteria:**
-  1. API and CLI share the same normalized option semantics.
-  2. Invalid options fail before I/O begins.
-  3. Normalization has focused unit tests that cover each option branch.
+  1. `normalizePdfToPngOptions({ outputFolder: '' })` throws synchronously before any I/O.
+  2. `normalizePdfToPngOptions({ verbosityLevel: 3 })` throws.
+  3. `normalizePdfToPngOptions({ pagesToProcess: [0] })` throws; `normalizePdfToPngOptions({ pagesToProcess: [-1] })` throws.
+  4. `normalizePdfToPngOptions({ verbosityLevel: 0 })`, `normalizePdfToPngOptions({ verbosityLevel: 1 })`, and `normalizePdfToPngOptions({ verbosityLevel: 5 })` do not throw.
+  5. A new test file `__tests__/normalize.pdf.to.png.options.test.ts` covers all branches above plus the happy-path case where all defaults are applied correctly.
+  6. `npm test` and `npm run lint` pass.
 
 ### [ ] ARCH-003 Split `src/pdfToPng.ts` into composable modules
-- **Problem:** `src/pdfToPng.ts` currently mixes input loading, pdfjs bootstrap, render orchestration, filename generation, parallel batching, file writing, path security, and cleanup in one module.
-- **Technical rationale:** The file has become the system’s orchestration layer, adapter layer, and infrastructure layer at the same time. That concentration will slow future work such as adding new output sinks, alternative renderers, or stronger isolation tests.
-- **Implementation direction:**
-  1. Extract input handling into a dedicated module such as `src/io/input.ts` or `pdfInput.ts` for `getPdfFileBuffer()` and normalization logic.
-  2. Extract PDF lifecycle management into `src/pdf/document.ts`, `pdfDocumentLoader.ts`, or `pdfjsAdapter.ts` for pdfjs loading, caching, and teardown.
-  3. Extract rendering into `src/render/renderer.ts` or `pageRenderer.ts` for metadata-only and full-render logic.
-  4. Extract storage and security into `src/io/storage.ts`, `outputWriter.ts`, and `pathGuards.ts` for filesystem behavior and path-containment checks.
-  5. Extract page-loop and concurrency coordination into `src/orchestration/conversion.ts`.
-  6. Keep `pdfToPng()` as a thin orchestrator over those modules.
+- **Problem:** At ~490 lines, `src/pdfToPng.ts` simultaneously owns input loading, pdfjs bootstrap, render orchestration, filename generation, parallel batching, file writing, path security, and cleanup.
+- **Technical rationale:** This concentration prevents isolated unit testing of any single responsibility and will slow additions of new output sinks, alternative renderers, or stronger isolation tests.
+- **Implementation direction — use these exact file names:**
+
+  | New file | Extracted from `pdfToPng.ts` | Contents |
+  |---|---|---|
+  | `src/pdfInput.ts` | `getPdfFileBuffer()` | File read + Buffer normalisation |
+  | `src/pdfjsLoader.ts` | `getPdfDocument()` + `let pdfjsLib` cache | Dynamic pdfjs import, document creation |
+  | `src/pageRenderer.ts` | `renderPdfPage()` + `getPageMetadata()` | Canvas creation, render, metadata-only path |
+  | `src/outputWriter.ts` | `savePNGfile()` + `isEscapingRelativePath()` | File write + path-containment checks |
+  | `src/pageOrchestrator.ts` | `processAndSavePage()` + `resolvePageName()` | Per-page coordination, name resolution |
+
+  After extraction, `src/pdfToPng.ts` retains only `pdfToPng()` (~50 lines) and imports from the modules above. All imports must use `.js` extensions (e.g. `import { getPdfFileBuffer } from './pdfInput.js'`).
+
 - **Acceptance criteria:**
-  1. No single module owns validation, rendering, persistence, and security checks simultaneously.
-  2. Private helpers become unit-testable without mocking the full pipeline.
-  3. `pdfToPng.ts` is reduced to orchestration and high-level flow.
+  1. `src/pdfToPng.ts` is under 80 lines after the split.
+  2. All five new files exist with the exact names in the table above.
+  3. `npm run build:test` passes with no type errors.
+  4. `npm run lint` passes with no new suppressions.
+  5. All existing tests pass without modification — this is a pure refactor; no test file may be changed.
 
 ### [ ] ARCH-004 Harden file writes against symlink and TOCTOU races
-- **Problem:** `savePNGfile()` performs containment checks and documents the remaining race window, but still finishes with `fsPromises.writeFile()`, which can follow symlinks and cannot fully guarantee containment.
-- **Technical rationale:** The current implementation is better than no guard, but it remains vulnerable on multi-user or shared filesystems. Security-sensitive logic should not end in an API that defeats the containment model.
+- **Problem:** `savePNGfile()` (lines 437–479 of `src/pdfToPng.ts`) ends with `fsPromises.writeFile()`, which follows symlinks at the target filename, defeating the containment model that the preceding checks establish.
+- **Technical rationale:** The containment checks are strong, but the final write can still be redirected by a symlink planted at the output filename before the write. `fsPromises.open` with exclusive-create flags blocks this on POSIX systems.
 - **Implementation direction:**
-  1. Replace `writeFile()` with an fd-based write flow that minimizes follow/swap risk.
-  2. Use exclusive creation and, where supported, no-follow semantics.
-  3. Consider a write-to-temp-then-rename flow inside the validated directory.
-  4. Document any unavoidable OS portability limitations in one place instead of inside the main render flow.
+  1. In `savePNGfile` (line 479), replace `await fsPromises.writeFile(pngPageOutput.path, pngPageOutput.content as Buffer)` with an fd-based write using the `'wx'` flag (`O_WRONLY | O_CREAT | O_EXCL`), which fails with `EEXIST` if the target path exists — including if it is a symlink — on POSIX:
+     ```ts
+     const fd = await fsPromises.open(pngPageOutput.path, 'wx');
+     try {
+         await fd.writeFile(pngPageOutput.content as Buffer);
+     } finally {
+         await fd.close();
+     }
+     ```
+  2. Update the JSDoc on `savePNGfile` to document that `'wx'` prevents overwriting existing files and that callers should clear the output folder between runs if re-running the same conversion.
+  3. Update the TOCTOU limitation comment in the JSDoc to reflect the improved guarantee.
 - **Acceptance criteria:**
-  1. The write path no longer depends on `writeFile()` directly.
-  2. Security tests cover symlink escapes and directory swap attempts as far as the platform allows.
-  3. The containment model is centralized and documented in one module.
+  1. `savePNGfile` no longer calls `fsPromises.writeFile` directly — `grep -n 'writeFile' src/pdfToPng.ts` must return zero results for a top-level `writeFile` call (or check `src/outputWriter.ts` if ARCH-003 landed first).
+  2. A new test in `__tests__/security.path.test.ts` creates a symlink at the target filename path before calling the function under test and asserts the call throws `EEXIST`.
+  3. All existing integration tests that write files to disk pass unchanged.
+  4. `npm test` passes.
+
+---
 
 ## P2
 
 ### [ ] TYPE-001 Replace ambiguous output shapes with discriminated result types
-- **Problem:** `PngPageOutput` represents multiple modes at once: metadata-only, in-memory render, and rendered-to-disk. Consumers must infer validity from `content?: Buffer` and `path: string`, including the sentinel empty string.
-- **Technical rationale:** The current type shape hides invariants instead of expressing them. This pushes correctness from the compiler into documentation and consumer guesswork.
+- **Semver impact:** `major` — `PngPageOutput` is a public type; callers that access `.content` or `.path` without a `kind` guard will require updates.
+- **Problem:** `PngPageOutput` represents three modes at once — metadata-only, in-memory render, and rendered-to-disk — forcing consumers to infer validity from `content?: Buffer` and the sentinel `path: ''`.
+- **Technical rationale:** The current shape hides invariants instead of expressing them, pushing correctness into documentation and consumer guesswork.
 - **Implementation direction:**
-  1. Replace `PngPageOutput` with a discriminated union such as `MetadataPageOutput | RenderedPageOutput`.
-  2. Model disk persistence explicitly instead of using `path: ''`.
-  3. Expose mode information through a field like `kind` or `contentMode`.
+  1. In `src/interfaces/png.page.output.ts`, replace the single interface with:
+     ```ts
+     interface BasePngPageOutput {
+         pageNumber: number;
+         name: string;
+         width: number;
+         height: number;
+         rotation: number;
+     }
+     export interface MetadataPngPageOutput extends BasePngPageOutput {
+         kind: 'metadata';
+         content: undefined;
+         path: '';
+     }
+     export interface InMemoryPngPageOutput extends BasePngPageOutput {
+         kind: 'content';
+         content: Buffer;
+         path: '';
+     }
+     export interface FilePngPageOutput extends BasePngPageOutput {
+         kind: 'file';
+         content: Buffer | undefined;
+         path: string;
+     }
+     export type PngPageOutput = MetadataPngPageOutput | InMemoryPngPageOutput | FilePngPageOutput;
+     ```
+  2. Update `src/interfaces/index.ts` to re-export all four new names.
+  3. In `src/pdfToPng.ts` (or extracted modules if ARCH-003 landed first), set `kind` explicitly in every `PngPageOutput` construction site: `getPageMetadata` returns `MetadataPngPageOutput`, `renderPdfPage` returns `InMemoryPngPageOutput`, the post-write path in `processAndSavePage` returns `FilePngPageOutput`.
+  4. Update `CHANGELOG.md` with a new section noting the breaking change. Update `README.md` examples that reference `PngPageOutput.content` or `PngPageOutput.path` to branch on `kind` first.
 - **Acceptance criteria:**
-  1. Metadata-only results cannot expose `content`.
-  2. Disk-backed results cannot use an empty-string sentinel path.
-  3. Public examples compile without type assertions when branching on the discriminator.
+  1. `npm run build:test` passes — the compiler enforces the discriminated union at every call site.
+  2. Accessing `.content` on a `MetadataPngPageOutput` without narrowing on `kind` is a compile-time error.
+  3. A new test compiles and passes using `if (page.kind === 'file') { page.path; }` without any type assertion.
+  4. `CHANGELOG.md` and `README.md` are updated.
+  5. `npm test` passes.
 
 ### [ ] ARCH-005 Remove hidden mutation from the page processing pipeline
-- **Problem:** `processAndSavePage()` and `savePNGfile()` mutate `PngPageOutput` after creation by changing `path` and deleting `content`.
-- **Technical rationale:** Hidden mutation makes the lifecycle of an output object non-obvious, complicates debugging, and makes future refactors riskier. Immutable outputs are easier to reason about and test.
+- **Problem:** `savePNGfile()` mutates `pngPageOutput.path` (line 461 of `src/pdfToPng.ts`) and `processAndSavePage()` mutates `pageOutput.content = undefined` (line 99). These are hidden side effects on objects created elsewhere.
+- **Technical rationale:** Hidden mutation makes object lifecycle non-obvious, complicates debugging, and makes refactors riskier.
 - **Implementation direction:**
-  1. Have `renderPdfPage()` and `getPageMetadata()` return immutable intermediate values.
-  2. Let the writer return a new result object with persistence metadata.
-  3. Make content-retention behavior explicit in the returned type rather than mutating fields post hoc.
+  1. Change `savePNGfile` from `Promise<void>` to `Promise<string>` — remove the `pngPageOutput.path = resolvedFilePath` mutation and instead `return resolvedFilePath` at the end.
+  2. In `processAndSavePage`, after `await savePNGfile(pageOutput, ...)`, construct and return a new object:
+     ```ts
+     return { ...pageOutput, path: resolvedPath, content: returnPageContent === false ? undefined : pageOutput.content };
+     ```
+     Do not assign to `pageOutput.path` or `pageOutput.content`.
+  3. If TYPE-001 is implemented first, the `FilePngPageOutput` construction naturally forces a new object; steps 1–2 are then redundant and may be skipped.
 - **Acceptance criteria:**
-  1. No helper mutates `PngPageOutput` after creation.
-  2. The writer returns data instead of modifying its input argument.
-  3. Tests assert result construction, not mutation side effects.
+  1. `savePNGfile` signature returns `Promise<string>`, not `Promise<void>`.
+  2. `grep -n 'pageOutput\.' src/pdfToPng.ts` (or the relevant extracted module) returns zero assignment expressions on `pageOutput` fields after the initial object construction.
+  3. `npm test` passes.
 
-### [ ] TYPE-002 Eliminate unsafe assertions and non-null casts in `src/pdfToPng.ts` and `src/cli.ts`
-- **Problem:** The code relies on `as Buffer`, `as NodeCanvasFactory`, `canvas!`, and `as { version?: string }`.
-- **Technical rationale:** These assertions bypass the type system exactly where the code crosses process, filesystem, and external-library boundaries. Those are the places where runtime surprises are most likely.
-- **Implementation direction:**
-  1. Introduce small type guards for parsed JSON, canvas/content presence, and PDF.js adapter contracts.
-  2. Add a unified internal input type such as `PdfInputBuffer` and centralize buffer normalization behind explicit type guards.
-  3. Define a local interface for the canvas factory contract instead of casting `pdf.canvasFactory`.
-  4. Replace `canvas!` with explicit narrowing or a factory return type that guarantees live values.
+### [ ] TYPE-002 Eliminate unsafe assertions and non-null casts
+- **Problem:** `src/pdfToPng.ts` uses `pdfFile as Buffer` (line 263), `pdf.canvasFactory as NodeCanvasFactory` (line 372), `canvas!` (line 380), and `pngPageOutput.content as Buffer` (line 479).
+- **Technical rationale:** These casts bypass the type system at process, filesystem, and external-library boundaries — the places where runtime surprises are most likely.
+- **Implementation direction — per-cast fix:**
+  1. **`pdfFile as Buffer` (line 263):** The `Buffer.isBuffer(pdfFile)` guard on line 262 already narrows the type in the true branch. Remove the `as Buffer` cast — it is redundant.
+  2. **`pdf.canvasFactory as NodeCanvasFactory` (line 372):** Add a local type guard `function isNodeCanvasFactory(f: unknown): f is NodeCanvasFactory { return typeof (f as NodeCanvasFactory)?.create === 'function'; }` and replace the cast with `isNodeCanvasFactory(pdf.canvasFactory) ? pdf.canvasFactory : new NodeCanvasFactory()`.
+  3. **`canvas!` (line 380):** Immediately after `canvasFactory.create(...)`, add `if (!canvas) throw new Error('NodeCanvasFactory.create returned a null canvas')` and remove the `!` assertion.
+  4. **`pngPageOutput.content as Buffer` (line 479):** Add `if (!Buffer.isBuffer(pngPageOutput.content)) throw new Error(...)` immediately before the write call and remove the cast.
 - **Acceptance criteria:**
-  1. Core source files no longer use avoidable `as` casts or non-null assertions for runtime values.
-  2. Buffer normalization and JSON parsing use tested type guards rather than ad hoc assertions.
-  3. Type guards are covered by unit tests.
-  4. ESLint/TypeScript can enforce the safer contract without suppressions.
+  1. `grep -n ' as ' src/pdfToPng.ts` returns zero results for the four casts listed above.
+  2. `grep -n '!' src/pdfToPng.ts` returns zero results for non-null assertions on runtime values.
+  3. `npm run lint` and `npm test` pass.
 
 ### [ ] ARCH-006 Manage PDF.js lifecycle explicitly, including `destroy()`
-- **Problem:** The render pipeline calls `pdfDocument.cleanup()` in `finally`, but it does not keep the loading task or explicitly destroy the document/transport lifecycle.
-- **Technical rationale:** `cleanup()` releases render resources, but PDF.js also exposes `destroy()` on the document/loading task. Not modeling the lifecycle explicitly risks resource retention and makes the adapter contract unclear.
+- **Problem:** `pdfToPng()` calls `pdfDocument.cleanup()` in `finally` (line 203) but never calls `pdfDocument.destroy()`. The `getDocument()` loading task is discarded without teardown on error paths.
+- **Technical rationale:** `cleanup()` clears cached render resources; `destroy()` terminates the document and worker transport. Omitting `destroy()` can retain memory and worker threads between calls.
 - **Implementation direction:**
-  1. Wrap `getDocument()` in a local adapter that owns both the loading task and the `PDFDocumentProxy`.
-  2. Move PDF.js module caching behind an explicit provider/service abstraction instead of a module-level side effect.
-  3. Define a teardown contract that calls the appropriate `cleanup()` and `destroy()` steps deliberately.
-  4. Add tests for error paths to confirm teardown runs after parse/render failures.
+  1. In `src/pdfToPng.ts` line 203, change `await pdfDocument.cleanup()` to `await pdfDocument.destroy()`. `destroy()` internally calls `cleanup()` — no separate `cleanup()` call is needed.
+  2. In `getPdfDocument()`, store the `PDFDocumentLoadingTask` returned by `pdfjsLib.getDocument(...)` in a `const task` variable. Wrap `.promise` in a try/catch: if `.promise` rejects, call `await task.destroy()` in the catch before re-throwing.
+  3. Add a unit test that mocks `page.render` to reject and asserts that `pdfDocument.destroy()` is called (use `vi.spyOn`).
 - **Acceptance criteria:**
-  1. PDF.js loading, caching, and teardown are owned by one adapter/service.
-  2. Error paths and happy paths both exercise explicit teardown.
-  3. No lifecycle step is hidden inside unrelated orchestration logic.
+  1. `grep -n 'cleanup' src/pdfToPng.ts` returns zero results in the `finally` block — `destroy()` is used instead.
+  2. A new test covering the render-failure path asserts `destroy()` was called.
+  3. `npm test` passes.
 
 ### [ ] ARCH-007 Make the CLI a thin adapter over a reusable execution API
-- **Problem:** `src/cli.ts` mixes parsing, validation, logging, error formatting, and `process.exit()` control flow in one function.
-- **Technical rationale:** This makes the CLI harder to test cleanly and impossible to reuse as a library-facing execution entry point. It also spreads validation rules away from the core API.
+- **Problem:** `run()` in `src/cli.ts` is ~134 lines mixing `parseArgs`, numeric validation, boolean parsing, options assembly, logging, error formatting, and `process.exit()`.
+- **Technical rationale:** Mixing these concerns makes CLI behavior hard to test without mocking `process.exit()` and prevents reuse of the execution logic.
 - **Implementation direction:**
-  1. Extract `parseCliArgs()` to return a typed command object.
-  2. Extract `executeCliCommand()` that returns structured results or an exit code.
-  3. Keep `main()` responsible only for printing and exiting.
-  4. Reuse the shared option normalization layer from `ARCH-002`.
+  1. Extract `buildPdfToPngOptions(values: ParsedValues, positionals: string[]): { pdfFilePath: string } & PdfToPngOptions` — a pure function covering approximately lines 144–224 of the current `run()`.
+  2. Extract `executeConversion(pdfFilePath: string, options: PdfToPngOptions, log: (...msgs: unknown[]) => void): Promise<void>` — wraps the `try/catch` block at lines 231–244.
+  3. `run()` becomes: call `parseArgs` → call `buildPdfToPngOptions` → call `executeConversion` → call `process.exit`. Target under 35 lines.
+  4. `buildPdfToPngOptions` should call `normalizePdfToPngOptions` from ARCH-002 where possible.
 - **Acceptance criteria:**
-  1. Tests no longer need to mock `process.exit()` for core CLI behavior.
-  2. CLI validation is delegated to shared logic.
-  3. The top-level binary wrapper is smaller than the execution logic.
+  1. `run()` function body is under 35 lines after the extraction.
+  2. Tests for `buildPdfToPngOptions` do not mock `process.exit`.
+  3. `npm test` passes including all existing CLI tests.
+  4. `npm run build:test` and `npm run lint` pass.
 
-### [ ] ARCH-008 Define and implement a deliberate module packaging strategy
-- **Problem:** The package mixes `type: "commonjs"`, `nodenext` TypeScript, `.js` import specifiers in source, and documentation that shows both CJS and ESM usage without a clearly stated publish strategy.
-- **Technical rationale:** Consumers should not need Node interop trivia to understand how to import the library. Packaging ambiguity becomes more expensive as the public API grows.
+### [ ] ARCH-008 Confirm and document the CJS-only module packaging strategy
+- **Problem:** The package mixes `"type": "commonjs"`, `nodenext` TypeScript module resolution, and `.js` import specifiers in source, but lacks a contract test asserting the published `require()` / `import` surface.
+- **Technical rationale:** The packaging is already consistent (CJS-only), but without a contract test, a future change to `package.json` or `tsconfig.prod.json` could silently break consumers.
+- **Decision (CJS-only; do not add a dual-publish build):** The existing `exports` map and `"type": "commonjs"` are correct. The only actions needed are to add a contract test and a clarifying comment.
 - **Implementation direction:**
-  1. Choose one of: CJS only, ESM only, or dual publish.
-  2. Align `package.json` `exports`, `main`, `types`, and build outputs with that choice.
-  3. Add import contract tests for the supported consumption modes.
-  4. Update README examples to match the actual package contract.
+  1. Create `__tests__/exports.contract.test.ts`. Import `pdfToPng` and `VerbosityLevel` from `'../src/index.js'` and assert both are defined (truthy).
+  2. Add a `"_packageFormatNote"` key to `package.json`: `"_packageFormatNote": "CJS-only — nodenext TS with .js specifiers is compatible."`.
+  3. Verify `README.md` import examples use `import { pdfToPng } from 'pdf-to-png-converter'` without a path that requires ESM interop.
 - **Acceptance criteria:**
-  1. The package format strategy is explicit in code and docs.
-  2. Import behavior is covered by tests.
-  3. No example relies on unsupported or accidental interop.
+  1. `__tests__/exports.contract.test.ts` exists and passes.
+  2. `npm test` passes.
 
 ### [ ] TYPE-003 Strengthen public option and metadata types
-- **Problem:** Several domain fields are typed too loosely: `verbosityLevel?: number`, `pagesToProcess?: number[]`, and `rotation: number`.
-- **Technical rationale:** Weak public types reduce IDE guidance, allow invalid values to flow further into the system, and force runtime checks to carry more weight than necessary.
+- **Problem:** `verbosityLevel?: number` accepts any integer, `pagesToProcess?: number[]` accepts any number, and `rotation: number` is wider than the four valid PDF rotation values.
+- **Technical rationale:** Weak public types reduce IDE guidance and allow invalid values to flow further into the system.
 - **Implementation direction:**
-  1. Type `verbosityLevel` as `VerbosityLevel`.
-  2. Introduce validated internal types for positive integers/page indices.
-  3. Narrow `rotation` to `0 | 90 | 180 | 270` after validation at the PDF.js boundary.
-  4. Prefer `readonly` arrays for normalized page lists passed through the pipeline.
+  1. In `src/interfaces/pdf.to.png.options.ts`, change `verbosityLevel?: number` to `verbosityLevel?: VerbosityLevel`. Add `import type { VerbosityLevel } from '../types/index.js'` at the top of the file.
+  2. In `src/interfaces/png.page.output.ts`, change `rotation: number` to `rotation: 0 | 90 | 180 | 270`.
+  3. In `src/pdfToPng.ts`, add a helper `normalizeRotation(raw: number): 0 | 90 | 180 | 270` that computes `(((raw % 360) + 360) % 360)` and asserts the result is in `{0, 90, 180, 270}`. Call it in both `getPageMetadata` and `renderPdfPage` when setting `rotation`.
+  4. Add a unit test for `normalizeRotation`: `normalizeRotation(0) === 0`, `normalizeRotation(270) === 270`, `normalizeRotation(-90) === 270`, `normalizeRotation(360) === 0`.
 - **Acceptance criteria:**
-  1. Public types communicate domain constraints more precisely.
-  2. Internal normalized types prevent invalid values from reaching renderer/writer stages.
-  3. Existing examples and tests compile against the stronger contracts.
+  1. `npm run build:test` passes — all call sites of `rotation` receive the narrowed type.
+  2. `verbosityLevel: 3` passed to `pdfToPng()` is caught by ARCH-002's validation before reaching pdfjs.
+  3. The `normalizeRotation` unit test passes.
+  4. `npm run lint` passes.
 
-### [ ] PERF-001 Add memory-aware rendering and output-sink abstractions
-- **Problem:** When `outputFolder` is set, the architecture always creates PNG buffers in memory before writing them. With parallel mode, memory usage scales with page size and `concurrencyLimit`.
-- **Technical rationale:** The current model is acceptable for small documents, but it does not scale predictably for large PDFs or high-resolution renders. The concurrency knob is blind to page size and output strategy.
+### [ ] PERF-001a Output-sink abstraction (prerequisite for PERF-001b)
+- **Problem:** Rendering is tightly coupled to in-memory `Buffer` retention. There is no way to write page output directly to disk without first building a full in-memory PNG buffer.
+- **Technical rationale:** Decoupling rendering from the output sink is the prerequisite for any memory or scheduling improvement.
 - **Implementation direction:**
-  1. Introduce an output-sink abstraction so rendering is not tightly coupled to in-memory `Buffer` retention.
-  2. Investigate direct-to-disk or chunked encoding paths supported by the canvas layer.
-  3. Add an adaptive concurrency policy based on estimated canvas pixels or memory budget.
-  4. Replace lock-step `Promise.all` chunking with a sliding-window scheduler or `p-limit`-style queue so new pages start as soon as earlier ones finish.
+  1. Create `src/interfaces/output.sink.ts` with:
+     ```ts
+     export interface OutputSink {
+         write(name: string, content: Buffer): Promise<string>;
+     }
+     ```
+  2. Create `src/filesystemSink.ts` implementing `OutputSink` — wraps the current `savePNGfile` logic.
+  3. Create `src/nullSink.ts` implementing `OutputSink` — returns `''` and discards the buffer (used when only in-memory content is needed).
+  4. In `processAndSavePage`, replace the `if (resolvedOutputFolder !== undefined …)` branch with a call to the injected sink.
 - **Acceptance criteria:**
-  1. The render pipeline can target at least two sinks: in-memory and filesystem.
-  2. Concurrency decisions can consider page size, not only page count.
-  3. Large-document tests demonstrate bounded memory behavior under parallel mode.
-  4. Parallel scheduling keeps up to `concurrencyLimit` active tasks without leaving slots idle until a whole batch completes.
+  1. `npm test` passes with no behavior change observable from existing tests.
+  2. `npm run build:test` and `npm run lint` pass.
+  3. `src/interfaces/output.sink.ts`, `src/filesystemSink.ts`, and `src/nullSink.ts` all exist.
 
-### [ ] TEST-001 Expand contract tests around normalization, packaging, and security invariants
-- **Problem:** The current suite is strong on integration scenarios, but it leaves gaps around normalization semantics, absolute path handling, packaging/import contracts, and stronger adversarial path cases.
-- **Technical rationale:** Architectural regressions often happen at boundaries, not pixel-comparison paths. Contract tests are cheaper and more targeted than heavy integration tests.
+### [ ] PERF-001b Sliding-window page scheduler (depends on PERF-001a)
+- **Problem:** The parallel render loop (lines 166–184 of `src/pdfToPng.ts`) uses lock-step `Promise.all` chunking: page 3 does not start until pages 1 and 2 both finish, leaving concurrency slots idle when one page finishes early.
+- **Technical rationale:** A sliding-window scheduler keeps exactly `concurrencyLimit` tasks active, improving throughput on documents with variable-duration pages.
 - **Implementation direction:**
-  1. Add tests for absolute `outputFolder`, empty/whitespace folder names, invalid `pagesToProcess`, and unsupported verbosity values.
-  2. Add package import tests for the supported module formats.
-  3. Add focused security tests for filename normalization, nested directories, and symlink behavior where practical.
+  1. Replace the `for` + `Promise.all` batch loop with a sliding-window implementation using only `Promise` and an index counter — do not add any new npm dependency.
+  2. The replacement must maintain document order in the returned `PngPageOutput[]` array.
 - **Acceptance criteria:**
-  1. The most important API guarantees are enforced by fast tests.
-  2. A regression in option normalization or packaging breaks tests immediately.
-  3. Security-sensitive filename/path cases are covered outside the heavy render suite.
+  1. A new test with `concurrencyLimit: 2` and 5 pages asserts that page 3 starts as soon as page 1 or 2 completes (not after both complete). Use `vi.spyOn` on the render function to track start order.
+  2. All existing parallel-mode tests pass unchanged.
+  3. `npm test` passes.
+
+### [ ] TEST-001 Expand contract and security tests
+- **Problem:** The test suite is strong on integration render scenarios but lacks contract tests for option normalization, absolute path handling, and adversarial filename/symlink cases.
+- **Technical rationale:** Architectural regressions happen at boundaries. Contract tests are cheaper and faster than render-based integration tests.
+- **Implementation direction — implement all rows in this table in `__tests__/security.path.test.ts`:**
+
+  | Input | Expected behavior |
+  |---|---|
+  | `outputFolder: '../escape'` | Does not throw (folder path is allowed; containment is per filename) |
+  | `outputFileMaskFunc: () => '../escape.png'` | `savePNGfile` throws `"Output file name escapes the output folder"` |
+  | `outputFileMaskFunc: () => '/etc/passwd'` | `savePNGfile` throws (absolute filename) |
+  | `outputFileMaskFunc: () => ''` | `resolvePageName` throws `"outputFileMaskFunc returned an empty filename"` |
+  | `outputFolder: ''` | After ARCH-002: throws before I/O |
+  | `pagesToProcess: [0]` | After ARCH-002: throws before I/O |
+  | `pagesToProcess: [-1]` | After ARCH-002: throws before I/O |
+  | `pagesToProcess: [999999]` | Silently filtered; returns `[]` |
+  | `verbosityLevel: 3` | After ARCH-002: throws before I/O |
+  | Target path is a symlink pointing outside `outputFolder` | `savePNGfile` throws (use `fsPromises.symlink` in test setup) |
+
+  Each table row maps to exactly one `test()` call. Tests that depend on ARCH-001/002/004 may be marked `test.skip` until those items land; add a `// depends on: ARCH-NNN` comment.
+
+- **Acceptance criteria:**
+  1. All ten table rows have a corresponding `test()` in `__tests__/security.path.test.ts`.
+  2. `npm test` passes.
+
+---
 
 ## P3
 
-### [ ] CLI-001 Stop reading `package.json` synchronously at runtime for `--version`
-- **Problem:** `getVersion()` reads and parses `package.json` synchronously at runtime and hides all failures by returning `"Unknown"`.
-- **Technical rationale:** The CLI version should be deterministic. Runtime filesystem lookup adds unnecessary failure modes and makes packaging behavior harder to reason about.
+### [ ] CLI-001 Stop silently swallowing `getVersion()` failures
+- **Problem:** `getVersion()` in `src/cli.ts` (lines 94–102) catches all errors and returns `'Unknown'`, masking packaging defects.
+- **Technical rationale:** A missing or malformed `package.json` is a packaging bug, not an expected runtime condition. Hiding it delays diagnosis.
 - **Implementation direction:**
-  1. Inject the package version at build time or export it from generated metadata.
-  2. If runtime lookup remains, cache the result and narrow the error handling to the expected failure modes.
-  3. Avoid silent fallback for cases that represent packaging defects.
+  1. Change `getVersion()` to throw `Error('Cannot determine package version: package.json missing or malformed')` instead of returning `'Unknown'` when `package.json` is absent or has no `version` field.
+  2. In `run()`, wrap the `console.log(\`v${getVersion()}\`)` call in a `try/catch` that calls `console.error(err.message)` and `process.exit(1)` on failure.
+  3. Update the `getVersion()` unit test to assert the throw for a missing file and a missing `version` field.
 - **Acceptance criteria:**
-  1. `--version` works without filesystem probing on every invocation.
-  2. Failure behavior is deliberate and testable.
-  3. Version reporting no longer depends on synchronous JSON parsing in hot CLI code.
+  1. `getVersion()` throws when `package.json` is absent — asserted by a unit test using `vi.mock('node:fs')`.
+  2. `--version` from a correctly packaged build still outputs the correct semver string.
+  3. `npm test` passes.
 
-### [ ] DX-001 Tighten release-grade type checking and dependency boundary confidence
-- **Problem:** `tsconfig.json` uses `skipLibCheck: true`, which reduces friction but also hides incompatibilities at external type boundaries such as `pdfjs-dist` and `@napi-rs/canvas`.
-- **Technical rationale:** This project’s core value depends on third-party adapter correctness. Suppressing upstream type issues weakens confidence exactly where the system integrates with external APIs.
+### [ ] DX-001 Add a stricter type-check job for release validation
+- **Problem:** `tsconfig.json` uses `skipLibCheck: true`, which hides incompatibilities at external type boundaries (`pdfjs-dist`, `@napi-rs/canvas`).
+- **Technical rationale:** The project's correctness depends on these third-party adapters. Suppressing upstream type issues weakens confidence at the most important integration points.
+- **Decision (do not set `skipLibCheck: false` in the main tsconfig):** `pdfjs-dist` is known to have type issues. Instead, add a separate config for release-time stricter checking.
 - **Implementation direction:**
-  1. Evaluate enabling `skipLibCheck: false` in CI or release validation, even if local development keeps the faster setting.
-  2. If full strictness is too expensive, add a dedicated stricter typecheck job for release candidates.
-  3. Document any upstream type gaps explicitly rather than hiding them globally.
+  1. Create `tsconfig.strict.json` at the repo root:
+     ```json
+     {
+       "extends": "./tsconfig.json",
+       "compilerOptions": { "skipLibCheck": false, "noEmit": true }
+     }
+     ```
+  2. Add a `"build:strict"` script to `package.json`: `"build:strict": "tsc --project tsconfig.strict.json || true"`.
+  3. In `.github/workflows/test.yml`, add a step after the existing lint step: `run: npm run build:strict`, marked `continue-on-error: true` so it reports failures without blocking the build. Remove `continue-on-error` when all errors are resolved.
+  4. For any errors that surface, add a `// @ts-ignore — upstream <package>@<version> type gap` comment at the specific import site in `src/` (not a global suppression).
 - **Acceptance criteria:**
-  1. Release validation has a stricter type boundary check than local edit-time defaults.
-  2. Any remaining skipped library issues are explicit and intentional.
-  3. Dependency type regressions are more likely to fail CI before release.
+  1. `tsconfig.strict.json` exists at the repo root.
+  2. `npm run build:strict` runs without a script error (exit 0 or `|| true`).
+  3. `.github/workflows/test.yml` includes the `build:strict` step.
+  4. `npm test` passes unchanged.
