@@ -2,6 +2,7 @@ coverage
 out
 test-results
 .vscode
+.claude/
 
 # Logs
 logs
