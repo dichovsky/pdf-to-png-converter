@@ -1,6 +1,6 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, promises as fsPromises, readFileSync } from 'node:fs';
 import { parse } from 'node:path';
-import { type ComparePngOptions, comparePng } from 'png-visual-compare';
+import { type ComparePngOptions, comparePngAsync } from 'png-visual-compare';
 
 /**
  * Compares a PNG image with an expected PNG image.
@@ -10,7 +10,7 @@ import { type ComparePngOptions, comparePng } from 'png-visual-compare';
  * @param opts - Optional compare options.
  * @returns A promise that resolves to the comparison result.
  */
-export function comparePNG({
+export async function comparePNG({
     actualFile,
     expectedFile,
     createExpectedFileIfMissing,
@@ -23,9 +23,9 @@ export function comparePNG({
 }) {
     if (createExpectedFileIfMissing && !existsSync(expectedFile)) {
         const expectedFileDir = parse(expectedFile).dir;
-        mkdirSync(expectedFileDir, { recursive: true });
+        await fsPromises.mkdir(expectedFileDir, { recursive: true });
         const actualBuffer = typeof actualFile === 'string' ? readFileSync(actualFile) : actualFile;
-        writeFileSync(expectedFile, actualBuffer);
+        await fsPromises.writeFile(expectedFile, actualBuffer);
     }
-    return comparePng(actualFile, expectedFile, opts);
+    return await comparePngAsync(actualFile, expectedFile, opts);
 }

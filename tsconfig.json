@@ -21,6 +21,11 @@
     "declaration": false,
     "noEmit": true
   },
+  "ts-node": {
+    "compilerOptions": {
+      "module": "CommonJS"
+    }
+  },
   "include": [
     "./src/**/*",
     "./__tests__/**/*"

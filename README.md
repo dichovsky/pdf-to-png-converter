@@ -37,6 +37,7 @@ A high-performance Node.js library for converting PDF files and buffers to PNG i
 
 - [Installation](#installation)
 - [Quick Start](#quick-start)
+- [Migration Guide](#migration-guide)
 - [CLI Usage](#cli-usage)
 - [API Reference](#api-reference)
 - [Examples](#examples)
@@ -87,6 +88,17 @@ const pngPages: PngPageOutput[] = await pdfToPng('document.pdf', {
     verbosityLevel: VerbosityLevel.ERRORS, // 0=ERRORS, 1=WARNINGS, 5=INFOS
 });
 ```
+
+---
+
+## Migration Guide
+
+Recent backlog work introduced public and behavioral changes that existing consumers may need to adopt:
+
+1. **`PngPageOutput` is now discriminated.** Branch on `page.kind` before reading `page.path` or assuming `page.content` is present.
+2. **`verbosityLevel` is now typed as `VerbosityLevel`.** Prefer `VerbosityLevel.ERRORS`, `VerbosityLevel.WARNINGS`, or `VerbosityLevel.INFOS` instead of raw numeric literals.
+3. **Invalid `pagesToProcess` values now throw early.** `0`, negative numbers, and non-integers are rejected immediately; page numbers above the document length are still ignored.
+4. **Disk writes are now exclusive-create (`'wx'`).** Re-running the same conversion into the same output filenames now throws `EEXIST`; clear the target directory or generate unique filenames between runs.
 
 ---
 
@@ -154,7 +166,8 @@ Converts PDF pages to PNG images.
     pdfFilePassword?: string,        // Password for encrypted PDFs
 
     // Processing
-    pagesToProcess?: number[],       // Pages to convert (1-indexed, e.g., [1, 3, 5])
+    pagesToProcess?: number[],       // 1-indexed integer pages to convert (e.g., [1, 3, 5])
+                                    // Non-integer and <= 0 values throw; pages beyond the PDF length are ignored
     processPagesInParallel?: boolean, // Enable parallel processing (default: false)
     concurrencyLimit?: number,       // Max concurrent pages, positive integer (default: 4)
 
@@ -163,9 +176,9 @@ Converts PDF pages to PNG images.
     returnMetadataOnly?: boolean,    // Return only page dimensions/rotation without rendering (default: false)
 
     // Logging
-    verbosityLevel?: number,         // 0=ERRORS, 1=WARNINGS, 5=INFOS (default: 0)
-                                     // Use the VerbosityLevel enum for readable values:
-                                     // import { VerbosityLevel } from 'pdf-to-png-converter'
+    verbosityLevel?: VerbosityLevel, // VerbosityLevel.ERRORS | WARNINGS | INFOS (default: ERRORS)
+                                      // Use the VerbosityLevel enum for readable values:
+                                      // import { VerbosityLevel } from 'pdf-to-png-converter'
 }
 ```
 
@@ -253,7 +266,9 @@ const pngPages = await pdfToPng('large-document.pdf', {
 
 // Pages are written to disk, content property will be undefined
 pngPages.forEach(page => {
-    console.log(`Saved: ${page.path}`);
+    if (page.kind === 'file') {
+        console.log(`Saved: ${page.path}`);
+    }
 });
 ```
 
@@ -276,25 +291,37 @@ This is significantly faster than full rendering and useful for checking page co
 
 ## Output Format
 
-The `pdfToPng` function returns an array of page objects:
+The `pdfToPng` function returns an array of discriminated page objects:
 
 ```javascript
 [
     {
+        kind: 'content',                   // 'metadata' | 'content' | 'file'
         pageNumber: 1,                      // Page number in the PDF
         name: 'document_page_1.png',        // PNG filename
         content: Buffer<...>,               // PNG image data
                                             //   undefined if returnPageContent=false
-                                            //   undefined if returnMetadataOnly=true
-        path: '/output/document_page_1.png', // Full file path after writing to disk
-                                            //   empty string ('') if no outputFolder
-                                            //   empty string ('') if returnMetadataOnly=true
+        path: '',                           // Empty string for in-memory and metadata results
         width: 612,                         // Image width in pixels
         height: 792,                        // Image height in pixels
         rotation: 0                         // Page rotation in degrees: 0, 90, 180, or 270
     },
     // ... more pages
 ]
+```
+
+Branch on `kind` before using mode-specific fields:
+
+```javascript
+pngPages.forEach((page) => {
+    if (page.kind === 'file') {
+        console.log(page.path);
+    }
+
+    if (page.kind === 'content' && page.content) {
+        console.log(page.content.byteLength);
+    }
+});
 ```
 
 ---

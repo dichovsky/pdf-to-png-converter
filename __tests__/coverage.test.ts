@@ -1,6 +1,6 @@
 import { promises as fsPromises } from 'node:fs';
 import type { Mock } from 'vitest';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as index from '../src/index';
 import { pdfToPng } from '../src/pdfToPng';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
@@ -9,7 +9,10 @@ vi.mock('node:fs', () => ({
     promises: {
         readFile: vi.fn(),
         mkdir: vi.fn(),
-        writeFile: vi.fn(),
+        open: vi.fn().mockResolvedValue({
+            writeFile: vi.fn().mockResolvedValue(undefined),
+            close: vi.fn().mockResolvedValue(undefined),
+        }),
         realpath: vi.fn(),
     },
 }));
@@ -17,6 +20,17 @@ vi.mock('node:fs', () => ({
 vi.mock('pdfjs-dist/legacy/build/pdf.mjs', () => ({
     getDocument: vi.fn(),
 }));
+
+beforeEach(() => {
+    (fsPromises.readFile as Mock).mockReset();
+    (fsPromises.mkdir as Mock).mockReset();
+    (fsPromises.open as Mock).mockReset().mockResolvedValue({
+        writeFile: vi.fn().mockResolvedValue(undefined),
+        close: vi.fn().mockResolvedValue(undefined),
+    });
+    (fsPromises.realpath as Mock).mockReset();
+    (getDocument as Mock).mockReset();
+});
 
 describe('index', () => {
     it('should export pdfToPng function', () => {
@@ -91,16 +105,26 @@ describe('pdfToPng', () => {
 
     it('should not throw for viewportScale of 100 (boundary — maximum valid value)', async () => {
         (fsPromises.readFile as Mock).mockResolvedValueOnce(new ArrayBuffer(8));
-        (getDocument as Mock).mockReturnValueOnce({ promise: Promise.reject(new Error('Mock PDF parse error')) });
+        const destroyLoadingTask = vi.fn().mockResolvedValue(undefined);
+        (getDocument as Mock).mockReturnValueOnce({
+            promise: Promise.reject(new Error('Mock PDF parse error')),
+            destroy: destroyLoadingTask,
+        });
         // The call fails at PDF parsing — viewportScale validation must not throw first.
         await expect(pdfToPng('test.pdf', { viewportScale: 100 })).rejects.toThrow('Mock PDF parse error');
+        expect(destroyLoadingTask).toHaveBeenCalled();
     });
 
     it('should not throw for viewportScale of 0.001 (very small but valid)', async () => {
         (fsPromises.readFile as Mock).mockResolvedValueOnce(new ArrayBuffer(8));
-        (getDocument as Mock).mockReturnValueOnce({ promise: Promise.reject(new Error('Mock PDF parse error')) });
+        const destroyLoadingTask = vi.fn().mockResolvedValue(undefined);
+        (getDocument as Mock).mockReturnValueOnce({
+            promise: Promise.reject(new Error('Mock PDF parse error')),
+            destroy: destroyLoadingTask,
+        });
         // The call fails at PDF parsing — viewportScale validation must not throw first.
         await expect(pdfToPng('test.pdf', { viewportScale: 0.001 })).rejects.toThrow('Mock PDF parse error');
+        expect(destroyLoadingTask).toHaveBeenCalled();
     });
 
     it('should throw when canvas pixel area exceeds the limit', async () => {
@@ -114,14 +138,19 @@ describe('pdfToPng', () => {
             numPages: 1,
             getPage: vi.fn().mockResolvedValue(mockPage),
             cleanup: vi.fn(),
+            destroy: vi.fn().mockResolvedValue(undefined),
             canvasFactory: null,
         };
 
         (fsPromises.readFile as Mock).mockResolvedValueOnce(new ArrayBuffer(8));
-        (getDocument as Mock).mockReturnValueOnce({ promise: Promise.resolve(mockDocument) });
+        (getDocument as Mock).mockReturnValueOnce({
+            promise: Promise.resolve(mockDocument),
+            destroy: vi.fn().mockResolvedValue(undefined),
+        });
 
         await expect(pdfToPng('test.pdf')).rejects.toThrow('exceeds the');
         expect(mockPage.cleanup).toHaveBeenCalled();
+        expect(mockDocument.destroy).toHaveBeenCalled();
     });
 
     it('should throw when outputFolder directory resolves outside outputFolder via symlink (symlink escape on dirname)', async () => {
@@ -142,11 +171,15 @@ describe('pdfToPng', () => {
             numPages: 1,
             getPage: vi.fn().mockResolvedValue(mockPage),
             cleanup: vi.fn(),
+            destroy: vi.fn().mockResolvedValue(undefined),
             canvasFactory: mockCanvasFactory,
         };
 
         (fsPromises.readFile as Mock).mockResolvedValueOnce(new ArrayBuffer(8));
-        (getDocument as Mock).mockReturnValueOnce({ promise: Promise.resolve(mockDocument) });
+        (getDocument as Mock).mockReturnValueOnce({
+            promise: Promise.resolve(mockDocument),
+            destroy: vi.fn().mockResolvedValue(undefined),
+        });
         (fsPromises.mkdir as Mock).mockResolvedValueOnce(undefined);
         // 1st realpath: resolvedOutputFolder in pdfToPng → establishes realOutputFolder
         // 2nd realpath: dirname(resolvedFilePath) in savePNGfile → escapes (simulates symlink)
@@ -155,7 +188,7 @@ describe('pdfToPng', () => {
         await expect(pdfToPng('/path/to/test.pdf', { outputFolder: 'test-output' })).rejects.toThrow(
             'Output file name escapes the output folder',
         );
-        expect(fsPromises.writeFile).not.toHaveBeenCalled();
+        expect(fsPromises.open).not.toHaveBeenCalled();
     });
 
     it('should throw when content is undefined at write time (defensive guard)', async () => {
@@ -176,18 +209,22 @@ describe('pdfToPng', () => {
             numPages: 1,
             getPage: vi.fn().mockResolvedValue(mockPage),
             cleanup: vi.fn(),
+            destroy: vi.fn().mockResolvedValue(undefined),
             canvasFactory: mockCanvasFactory,
         };
 
         (fsPromises.readFile as Mock).mockResolvedValueOnce(new ArrayBuffer(8));
-        (getDocument as Mock).mockReturnValueOnce({ promise: Promise.resolve(mockDocument) });
+        (getDocument as Mock).mockReturnValueOnce({
+            promise: Promise.resolve(mockDocument),
+            destroy: vi.fn().mockResolvedValue(undefined),
+        });
         (fsPromises.mkdir as Mock).mockResolvedValueOnce(undefined);
         // Both realpath calls return the same safe path so the symlink check (L457) passes;
         // L463 fires before the TOCTOU re-check (L474) is reached.
         (fsPromises.realpath as Mock).mockResolvedValueOnce('/safe/output').mockResolvedValueOnce('/safe/output');
 
         await expect(pdfToPng('/path/to/test.pdf', { outputFolder: 'test-output' })).rejects.toThrow('Cannot write PNG file');
-        expect(fsPromises.writeFile).not.toHaveBeenCalled();
+        expect(fsPromises.open).not.toHaveBeenCalled();
     });
 
     it('should throw when output folder realpath changes between initial check and final write', async () => {
@@ -208,11 +245,15 @@ describe('pdfToPng', () => {
             numPages: 1,
             getPage: vi.fn().mockResolvedValue(mockPage),
             cleanup: vi.fn(),
+            destroy: vi.fn().mockResolvedValue(undefined),
             canvasFactory: mockCanvasFactory,
         };
 
         (fsPromises.readFile as Mock).mockResolvedValueOnce(new ArrayBuffer(8));
-        (getDocument as Mock).mockReturnValueOnce({ promise: Promise.resolve(mockDocument) });
+        (getDocument as Mock).mockReturnValueOnce({
+            promise: Promise.resolve(mockDocument),
+            destroy: vi.fn().mockResolvedValue(undefined),
+        });
         (fsPromises.mkdir as Mock).mockResolvedValueOnce(undefined);
         // 1st realpath: resolvedOutputFolder in pdfToPng (cached as realOutputFolder) — passes
         // 2nd realpath: dirname(resolvedFilePath) in savePNGfile (symlink containment check) — passes
@@ -226,6 +267,34 @@ describe('pdfToPng', () => {
             'Output folder was modified during write',
         );
 
-        expect(fsPromises.writeFile).not.toHaveBeenCalled();
+        expect(fsPromises.open).not.toHaveBeenCalled();
+    });
+
+    it('should destroy the document when page render rejects', async () => {
+        const mockPage = {
+            getViewport: vi.fn().mockReturnValue({ width: 10, height: 10 }),
+            render: vi.fn().mockReturnValue({ promise: Promise.reject(new Error('render failed')) }),
+            rotate: 0,
+            cleanup: vi.fn(),
+        };
+        const mockDocument = {
+            numPages: 1,
+            getPage: vi.fn().mockResolvedValue(mockPage),
+            cleanup: vi.fn(),
+            destroy: vi.fn().mockResolvedValue(undefined),
+            canvasFactory: {
+                create: vi.fn().mockReturnValue({ canvas: { toBuffer: vi.fn() }, context: {} }),
+                destroy: vi.fn(),
+            },
+        };
+
+        (fsPromises.readFile as Mock).mockResolvedValueOnce(new ArrayBuffer(8));
+        (getDocument as Mock).mockReturnValueOnce({
+            promise: Promise.resolve(mockDocument),
+            destroy: vi.fn().mockResolvedValue(undefined),
+        });
+
+        await expect(pdfToPng('test.pdf')).rejects.toThrow('render failed');
+        expect(mockDocument.destroy).toHaveBeenCalled();
     });
 });

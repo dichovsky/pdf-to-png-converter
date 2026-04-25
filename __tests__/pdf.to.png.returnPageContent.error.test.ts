@@ -7,8 +7,10 @@ describe('pdfToPng returnPageContent with outputFolder', () => {
     it('should not throw an error when returnPageContent is false and outputFolder is provided', async () => {
         const pdfFilePath = 'test-data/sample.pdf';
         const outputFolder = 'test-results/pdf.to.png.returnPageContent.false.with.outputFolder';
+        const resolvedOutputFolder = join(process.cwd(), outputFolder);
 
-        await fsPromises.mkdir(join(process.cwd(), outputFolder), { recursive: true });
+        await fsPromises.rm(resolvedOutputFolder, { recursive: true, force: true });
+        await fsPromises.mkdir(resolvedOutputFolder, { recursive: true });
 
         const pngPages = await pdfToPng(pdfFilePath, {
             outputFolder,

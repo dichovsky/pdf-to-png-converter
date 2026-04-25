@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { promises as fsPromises, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test } from 'vitest';
 import type { PngPageOutput } from '../src';
@@ -67,15 +67,17 @@ test('should match rendered PNG pixel dimensions to reported metadata dimensions
 });
 
 test('should write rotated pages to files with correct visual output', async () => {
+    const outputFolder = resolve('./test-results/rotated-pages/actual');
+    await fsPromises.rm(outputFolder, { recursive: true, force: true });
     const pages: PngPageOutput[] = await pdfToPng(PDF_PATH, {
-        outputFolder: resolve('./test-results/rotated-pages/actual'),
+        outputFolder,
     });
 
     expect(pages.length).toBe(4);
     for (const page of pages) {
         const expectedFilePath = resolve('./test-data/rotated-pages/expected', page.name);
         const actualFileContent: Buffer = readFileSync(page.path);
-        const compareResult: number = comparePNG({
+        const compareResult: number = await comparePNG({
             actualFile: actualFileContent,
             expectedFile: expectedFilePath,
             createExpectedFileIfMissing: true,

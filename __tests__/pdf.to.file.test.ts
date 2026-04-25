@@ -1,13 +1,16 @@
-import { readFileSync } from 'node:fs';
+import { promises as fsPromises, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test } from 'vitest';
-import { PngPageOutput, pdfToPng } from '../src';
+import type { PngPageOutput } from '../src';
+import { pdfToPng } from '../src';
 import { comparePNG } from './comparePNG';
 
 test(`should convert PDF To PNG files`, async () => {
     const pdfFilePath: string = resolve('./test-data/large_pdf.pdf');
+    const outputFolder = resolve('./test-results/pdf.to.file/actual');
+    await fsPromises.rm(outputFolder, { recursive: true, force: true });
     const pngPages: PngPageOutput[] = await pdfToPng(pdfFilePath, {
-        outputFolder: resolve('./test-results/pdf.to.file/actual'),
+        outputFolder,
         processPagesInParallel: false,
     });
 
@@ -15,7 +18,7 @@ test(`should convert PDF To PNG files`, async () => {
     for (const pngPage of pngPages) {
         const expectedFilePath: string = resolve('./test-data/pdf.to.file/expected', pngPage.name);
         const actualFileContent: Buffer = readFileSync(pngPage.path);
-        const compareResult: number = comparePNG({
+        const compareResult: number = await comparePNG({
             actualFile: actualFileContent,
             expectedFile: expectedFilePath,
             createExpectedFileIfMissing: true,
@@ -34,8 +37,10 @@ test(`should convert TAMReview PDF to the expected number of PNG pages`, async (
 
 test(`should convert PDF To PNG files in parallel mode`, async () => {
     const pdfFilePath: string = resolve('./test-data/large_pdf.pdf');
+    const outputFolder = resolve('./test-results/pdf.to.file/actual');
+    await fsPromises.rm(outputFolder, { recursive: true, force: true });
     const pngPages: PngPageOutput[] = await pdfToPng(pdfFilePath, {
-        outputFolder: resolve('./test-results/pdf.to.file/actual'),
+        outputFolder,
         processPagesInParallel: true,
     });
 
@@ -43,7 +48,7 @@ test(`should convert PDF To PNG files in parallel mode`, async () => {
     for (const pngPage of pngPages) {
         const expectedFilePath: string = resolve('./test-data/pdf.to.file/expected', pngPage.name);
         const actualFileContent: Buffer = readFileSync(pngPage.path);
-        const compareResult: number = comparePNG({
+        const compareResult: number = await comparePNG({
             actualFile: actualFileContent,
             expectedFile: expectedFilePath,
             createExpectedFileIfMissing: true,
