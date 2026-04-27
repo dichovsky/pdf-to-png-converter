@@ -99,7 +99,7 @@
     },
     "packageManager": "npm@11.13.0",
     "engines": {
-        "node": ">=20.19.0 || >=22.13.0 || >=24"
+        "node": ">=22.13.0 || >=24"
     },
     "_packageFormatNote": "CJS-only — nodenext TS with .js specifiers is compatible."
 }

@@ -2,7 +2,7 @@ import { MAX_VIEWPORT_SCALE, PDF_TO_PNG_OPTIONS_DEFAULTS } from './const.js';
 import type { PdfToPngOptions } from './interfaces/pdf.to.png.options.js';
 import { VerbosityLevel } from './types/verbosity.level.js';
 
-interface NormalizedPdfToPngOptions {
+export interface NormalizedPdfToPngOptions {
     viewportScale: number;
     disableFontFace: boolean;
     useSystemFonts: boolean;
