@@ -27,7 +27,7 @@ export function normalizePdfToPngOptions(props: PdfToPngOptions | undefined): No
     }
 
     const outputFolder = props?.outputFolder;
-    if (outputFolder?.trim().length === 0) {
+    if (outputFolder?.trim() === '') {
         throw new Error('outputFolder must not be empty');
     }
 

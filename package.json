@@ -53,7 +53,7 @@
     "prebuild": "npm run clean",
     "build": "tsc --pretty --project tsconfig.prod.json",
     "build:test": "tsc --pretty --noEmit --project tsconfig.json",
-    "build:strict": "tsc --project tsconfig.strict.json || true",
+    "build:strict": "tsc --project tsconfig.strict.json",
     "clean": "rimraf ./out ./test-results",
     "codemap": "ts-node scripts/generate-codemap.ts",
     "docker:build": "docker build --build-arg NODE_VERSION=$(cat .nvmrc) --compress -t test-pdf-to-png-converter .",

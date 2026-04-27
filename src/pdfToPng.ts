@@ -18,17 +18,26 @@ async function processPagesWithSlidingWindow<T>(
 ): Promise<T[]> {
     const results = new Array<T>(pageNumbers.length);
     let nextIndex = 0;
+    let firstError: unknown;
 
     async function runWorker(): Promise<void> {
-        while (nextIndex < pageNumbers.length) {
+        while (firstError === undefined && nextIndex < pageNumbers.length) {
             const currentIndex = nextIndex;
             nextIndex += 1;
-            results[currentIndex] = await processPage(pageNumbers[currentIndex]);
+            try {
+                results[currentIndex] = await processPage(pageNumbers[currentIndex]);
+            } catch (error: unknown) {
+                firstError ??= error;
+            }
         }
     }
 
     const workerCount = Math.min(concurrencyLimit, pageNumbers.length);
-    await Promise.all(Array.from({ length: workerCount }, () => runWorker()));
+    await Promise.allSettled(Array.from({ length: workerCount }, () => runWorker()));
+
+    if (firstError !== undefined) {
+        throw firstError;
+    }
 
     return results;
 }
