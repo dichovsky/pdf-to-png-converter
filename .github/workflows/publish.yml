@@ -1,31 +1,31 @@
 name: Publish Package
 on:
-  release:
-    types: [published]
+    release:
+        types: [published]
 
 permissions:
-  contents: read
-  id-token: write
+    contents: read
+    id-token: write
 
 concurrency:
-  group: publish-${{ github.event.release.tag_name }}
-  cancel-in-progress: false
+    group: publish-${{ github.event.release.tag_name }}
+    cancel-in-progress: false
 
 jobs:
-  publish:
-    if: ${{ !github.event.release.prerelease }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # v6
-        with:
-            node-version-file: .nvmrc
-            cache: 'npm'
-            registry-url: 'https://registry.npmjs.org'
-      - run: npm ci
-      - run: npm audit --audit-level=high
-      - run: npm run build
-      - run: npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+    publish:
+        if: ${{ !github.event.release.prerelease }}
+        runs-on: ubuntu-latest
+        timeout-minutes: 30
+        steps:
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+            - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+              with:
+                  node-version-file: .nvmrc
+                  cache: 'npm'
+                  registry-url: 'https://registry.npmjs.org'
+            - run: npm ci
+            - run: npm audit --audit-level=high
+            - run: npm run build
+            - run: npm publish
+              env:
+                  NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

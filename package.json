@@ -1,103 +1,105 @@
 {
-  "name": "pdf-to-png-converter",
-  "version": "4.0.0",
-  "description": "Node.js utility to convert PDF file/buffer pages to PNG files/buffers. No build-time compilation required — pre-built native binaries included for all major platforms.",
-  "keywords": [
-    "pdf",
-    "pdfparse",
-    "pdf parse",
-    "pdf-parse",
-    "pdf to png",
-    "pdf to image",
-    "pdf file to image",
-    "pdf buffer to image",
-    "convert pdf to png",
-    "pdf to png converter",
-    "pdf to png cli"
-  ],
-  "homepage": "https://github.com/dichovsky/pdf-to-png-converter#readme",
-  "bugs": {
-    "url": "https://github.com/dichovsky/pdf-to-png-converter/issues"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/dichovsky/pdf-to-png-converter.git"
-  },
-  "funding": {
-    "type": "buymeacoffee",
-    "url": "https://buymeacoffee.com/dichovsky"
-  },
-  "license": "MIT",
-  "author": "Igor Magdich <magdich.igor@gmail.com>",
-  "sideEffects": false,
-  "type": "commonjs",
-  "exports": {
-    ".": {
-      "types": "./out/index.d.ts",
-      "require": "./out/index.js",
-      "default": "./out/index.js"
-    }
-  },
-  "main": "out/index.js",
-  "types": "out/index.d.ts",
-  "bin": {
-    "pdf-to-png-converter": "out/cli.js"
-  },
-  "files": [
-    "out"
-  ],
-  "scripts": {
-    "prebuild": "npm run clean",
-    "build": "tsc --pretty --project tsconfig.prod.json",
-    "build:strict": "tsc --project tsconfig.strict.json",
-    "build:test": "tsc --pretty --noEmit --project tsconfig.json",
-    "clean": "rimraf ./out ./test-results",
-    "codemap": "ts-node scripts/generate-codemap.ts",
-    "docker:build": "docker build --build-arg NODE_VERSION=$(cat .nvmrc) --compress -t test-pdf-to-png-converter .",
-    "docker:run": "docker run --rm -it -v ${PWD}/test-results:/usr/pkg/test-results test-pdf-to-png-converter",
-    "docker:test": "vitest run --coverage",
-    "lint": "eslint .",
-    "prepare": "husky",
-    "prepublishOnly": "npm test && npm run build",
-    "pretest": "npm run clean && npm run build:test && npm run lint && npm run test:license",
-    "test": "vitest run --coverage",
-    "test:docker": "npm run clean && npm run docker:build && npm run docker:run",
-    "test:fast": "vitest run --reporter=dot --no-coverage",
-    "test:license": "license-checker --production --onlyAllow \"ISC; MIT; MIT OR X11; BSD; Apache-2.0; Unlicense\""
-  },
-  "lint-staged": {
-    "src/**/*.ts": [
-      "eslint --fix",
-      "prettier --write"
+    "name": "pdf-to-png-converter",
+    "version": "4.0.0",
+    "description": "Node.js utility to convert PDF file/buffer pages to PNG files/buffers. No build-time compilation required — pre-built native binaries included for all major platforms.",
+    "keywords": [
+        "pdf",
+        "pdfparse",
+        "pdf parse",
+        "pdf-parse",
+        "pdf to png",
+        "pdf to image",
+        "pdf file to image",
+        "pdf buffer to image",
+        "convert pdf to png",
+        "pdf to png converter",
+        "pdf to png cli"
     ],
-    "__tests__/**/*.ts": [
-      "prettier --write"
-    ]
-  },
-  "dependencies": {
-    "@napi-rs/canvas": "~0.1.100",
-    "pdfjs-dist": "~5.6.205"
-  },
-  "devDependencies": {
-    "@eslint/js": "^10.0.1",
-    "@types/node": "^25.6.0",
-    "@typescript-eslint/eslint-plugin": "^8.59.1",
-    "@typescript-eslint/parser": "^8.59.1",
-    "@vitest/coverage-v8": "^4.1.5",
-    "eslint": "^10.2.1",
-    "husky": "^9.1.7",
-    "license-checker": "^25.0.1",
-    "lint-staged": "^16.4.0",
-    "png-visual-compare": "^6.0.0",
-    "prettier": "^3.8.3",
-    "rimraf": "^6.1.3",
-    "ts-node": "^10.9.2",
-    "typescript": "^6.0.3",
-    "vitest": "^4.1.5"
-  },
-  "packageManager": "npm@11.13.0",
-  "engines": {
-    "node": ">=20.19.0 || >=22.13.0 || >=24"
-  },
-  "_packageFormatNote": "CJS-only — nodenext TS with .js specifiers is compatible."
+    "homepage": "https://github.com/dichovsky/pdf-to-png-converter#readme",
+    "bugs": {
+        "url": "https://github.com/dichovsky/pdf-to-png-converter/issues"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/dichovsky/pdf-to-png-converter.git"
+    },
+    "funding": {
+        "type": "buymeacoffee",
+        "url": "https://buymeacoffee.com/dichovsky"
+    },
+    "license": "MIT",
+    "author": "Igor Magdich <magdich.igor@gmail.com>",
+    "sideEffects": false,
+    "type": "commonjs",
+    "exports": {
+        ".": {
+            "types": "./out/index.d.ts",
+            "require": "./out/index.js",
+            "default": "./out/index.js"
+        }
+    },
+    "main": "out/index.js",
+    "types": "out/index.d.ts",
+    "bin": {
+        "pdf-to-png-converter": "out/cli.js"
+    },
+    "files": [
+        "out"
+    ],
+    "scripts": {
+        "prebuild": "npm run clean",
+        "build": "tsc --pretty --project tsconfig.prod.json",
+        "build:strict": "tsc --project tsconfig.strict.json",
+        "build:test": "tsc --pretty --noEmit --project tsconfig.json",
+        "clean": "rimraf ./out ./test-results",
+        "codemap": "ts-node scripts/generate-codemap.ts",
+        "docker:build": "docker build --build-arg NODE_VERSION=$(cat .nvmrc) --compress -t test-pdf-to-png-converter .",
+        "docker:run": "docker run --rm -it -v ${PWD}/test-results:/usr/pkg/test-results test-pdf-to-png-converter",
+        "docker:test": "vitest run --coverage",
+        "format": "prettier --write .",
+        "format:check": "prettier --check .",
+        "lint": "eslint .",
+        "prepare": "husky",
+        "prepublishOnly": "npm test && npm run build",
+        "pretest": "npm run clean && npm run build:test && npm run lint && npm run test:license",
+        "test": "vitest run --coverage",
+        "test:docker": "npm run clean && npm run docker:build && npm run docker:run",
+        "test:fast": "vitest run --reporter=dot --no-coverage",
+        "test:license": "license-checker --production --onlyAllow \"ISC; MIT; MIT OR X11; BSD; Apache-2.0; Unlicense\""
+    },
+    "lint-staged": {
+        "src/**/*.ts": [
+            "eslint --fix",
+            "prettier --write"
+        ],
+        "__tests__/**/*.ts": [
+            "prettier --write"
+        ]
+    },
+    "dependencies": {
+        "@napi-rs/canvas": "~0.1.100",
+        "pdfjs-dist": "~5.7.284"
+    },
+    "devDependencies": {
+        "@eslint/js": "^10.0.1",
+        "@types/node": "^25.6.0",
+        "@typescript-eslint/eslint-plugin": "^8.59.1",
+        "@typescript-eslint/parser": "^8.59.1",
+        "@vitest/coverage-v8": "^4.1.5",
+        "eslint": "^10.2.1",
+        "husky": "^9.1.7",
+        "license-checker": "^25.0.1",
+        "lint-staged": "^16.4.0",
+        "png-visual-compare": "^6.0.0",
+        "prettier": "^3.8.3",
+        "rimraf": "^6.1.3",
+        "ts-node": "^10.9.2",
+        "typescript": "^6.0.3",
+        "vitest": "^4.1.5"
+    },
+    "packageManager": "npm@11.13.0",
+    "engines": {
+        "node": ">=20.19.0 || >=22.13.0 || >=24"
+    },
+    "_packageFormatNote": "CJS-only — nodenext TS with .js specifiers is compatible."
 }

@@ -18,6 +18,7 @@ Zero-native-binary Node.js library that converts PDF pages to PNG images.
 Published to npm as `pdf-to-png-converter`. Entry: `out/index.js`, types: `out/index.d.ts`.
 
 **Data flow:**
+
 1. `pdfToPng(pdfFile, props?)` in `src/pdfToPng.ts` — sole public entry point
 2. `getPdfFileBuffer()` — reads file path via `fsPromises.readFile` or passes `ArrayBufferLike` through; normalises Node `Buffer` → `ArrayBuffer`
 3. `getPdfDocument()` — dynamically imports `pdfjs-dist/legacy/build/pdf.mjs`, calls `getDocument()` with params from `propsToPdfDocInitParams()`
@@ -29,6 +30,7 @@ Published to npm as `pdf-to-png-converter`. Entry: `out/index.js`, types: `out/i
 **Concurrency:** when `processPagesInParallel: true`, pages are chunked into batches of `concurrencyLimit` (default 4) and each batch runs via `Promise.all`. Sequential (default) processes pages one at a time.
 
 **`outputFolder` + `returnPageContent` + `returnMetadataOnly` interaction:**
+
 - When `returnMetadataOnly: true`, no rendering occurs, no output folder is created, no files are written, `content` is always `undefined`
 - When `outputFolder` is set, content is always retrieved internally (even if `returnPageContent: false`) so it can be written to disk; after writing, if `returnPageContent === false`, `content` is set to `undefined` to free memory
 - `shouldReturnContent` resolves as: `returnMetadataOnly ? false : outputFolder ? true : (returnPageContent ?? true)`
@@ -36,6 +38,7 @@ Published to npm as `pdf-to-png-converter`. Entry: `out/index.js`, types: `out/i
 ## Source Structure
 
 Public API: `src/index.ts` (re-exports only). Key modules:
+
 - `src/pdfToPng.ts` — all conversion logic (~490 lines); helpers approx at: `resolvePageName` ~L82, `processAndSavePage` ~L116, `pdfToPng` (exported) ~L139, `getPdfFileBuffer` ~L280, `getPdfDocument` ~L316, `getPageMetadata` ~L343, `renderPdfPage` ~L386, `savePNGfile` ~L471
 - `src/node.canvas.factory.ts` — NodeCanvasFactory (pdfjs canvas contract via @napi-rs/canvas)
 - `src/propsToPdfDocInitParams.ts` — maps PdfToPngOptions → pdfjs DocumentInitParameters
@@ -51,7 +54,7 @@ PDF_TO_PNG_OPTIONS_DEFAULTS = {
     disableFontFace: true,
     useSystemFonts: false,
     enableXfa: true,
-    outputFileMask: 'buffer',   // stem used when PDF is supplied as ArrayBufferLike
+    outputFileMask: 'buffer', // stem used when PDF is supplied as ArrayBufferLike
     pdfFilePassword: undefined,
     concurrencyLimit: 4,
 };
@@ -62,10 +65,10 @@ Always extend `PDF_TO_PNG_OPTIONS_DEFAULTS` using `??` — never hardcode defaul
 ## TypeScript Conventions
 
 - **`"module": "nodenext"` / `"moduleResolution": "node16"`** — use `.js` extensions in all relative imports even though source files are `.ts`:
-  ```typescript
-  import { normalizePath } from './normalizePath.js';  // correct
-  import { normalizePath } from './normalizePath';      // incorrect — fails at runtime
-  ```
+    ```typescript
+    import { normalizePath } from './normalizePath.js'; // correct
+    import { normalizePath } from './normalizePath'; // incorrect — fails at runtime
+    ```
 - **`import type`** for type-only imports — enforced by ESLint `@typescript-eslint/consistent-type-imports`
 - Unused variables/parameters must be prefixed with `_`
 - All class members need explicit accessibility modifiers (`public`, `private`, etc.)
@@ -86,6 +89,7 @@ Always extend `PDF_TO_PNG_OPTIONS_DEFAULTS` using `??` — never hardcode defaul
 **Run a single test:** `npx vitest run __tests__/<filename>.test.ts`
 
 **Test data (`test-data/`):**
+
 - `sample.pdf` — 2-page sample PDF
 - `large_pdf.pdf` — 12-page PDF used in most file output tests
 - `large_pdf-protected.pdf` — same PDF, password: `uES69xm545C/HP!`
@@ -95,15 +99,17 @@ Always extend `PDF_TO_PNG_OPTIONS_DEFAULTS` using `??` — never hardcode defaul
 Test output goes to `test-results/` (gitignored).
 
 **Import patterns in tests:**
+
 ```typescript
 import { expect, test } from 'vitest';
-import { pdfToPng } from '../src/pdfToPng';   // direct src import
-import { comparePNG } from './comparePNG';      // shared PNG comparison helper
+import { pdfToPng } from '../src/pdfToPng'; // direct src import
+import { comparePNG } from './comparePNG'; // shared PNG comparison helper
 ```
 
 **`comparePNG` helper** (`__tests__/comparePNG.ts`): uses `png-visual-compare`, returns `0` for identical images, creates expected file automatically when `createExpectedFileIfMissing: true`.
 
 **Mocking patterns:**
+
 ```typescript
 // Mock node:fs
 vi.mock('node:fs', () => ({

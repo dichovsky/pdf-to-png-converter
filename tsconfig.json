@@ -1,33 +1,23 @@
 {
-  "$schema": "https://json.schemastore.org/tsconfig",
-  "_version": "22.0.0",
-  "compilerOptions": {
-    "lib": [
-      "ES2024",
-      "ESNext.Array",
-      "ESNext.Collection",
-      "ESNext.Iterator"
-    ],
-    "module": "nodenext",
-    "target": "ES2024",
-    "types": [
-      "node"
-    ],
-    "rootDir": ".",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "moduleResolution": "node16",
-    "declaration": false,
-    "noEmit": true
-  },
-  "ts-node": {
+    "$schema": "https://json.schemastore.org/tsconfig",
+    "_version": "22.0.0",
     "compilerOptions": {
-      "module": "CommonJS"
-    }
-  },
-  "include": [
-    "./src/**/*",
-    "./__tests__/**/*"
-  ]
+        "lib": ["ES2024", "ESNext.Array", "ESNext.Collection", "ESNext.Iterator"],
+        "module": "nodenext",
+        "target": "ES2024",
+        "types": ["node"],
+        "rootDir": ".",
+        "strict": true,
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "moduleResolution": "node16",
+        "declaration": false,
+        "noEmit": true
+    },
+    "ts-node": {
+        "compilerOptions": {
+            "module": "CommonJS"
+        }
+    },
+    "include": ["./src/**/*", "./__tests__/**/*"]
 }

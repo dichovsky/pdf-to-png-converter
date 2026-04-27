@@ -54,7 +54,13 @@ function collectClassMembers(sourceFile: ts.SourceFile, classDeclaration: ts.Cla
                 return { name: 'constructor', kind: 'constructor', line: getLine(sourceFile, member) };
             }
 
-            if ((ts.isMethodDeclaration(member) || ts.isPropertyDeclaration(member) || ts.isGetAccessorDeclaration(member) || ts.isSetAccessorDeclaration(member)) && member.name) {
+            if (
+                (ts.isMethodDeclaration(member) ||
+                    ts.isPropertyDeclaration(member) ||
+                    ts.isGetAccessorDeclaration(member) ||
+                    ts.isSetAccessorDeclaration(member)) &&
+                member.name
+            ) {
                 const name = member.name.getText(sourceFile);
                 const kind = ts.isMethodDeclaration(member)
                     ? 'method'
@@ -205,7 +211,9 @@ async function generateCodemap(): Promise<void> {
         .flat()
         .sort((a, b) => a.localeCompare(b));
 
-    const fileEntries = files.map((filePath) => collectSymbols(ts.createSourceFile(filePath, ts.sys.readFile(filePath) ?? '', ts.ScriptTarget.Latest, true)));
+    const fileEntries = files.map((filePath) =>
+        collectSymbols(ts.createSourceFile(filePath, ts.sys.readFile(filePath) ?? '', ts.ScriptTarget.Latest, true)),
+    );
     const codemap = {
         generatedAt: new Date().toISOString(),
         root: relative(ROOT, ROOT) || '.',

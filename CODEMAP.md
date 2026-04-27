@@ -6,654 +6,651 @@ The JSON block below is the machine-readable symbol index for coding agents.
 
 ```json
 {
-  "generatedAt": "2026-04-27T18:37:45.767Z",
-  "root": ".",
-  "entrypoints": [
-    "src/index.ts",
-    "src/cli.ts"
-  ],
-  "files": [
-    {
-      "path": "scripts/generate-codemap.ts",
-      "symbols": [
+    "generatedAt": "2026-04-27T21:47:17.255Z",
+    "root": ".",
+    "entrypoints": ["src/index.ts", "src/cli.ts"],
+    "files": [
         {
-          "name": "SymbolMember",
-          "kind": "interface",
-          "exported": false,
-          "line": 5
+            "path": "scripts/generate-codemap.ts",
+            "symbols": [
+                {
+                    "name": "SymbolMember",
+                    "kind": "interface",
+                    "exported": false,
+                    "line": 5
+                },
+                {
+                    "name": "SymbolEntry",
+                    "kind": "interface",
+                    "exported": false,
+                    "line": 11
+                },
+                {
+                    "name": "ReExportEntry",
+                    "kind": "interface",
+                    "exported": false,
+                    "line": 19
+                },
+                {
+                    "name": "FileEntry",
+                    "kind": "interface",
+                    "exported": false,
+                    "line": 26
+                },
+                {
+                    "name": "ROOT",
+                    "kind": "variable",
+                    "exported": false,
+                    "line": 32
+                },
+                {
+                    "name": "SOURCE_DIRS",
+                    "kind": "variable",
+                    "exported": false,
+                    "line": 33
+                },
+                {
+                    "name": "OUTPUT_PATH",
+                    "kind": "variable",
+                    "exported": false,
+                    "line": 34
+                },
+                {
+                    "name": "HEADER",
+                    "kind": "variable",
+                    "exported": false,
+                    "line": 35
+                },
+                {
+                    "name": "isExported",
+                    "kind": "function",
+                    "exported": false,
+                    "line": 42
+                },
+                {
+                    "name": "getLine",
+                    "kind": "function",
+                    "exported": false,
+                    "line": 46
+                },
+                {
+                    "name": "collectClassMembers",
+                    "kind": "function",
+                    "exported": false,
+                    "line": 50
+                },
+                {
+                    "name": "collectSymbols",
+                    "kind": "function",
+                    "exported": false,
+                    "line": 80
+                },
+                {
+                    "name": "collectSourceFiles",
+                    "kind": "function",
+                    "exported": false,
+                    "line": 178
+                },
+                {
+                    "name": "generateCodemap",
+                    "kind": "function",
+                    "exported": false,
+                    "line": 198
+                }
+            ],
+            "reExports": []
         },
         {
-          "name": "SymbolEntry",
-          "kind": "interface",
-          "exported": false,
-          "line": 11
+            "path": "src/cli.ts",
+            "symbols": [
+                {
+                    "name": "HELP_TEXT",
+                    "kind": "variable",
+                    "exported": true,
+                    "line": 14
+                },
+                {
+                    "name": "CLI_OPTIONS",
+                    "kind": "variable",
+                    "exported": false,
+                    "line": 38
+                },
+                {
+                    "name": "ParsedValues",
+                    "kind": "type",
+                    "exported": false,
+                    "line": 56
+                },
+                {
+                    "name": "CliParseResult",
+                    "kind": "type",
+                    "exported": false,
+                    "line": 74
+                },
+                {
+                    "name": "parseBoolean",
+                    "kind": "function",
+                    "exported": true,
+                    "line": 85
+                },
+                {
+                    "name": "parseNumberList",
+                    "kind": "function",
+                    "exported": true,
+                    "line": 99
+                },
+                {
+                    "name": "parseNumericOption",
+                    "kind": "function",
+                    "exported": false,
+                    "line": 110
+                },
+                {
+                    "name": "parseIntegerOption",
+                    "kind": "function",
+                    "exported": false,
+                    "line": 123
+                },
+                {
+                    "name": "safeParseArgs",
+                    "kind": "function",
+                    "exported": false,
+                    "line": 136
+                },
+                {
+                    "name": "buildPdfToPngOptions",
+                    "kind": "function",
+                    "exported": true,
+                    "line": 148
+                },
+                {
+                    "name": "executeConversion",
+                    "kind": "function",
+                    "exported": true,
+                    "line": 188
+                },
+                {
+                    "name": "createLogger",
+                    "kind": "function",
+                    "exported": false,
+                    "line": 205
+                },
+                {
+                    "name": "handleRunError",
+                    "kind": "function",
+                    "exported": false,
+                    "line": 211
+                },
+                {
+                    "name": "getVersion",
+                    "kind": "function",
+                    "exported": true,
+                    "line": 230
+                },
+                {
+                    "name": "run",
+                    "kind": "function",
+                    "exported": true,
+                    "line": 250
+                }
+            ],
+            "reExports": []
         },
         {
-          "name": "ReExportEntry",
-          "kind": "interface",
-          "exported": false,
-          "line": 19
+            "path": "src/const.ts",
+            "symbols": [
+                {
+                    "name": "MAX_VIEWPORT_SCALE",
+                    "kind": "variable",
+                    "exported": true,
+                    "line": 8
+                },
+                {
+                    "name": "MAX_CANVAS_PIXELS",
+                    "kind": "variable",
+                    "exported": true,
+                    "line": 14
+                },
+                {
+                    "name": "PDF_TO_PNG_OPTIONS_DEFAULTS",
+                    "kind": "variable",
+                    "exported": true,
+                    "line": 20
+                },
+                {
+                    "name": "CMAP_RELATIVE_URL",
+                    "kind": "variable",
+                    "exported": true,
+                    "line": 38
+                },
+                {
+                    "name": "STANDARD_FONTS_RELATIVE_URL",
+                    "kind": "variable",
+                    "exported": true,
+                    "line": 39
+                },
+                {
+                    "name": "DOCUMENT_INIT_PARAMS_DEFAULTS",
+                    "kind": "variable",
+                    "exported": true,
+                    "line": 51
+                }
+            ],
+            "reExports": []
         },
         {
-          "name": "FileEntry",
-          "kind": "interface",
-          "exported": false,
-          "line": 26
+            "path": "src/filesystemSink.ts",
+            "symbols": [
+                {
+                    "name": "FilesystemSink",
+                    "kind": "class",
+                    "exported": true,
+                    "line": 4,
+                    "members": [
+                        {
+                            "name": "constructor",
+                            "kind": "constructor",
+                            "line": 5
+                        },
+                        {
+                            "name": "write",
+                            "kind": "method",
+                            "line": 10
+                        }
+                    ]
+                }
+            ],
+            "reExports": []
         },
         {
-          "name": "ROOT",
-          "kind": "variable",
-          "exported": false,
-          "line": 32
+            "path": "src/index.ts",
+            "symbols": [],
+            "reExports": [
+                {
+                    "kind": "re-export",
+                    "source": "./pdfToPng.js",
+                    "exportedName": "pdfToPng",
+                    "line": 1
+                },
+                {
+                    "kind": "re-export",
+                    "source": "./interfaces/index.js",
+                    "exportedName": "PngPageOutput",
+                    "line": 2
+                },
+                {
+                    "kind": "re-export",
+                    "source": "./interfaces/index.js",
+                    "exportedName": "PdfToPngOptions",
+                    "line": 2
+                },
+                {
+                    "kind": "re-export",
+                    "source": "./types/index.js",
+                    "exportedName": "VerbosityLevel",
+                    "line": 3
+                }
+            ]
         },
         {
-          "name": "SOURCE_DIRS",
-          "kind": "variable",
-          "exported": false,
-          "line": 33
+            "path": "src/interfaces/canvas.and.context.ts",
+            "symbols": [
+                {
+                    "name": "CanvasAndContext",
+                    "kind": "interface",
+                    "exported": true,
+                    "line": 10
+                }
+            ],
+            "reExports": []
         },
         {
-          "name": "OUTPUT_PATH",
-          "kind": "variable",
-          "exported": false,
-          "line": 34
+            "path": "src/interfaces/index.ts",
+            "symbols": [],
+            "reExports": [
+                {
+                    "kind": "re-export",
+                    "source": "./canvas.and.context.js",
+                    "exportedName": "CanvasAndContext",
+                    "line": 1
+                },
+                {
+                    "kind": "re-export",
+                    "source": "./pdf.to.png.options.js",
+                    "exportedName": "PdfToPngOptions",
+                    "line": 2
+                },
+                {
+                    "kind": "re-export",
+                    "source": "./png.page.output.js",
+                    "exportedName": "FilePngPageOutput",
+                    "line": 3
+                },
+                {
+                    "kind": "re-export",
+                    "source": "./png.page.output.js",
+                    "exportedName": "InMemoryPngPageOutput",
+                    "line": 3
+                },
+                {
+                    "kind": "re-export",
+                    "source": "./png.page.output.js",
+                    "exportedName": "MetadataPngPageOutput",
+                    "line": 3
+                },
+                {
+                    "kind": "re-export",
+                    "source": "./png.page.output.js",
+                    "exportedName": "PageRotation",
+                    "line": 3
+                },
+                {
+                    "kind": "re-export",
+                    "source": "./png.page.output.js",
+                    "exportedName": "PngPageOutput",
+                    "line": 3
+                }
+            ]
         },
         {
-          "name": "HEADER",
-          "kind": "variable",
-          "exported": false,
-          "line": 35
+            "path": "src/interfaces/output.sink.ts",
+            "symbols": [
+                {
+                    "name": "OutputSink",
+                    "kind": "interface",
+                    "exported": true,
+                    "line": 1
+                }
+            ],
+            "reExports": []
         },
         {
-          "name": "isExported",
-          "kind": "function",
-          "exported": false,
-          "line": 42
+            "path": "src/interfaces/pdf.to.png.options.ts",
+            "symbols": [
+                {
+                    "name": "PdfToPngOptions",
+                    "kind": "interface",
+                    "exported": true,
+                    "line": 9
+                }
+            ],
+            "reExports": []
         },
         {
-          "name": "getLine",
-          "kind": "function",
-          "exported": false,
-          "line": 46
+            "path": "src/interfaces/png.page.output.ts",
+            "symbols": [
+                {
+                    "name": "PageRotation",
+                    "kind": "type",
+                    "exported": true,
+                    "line": 1
+                },
+                {
+                    "name": "BasePngPageOutput",
+                    "kind": "interface",
+                    "exported": false,
+                    "line": 3
+                },
+                {
+                    "name": "MetadataPngPageOutput",
+                    "kind": "interface",
+                    "exported": true,
+                    "line": 11
+                },
+                {
+                    "name": "InMemoryPngPageOutput",
+                    "kind": "interface",
+                    "exported": true,
+                    "line": 17
+                },
+                {
+                    "name": "FilePngPageOutput",
+                    "kind": "interface",
+                    "exported": true,
+                    "line": 23
+                },
+                {
+                    "name": "PngPageOutput",
+                    "kind": "type",
+                    "exported": true,
+                    "line": 29
+                }
+            ],
+            "reExports": []
         },
         {
-          "name": "collectClassMembers",
-          "kind": "function",
-          "exported": false,
-          "line": 50
+            "path": "src/node.canvas.factory.ts",
+            "symbols": [
+                {
+                    "name": "NodeCanvasFactory",
+                    "kind": "class",
+                    "exported": true,
+                    "line": 15,
+                    "members": [
+                        {
+                            "name": "create",
+                            "kind": "method",
+                            "line": 24
+                        },
+                        {
+                            "name": "reset",
+                            "kind": "method",
+                            "line": 46
+                        },
+                        {
+                            "name": "destroy",
+                            "kind": "method",
+                            "line": 64
+                        }
+                    ]
+                }
+            ],
+            "reExports": []
         },
         {
-          "name": "collectSymbols",
-          "kind": "function",
-          "exported": false,
-          "line": 74
+            "path": "src/normalizePath.ts",
+            "symbols": [
+                {
+                    "name": "normalizePath",
+                    "kind": "function",
+                    "exported": true,
+                    "line": 21
+                }
+            ],
+            "reExports": []
         },
         {
-          "name": "collectSourceFiles",
-          "kind": "function",
-          "exported": false,
-          "line": 172
+            "path": "src/normalizePdfToPngOptions.ts",
+            "symbols": [
+                {
+                    "name": "NormalizedPdfToPngOptions",
+                    "kind": "interface",
+                    "exported": false,
+                    "line": 5
+                },
+                {
+                    "name": "normalizePdfToPngOptions",
+                    "kind": "function",
+                    "exported": true,
+                    "line": 21
+                }
+            ],
+            "reExports": []
         },
         {
-          "name": "generateCodemap",
-          "kind": "function",
-          "exported": false,
-          "line": 192
+            "path": "src/nullSink.ts",
+            "symbols": [
+                {
+                    "name": "NullSink",
+                    "kind": "class",
+                    "exported": true,
+                    "line": 3,
+                    "members": [
+                        {
+                            "name": "write",
+                            "kind": "method",
+                            "line": 4
+                        }
+                    ]
+                }
+            ],
+            "reExports": []
+        },
+        {
+            "path": "src/outputWriter.ts",
+            "symbols": [
+                {
+                    "name": "isEscapingRelativePath",
+                    "kind": "function",
+                    "exported": false,
+                    "line": 3
+                },
+                {
+                    "name": "savePNGfile",
+                    "kind": "function",
+                    "exported": true,
+                    "line": 18
+                }
+            ],
+            "reExports": []
+        },
+        {
+            "path": "src/pageOrchestrator.ts",
+            "symbols": [
+                {
+                    "name": "resolvePageName",
+                    "kind": "function",
+                    "exported": true,
+                    "line": 6
+                },
+                {
+                    "name": "processAndSavePage",
+                    "kind": "function",
+                    "exported": true,
+                    "line": 25
+                }
+            ],
+            "reExports": []
+        },
+        {
+            "path": "src/pageRenderer.ts",
+            "symbols": [
+                {
+                    "name": "isNodeCanvasFactory",
+                    "kind": "function",
+                    "exported": false,
+                    "line": 6
+                },
+                {
+                    "name": "normalizeRotation",
+                    "kind": "function",
+                    "exported": true,
+                    "line": 10
+                },
+                {
+                    "name": "getPageMetadata",
+                    "kind": "function",
+                    "exported": true,
+                    "line": 26
+                },
+                {
+                    "name": "renderPdfPage",
+                    "kind": "function",
+                    "exported": true,
+                    "line": 51
+                }
+            ],
+            "reExports": []
+        },
+        {
+            "path": "src/pdfInput.ts",
+            "symbols": [
+                {
+                    "name": "getPdfFileBuffer",
+                    "kind": "function",
+                    "exported": true,
+                    "line": 3
+                }
+            ],
+            "reExports": []
+        },
+        {
+            "path": "src/pdfjsLoader.ts",
+            "symbols": [
+                {
+                    "name": "pdfjsLib",
+                    "kind": "variable",
+                    "exported": false,
+                    "line": 6
+                },
+                {
+                    "name": "getPdfDocument",
+                    "kind": "function",
+                    "exported": true,
+                    "line": 8
+                }
+            ],
+            "reExports": []
+        },
+        {
+            "path": "src/pdfToPng.ts",
+            "symbols": [
+                {
+                    "name": "processPagesWithSlidingWindow",
+                    "kind": "function",
+                    "exported": false,
+                    "line": 14
+                },
+                {
+                    "name": "pdfToPng",
+                    "kind": "function",
+                    "exported": true,
+                    "line": 45
+                }
+            ],
+            "reExports": []
+        },
+        {
+            "path": "src/pngjs.d.ts",
+            "symbols": [],
+            "reExports": []
+        },
+        {
+            "path": "src/propsToPdfDocInitParams.ts",
+            "symbols": [
+                {
+                    "name": "propsToPdfDocInitParams",
+                    "kind": "function",
+                    "exported": true,
+                    "line": 23
+                }
+            ],
+            "reExports": []
+        },
+        {
+            "path": "src/types/index.ts",
+            "symbols": [],
+            "reExports": [
+                {
+                    "kind": "re-export",
+                    "source": "./verbosity.level.js",
+                    "exportedName": "VerbosityLevel",
+                    "line": 1
+                }
+            ]
+        },
+        {
+            "path": "src/types/verbosity.level.ts",
+            "symbols": [
+                {
+                    "name": "VerbosityLevel",
+                    "kind": "enum",
+                    "exported": true,
+                    "line": 8
+                }
+            ],
+            "reExports": []
         }
-      ],
-      "reExports": []
-    },
-    {
-      "path": "src/cli.ts",
-      "symbols": [
-        {
-          "name": "HELP_TEXT",
-          "kind": "variable",
-          "exported": true,
-          "line": 14
-        },
-        {
-          "name": "CLI_OPTIONS",
-          "kind": "variable",
-          "exported": false,
-          "line": 38
-        },
-        {
-          "name": "ParsedValues",
-          "kind": "type",
-          "exported": false,
-          "line": 56
-        },
-        {
-          "name": "CliParseResult",
-          "kind": "type",
-          "exported": false,
-          "line": 74
-        },
-        {
-          "name": "parseBoolean",
-          "kind": "function",
-          "exported": true,
-          "line": 85
-        },
-        {
-          "name": "parseNumberList",
-          "kind": "function",
-          "exported": true,
-          "line": 99
-        },
-        {
-          "name": "parseNumericOption",
-          "kind": "function",
-          "exported": false,
-          "line": 110
-        },
-        {
-          "name": "parseIntegerOption",
-          "kind": "function",
-          "exported": false,
-          "line": 123
-        },
-        {
-          "name": "safeParseArgs",
-          "kind": "function",
-          "exported": false,
-          "line": 136
-        },
-        {
-          "name": "buildPdfToPngOptions",
-          "kind": "function",
-          "exported": true,
-          "line": 148
-        },
-        {
-          "name": "executeConversion",
-          "kind": "function",
-          "exported": true,
-          "line": 188
-        },
-        {
-          "name": "createLogger",
-          "kind": "function",
-          "exported": false,
-          "line": 205
-        },
-        {
-          "name": "handleRunError",
-          "kind": "function",
-          "exported": false,
-          "line": 211
-        },
-        {
-          "name": "getVersion",
-          "kind": "function",
-          "exported": true,
-          "line": 230
-        },
-        {
-          "name": "run",
-          "kind": "function",
-          "exported": true,
-          "line": 250
-        }
-      ],
-      "reExports": []
-    },
-    {
-      "path": "src/const.ts",
-      "symbols": [
-        {
-          "name": "MAX_VIEWPORT_SCALE",
-          "kind": "variable",
-          "exported": true,
-          "line": 8
-        },
-        {
-          "name": "MAX_CANVAS_PIXELS",
-          "kind": "variable",
-          "exported": true,
-          "line": 14
-        },
-        {
-          "name": "PDF_TO_PNG_OPTIONS_DEFAULTS",
-          "kind": "variable",
-          "exported": true,
-          "line": 20
-        },
-        {
-          "name": "CMAP_RELATIVE_URL",
-          "kind": "variable",
-          "exported": true,
-          "line": 38
-        },
-        {
-          "name": "STANDARD_FONTS_RELATIVE_URL",
-          "kind": "variable",
-          "exported": true,
-          "line": 39
-        },
-        {
-          "name": "DOCUMENT_INIT_PARAMS_DEFAULTS",
-          "kind": "variable",
-          "exported": true,
-          "line": 51
-        }
-      ],
-      "reExports": []
-    },
-    {
-      "path": "src/filesystemSink.ts",
-      "symbols": [
-        {
-          "name": "FilesystemSink",
-          "kind": "class",
-          "exported": true,
-          "line": 4,
-          "members": [
-            {
-              "name": "constructor",
-              "kind": "constructor",
-              "line": 5
-            },
-            {
-              "name": "write",
-              "kind": "method",
-              "line": 10
-            }
-          ]
-        }
-      ],
-      "reExports": []
-    },
-    {
-      "path": "src/index.ts",
-      "symbols": [],
-      "reExports": [
-        {
-          "kind": "re-export",
-          "source": "./pdfToPng.js",
-          "exportedName": "pdfToPng",
-          "line": 1
-        },
-        {
-          "kind": "re-export",
-          "source": "./interfaces/index.js",
-          "exportedName": "PngPageOutput",
-          "line": 2
-        },
-        {
-          "kind": "re-export",
-          "source": "./interfaces/index.js",
-          "exportedName": "PdfToPngOptions",
-          "line": 2
-        },
-        {
-          "kind": "re-export",
-          "source": "./types/index.js",
-          "exportedName": "VerbosityLevel",
-          "line": 3
-        }
-      ]
-    },
-    {
-      "path": "src/interfaces/canvas.and.context.ts",
-      "symbols": [
-        {
-          "name": "CanvasAndContext",
-          "kind": "interface",
-          "exported": true,
-          "line": 10
-        }
-      ],
-      "reExports": []
-    },
-    {
-      "path": "src/interfaces/index.ts",
-      "symbols": [],
-      "reExports": [
-        {
-          "kind": "re-export",
-          "source": "./canvas.and.context.js",
-          "exportedName": "CanvasAndContext",
-          "line": 1
-        },
-        {
-          "kind": "re-export",
-          "source": "./pdf.to.png.options.js",
-          "exportedName": "PdfToPngOptions",
-          "line": 2
-        },
-        {
-          "kind": "re-export",
-          "source": "./png.page.output.js",
-          "exportedName": "FilePngPageOutput",
-          "line": 3
-        },
-        {
-          "kind": "re-export",
-          "source": "./png.page.output.js",
-          "exportedName": "InMemoryPngPageOutput",
-          "line": 3
-        },
-        {
-          "kind": "re-export",
-          "source": "./png.page.output.js",
-          "exportedName": "MetadataPngPageOutput",
-          "line": 3
-        },
-        {
-          "kind": "re-export",
-          "source": "./png.page.output.js",
-          "exportedName": "PageRotation",
-          "line": 3
-        },
-        {
-          "kind": "re-export",
-          "source": "./png.page.output.js",
-          "exportedName": "PngPageOutput",
-          "line": 3
-        }
-      ]
-    },
-    {
-      "path": "src/interfaces/output.sink.ts",
-      "symbols": [
-        {
-          "name": "OutputSink",
-          "kind": "interface",
-          "exported": true,
-          "line": 1
-        }
-      ],
-      "reExports": []
-    },
-    {
-      "path": "src/interfaces/pdf.to.png.options.ts",
-      "symbols": [
-        {
-          "name": "PdfToPngOptions",
-          "kind": "interface",
-          "exported": true,
-          "line": 9
-        }
-      ],
-      "reExports": []
-    },
-    {
-      "path": "src/interfaces/png.page.output.ts",
-      "symbols": [
-        {
-          "name": "PageRotation",
-          "kind": "type",
-          "exported": true,
-          "line": 1
-        },
-        {
-          "name": "BasePngPageOutput",
-          "kind": "interface",
-          "exported": false,
-          "line": 3
-        },
-        {
-          "name": "MetadataPngPageOutput",
-          "kind": "interface",
-          "exported": true,
-          "line": 11
-        },
-        {
-          "name": "InMemoryPngPageOutput",
-          "kind": "interface",
-          "exported": true,
-          "line": 17
-        },
-        {
-          "name": "FilePngPageOutput",
-          "kind": "interface",
-          "exported": true,
-          "line": 23
-        },
-        {
-          "name": "PngPageOutput",
-          "kind": "type",
-          "exported": true,
-          "line": 29
-        }
-      ],
-      "reExports": []
-    },
-    {
-      "path": "src/node.canvas.factory.ts",
-      "symbols": [
-        {
-          "name": "NodeCanvasFactory",
-          "kind": "class",
-          "exported": true,
-          "line": 15,
-          "members": [
-            {
-              "name": "create",
-              "kind": "method",
-              "line": 24
-            },
-            {
-              "name": "reset",
-              "kind": "method",
-              "line": 46
-            },
-            {
-              "name": "destroy",
-              "kind": "method",
-              "line": 64
-            }
-          ]
-        }
-      ],
-      "reExports": []
-    },
-    {
-      "path": "src/normalizePath.ts",
-      "symbols": [
-        {
-          "name": "normalizePath",
-          "kind": "function",
-          "exported": true,
-          "line": 21
-        }
-      ],
-      "reExports": []
-    },
-    {
-      "path": "src/normalizePdfToPngOptions.ts",
-      "symbols": [
-        {
-          "name": "NormalizedPdfToPngOptions",
-          "kind": "interface",
-          "exported": false,
-          "line": 5
-        },
-        {
-          "name": "normalizePdfToPngOptions",
-          "kind": "function",
-          "exported": true,
-          "line": 21
-        }
-      ],
-      "reExports": []
-    },
-    {
-      "path": "src/nullSink.ts",
-      "symbols": [
-        {
-          "name": "NullSink",
-          "kind": "class",
-          "exported": true,
-          "line": 3,
-          "members": [
-            {
-              "name": "write",
-              "kind": "method",
-              "line": 4
-            }
-          ]
-        }
-      ],
-      "reExports": []
-    },
-    {
-      "path": "src/outputWriter.ts",
-      "symbols": [
-        {
-          "name": "isEscapingRelativePath",
-          "kind": "function",
-          "exported": false,
-          "line": 3
-        },
-        {
-          "name": "savePNGfile",
-          "kind": "function",
-          "exported": true,
-          "line": 18
-        }
-      ],
-      "reExports": []
-    },
-    {
-      "path": "src/pageOrchestrator.ts",
-      "symbols": [
-        {
-          "name": "resolvePageName",
-          "kind": "function",
-          "exported": true,
-          "line": 6
-        },
-        {
-          "name": "processAndSavePage",
-          "kind": "function",
-          "exported": true,
-          "line": 25
-        }
-      ],
-      "reExports": []
-    },
-    {
-      "path": "src/pageRenderer.ts",
-      "symbols": [
-        {
-          "name": "isNodeCanvasFactory",
-          "kind": "function",
-          "exported": false,
-          "line": 6
-        },
-        {
-          "name": "normalizeRotation",
-          "kind": "function",
-          "exported": true,
-          "line": 10
-        },
-        {
-          "name": "getPageMetadata",
-          "kind": "function",
-          "exported": true,
-          "line": 26
-        },
-        {
-          "name": "renderPdfPage",
-          "kind": "function",
-          "exported": true,
-          "line": 51
-        }
-      ],
-      "reExports": []
-    },
-    {
-      "path": "src/pdfInput.ts",
-      "symbols": [
-        {
-          "name": "getPdfFileBuffer",
-          "kind": "function",
-          "exported": true,
-          "line": 3
-        }
-      ],
-      "reExports": []
-    },
-    {
-      "path": "src/pdfjsLoader.ts",
-      "symbols": [
-        {
-          "name": "pdfjsLib",
-          "kind": "variable",
-          "exported": false,
-          "line": 6
-        },
-        {
-          "name": "getPdfDocument",
-          "kind": "function",
-          "exported": true,
-          "line": 8
-        }
-      ],
-      "reExports": []
-    },
-    {
-      "path": "src/pdfToPng.ts",
-      "symbols": [
-        {
-          "name": "processPagesWithSlidingWindow",
-          "kind": "function",
-          "exported": false,
-          "line": 14
-        },
-        {
-          "name": "pdfToPng",
-          "kind": "function",
-          "exported": true,
-          "line": 45
-        }
-      ],
-      "reExports": []
-    },
-    {
-      "path": "src/pngjs.d.ts",
-      "symbols": [],
-      "reExports": []
-    },
-    {
-      "path": "src/propsToPdfDocInitParams.ts",
-      "symbols": [
-        {
-          "name": "propsToPdfDocInitParams",
-          "kind": "function",
-          "exported": true,
-          "line": 23
-        }
-      ],
-      "reExports": []
-    },
-    {
-      "path": "src/types/index.ts",
-      "symbols": [],
-      "reExports": [
-        {
-          "kind": "re-export",
-          "source": "./verbosity.level.js",
-          "exportedName": "VerbosityLevel",
-          "line": 1
-        }
-      ]
-    },
-    {
-      "path": "src/types/verbosity.level.ts",
-      "symbols": [
-        {
-          "name": "VerbosityLevel",
-          "kind": "enum",
-          "exported": true,
-          "line": 8
-        }
-      ],
-      "reExports": []
-    }
-  ]
+    ]
 }
 ```

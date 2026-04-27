@@ -5,7 +5,6 @@ import { join } from 'node:path';
 import { existsSync } from 'node:fs';
 
 describe('pdfToPng parallel no content', () => {
-
     it('should not return content when processPagesInParallel is true and returnPageContent is false', async () => {
         const pdfFilePath = 'test-data/sample.pdf';
         const outputFolder = 'test-results/pdf.to.png.parallel.no.content';
@@ -18,12 +17,12 @@ describe('pdfToPng parallel no content', () => {
             outputFolder,
             returnPageContent: false,
             processPagesInParallel: true,
-            concurrencyLimit: 2
+            concurrencyLimit: 2,
         });
 
         expect(result).toBeInstanceOf(Array);
         expect(result.length).toBe(2);
-        
+
         // Check that content is undefined
         expect(result[0].content).toBeUndefined();
         expect(result[1].content).toBeUndefined();
