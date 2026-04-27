@@ -19,7 +19,7 @@ npm ci
 
 ```sh
 npm test              # build + run all tests with coverage
-npm run lint          # ESLint on src/**/*.ts
+npm run lint          # ESLint across the repository using eslint.config.mjs
 npm run build:test    # type-check src/ + __tests__/ (no emit)
 npm run build:strict  # stricter dependency-boundary type-check
 npm run test:license  # verify production dependency licenses
