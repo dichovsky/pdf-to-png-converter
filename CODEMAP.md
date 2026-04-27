@@ -6,7 +6,7 @@ The JSON block below is the machine-readable symbol index for coding agents.
 
 ```json
 {
-  "generatedAt": "2026-04-25T14:13:45.919Z",
+  "generatedAt": "2026-04-27T18:37:45.767Z",
   "root": ".",
   "entrypoints": [
     "src/index.ts",
@@ -176,25 +176,25 @@ The JSON block below is the machine-readable symbol index for coding agents.
           "name": "createLogger",
           "kind": "function",
           "exported": false,
-          "line": 209
+          "line": 205
         },
         {
           "name": "handleRunError",
           "kind": "function",
           "exported": false,
-          "line": 215
+          "line": 211
         },
         {
           "name": "getVersion",
           "kind": "function",
           "exported": true,
-          "line": 234
+          "line": 230
         },
         {
           "name": "run",
           "kind": "function",
           "exported": true,
-          "line": 254
+          "line": 250
         }
       ],
       "reExports": []
@@ -468,7 +468,7 @@ The JSON block below is the machine-readable symbol index for coding agents.
         {
           "name": "NormalizedPdfToPngOptions",
           "kind": "interface",
-          "exported": true,
+          "exported": false,
           "line": 5
         },
         {
@@ -505,7 +505,7 @@ The JSON block below is the machine-readable symbol index for coding agents.
         {
           "name": "isEscapingRelativePath",
           "kind": "function",
-          "exported": true,
+          "exported": false,
           "line": 3
         },
         {
@@ -530,7 +530,7 @@ The JSON block below is the machine-readable symbol index for coding agents.
           "name": "processAndSavePage",
           "kind": "function",
           "exported": true,
-          "line": 21
+          "line": 25
         }
       ],
       "reExports": []
@@ -608,7 +608,7 @@ The JSON block below is the machine-readable symbol index for coding agents.
           "name": "pdfToPng",
           "kind": "function",
           "exported": true,
-          "line": 36
+          "line": 45
         }
       ],
       "reExports": []

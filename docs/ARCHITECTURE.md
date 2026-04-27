@@ -42,7 +42,7 @@ The codebase is organized around one public library entrypoint (`pdfToPng`) plus
 | `src/pdfjsLoader.ts` | Dynamic `pdfjs-dist` loading and document lifecycle | `getPdfDocument` |
 | `src/pageOrchestrator.ts` | Per-page naming, render/metadata branching, sink integration | `resolvePageName`, `processAndSavePage` |
 | `src/pageRenderer.ts` | Page metadata extraction, rendering, rotation normalization | `normalizeRotation`, `getPageMetadata`, `renderPdfPage` |
-| `src/outputWriter.ts` | Path-containment enforcement and secure file writes | `isEscapingRelativePath`, `savePNGfile` |
+| `src/outputWriter.ts` | Path-containment enforcement and secure file writes | `savePNGfile` |
 | `src/filesystemSink.ts` | Disk-backed sink using `savePNGfile()` | `FilesystemSink` |
 | `src/nullSink.ts` | No-op sink for in-memory workflows | `NullSink` |
 | `src/node.canvas.factory.ts` | `pdfjs-dist` canvas adapter backed by `@napi-rs/canvas` | `NodeCanvasFactory` |

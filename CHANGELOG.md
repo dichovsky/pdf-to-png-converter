@@ -22,7 +22,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `.editorconfig` for consistent editor settings across contributors
 - `.github/dependabot.yml` for automated weekly npm and GitHub Actions updates
 - `docker-compose.yml` for local Docker test runs
-- `tsconfig.test.json` to type-check `__tests__/` in CI alongside `src/`
 - `prepublishOnly` script to prevent stale local publishes
 - Pre-commit hooks via husky + lint-staged (ESLint + Prettier on staged files)
 - `license-checker` as a pinned devDependency (replaces `npx license-checker`)

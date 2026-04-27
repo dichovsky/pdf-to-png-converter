@@ -1,6 +1,6 @@
 {
   "name": "pdf-to-png-converter",
-  "version": "3.18.0",
+  "version": "4.0.0",
   "description": "Node.js utility to convert PDF file/buffer pages to PNG files/buffers. No build-time compilation required — pre-built native binaries included for all major platforms.",
   "keywords": [
     "pdf",
@@ -23,21 +23,14 @@
     "type": "git",
     "url": "git+https://github.com/dichovsky/pdf-to-png-converter.git"
   },
-  "license": "MIT",
-  "author": "Igor Magdich <magdich.igor@gmail.com>",
   "funding": {
     "type": "buymeacoffee",
     "url": "https://buymeacoffee.com/dichovsky"
   },
-  "type": "commonjs",
-  "_packageFormatNote": "CJS-only — nodenext TS with .js specifiers is compatible.",
-  "packageManager": "npm@11.13.0",
+  "license": "MIT",
+  "author": "Igor Magdich <magdich.igor@gmail.com>",
   "sideEffects": false,
-  "main": "out/index.js",
-  "types": "out/index.d.ts",
-  "bin": {
-    "pdf-to-png-converter": "out/cli.js"
-  },
+  "type": "commonjs",
   "exports": {
     ".": {
       "types": "./out/index.d.ts",
@@ -45,27 +38,41 @@
       "default": "./out/index.js"
     }
   },
+  "main": "out/index.js",
+  "types": "out/index.d.ts",
+  "bin": {
+    "pdf-to-png-converter": "out/cli.js"
+  },
   "files": [
     "out"
   ],
   "scripts": {
-    "prepublishOnly": "npm test && npm run build",
     "prebuild": "npm run clean",
     "build": "tsc --pretty --project tsconfig.prod.json",
-    "build:test": "tsc --pretty --noEmit --project tsconfig.json",
     "build:strict": "tsc --project tsconfig.strict.json",
+    "build:test": "tsc --pretty --noEmit --project tsconfig.json",
     "clean": "rimraf ./out ./test-results",
     "codemap": "ts-node scripts/generate-codemap.ts",
     "docker:build": "docker build --build-arg NODE_VERSION=$(cat .nvmrc) --compress -t test-pdf-to-png-converter .",
     "docker:run": "docker run --rm -it -v ${PWD}/test-results:/usr/pkg/test-results test-pdf-to-png-converter",
     "docker:test": "vitest run --coverage",
     "lint": "eslint .",
+    "prepare": "husky",
+    "prepublishOnly": "npm test && npm run build",
     "pretest": "npm run clean && npm run build:test && npm run lint && npm run test:license",
     "test": "vitest run --coverage",
-    "test:fast": "vitest run --reporter=dot --no-coverage",
     "test:docker": "npm run clean && npm run docker:build && npm run docker:run",
-    "test:license": "license-checker --production --onlyAllow \"ISC; MIT; MIT OR X11; BSD; Apache-2.0; Unlicense\"",
-    "prepare": "husky"
+    "test:fast": "vitest run --reporter=dot --no-coverage",
+    "test:license": "license-checker --production --onlyAllow \"ISC; MIT; MIT OR X11; BSD; Apache-2.0; Unlicense\""
+  },
+  "lint-staged": {
+    "src/**/*.ts": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "__tests__/**/*.ts": [
+      "prettier --write"
+    ]
   },
   "dependencies": {
     "@napi-rs/canvas": "~0.1.100",
@@ -88,16 +95,9 @@
     "typescript": "^6.0.3",
     "vitest": "^4.1.5"
   },
+  "packageManager": "npm@11.13.0",
   "engines": {
     "node": ">=20.19.0 || >=22.13.0 || >=24"
   },
-  "lint-staged": {
-    "src/**/*.ts": [
-      "eslint --fix",
-      "prettier --write"
-    ],
-    "__tests__/**/*.ts": [
-      "prettier --write"
-    ]
-  }
+  "_packageFormatNote": "CJS-only — nodenext TS with .js specifiers is compatible."
 }
