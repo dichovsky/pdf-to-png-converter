@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from 'vitest';
 import fs from 'node:fs';
 import * as cli from '../src/cli.js';
-import { HELP_TEXT, parseBoolean, parseNumberList, run } from '../src/cli.js';
+import { buildPdfToPngOptions, executeConversion, getVersion, HELP_TEXT, parseBoolean, parseNumberList, run } from '../src/cli.js';
 import { pdfToPng } from '../src/pdfToPng.js';
 
 vi.mock('../src/pdfToPng.js', () => ({
@@ -72,6 +72,71 @@ describe('parseNumberList', () => {
     });
 });
 
+describe('buildPdfToPngOptions', () => {
+    it('returns parsed and normalized options without touching process.exit', () => {
+        expect(
+            buildPdfToPngOptions(
+                {
+                    'output-folder': '/out',
+                    'viewport-scale': '2',
+                    'use-system-fonts': true,
+                    'disable-font-face': 'false',
+                    'enable-xfa': 'true',
+                    'pages-to-process': '1,2,3',
+                    'verbosity-level': '1',
+                    'process-pages-in-parallel': true,
+                    'concurrency-limit': '2',
+                },
+                ['test.pdf'],
+            ),
+        ).toEqual({
+            pdfFilePath: 'test.pdf',
+            outputFolder: '/out',
+            viewportScale: 2,
+            useSystemFonts: true,
+            disableFontFace: false,
+            enableXfa: true,
+            pdfFilePassword: undefined,
+            pagesToProcess: [1, 2, 3],
+            verbosityLevel: 1,
+            returnMetadataOnly: false,
+            returnPageContent: false,
+            processPagesInParallel: true,
+            concurrencyLimit: 2,
+        });
+    });
+
+    it('throws when no pdf path is provided', () => {
+        expect(() => buildPdfToPngOptions({}, [])).toThrow('<pdf-file-path> is required.');
+    });
+});
+
+describe('executeConversion', () => {
+    it('logs success output without using process.exit', async () => {
+        const log = vi.fn();
+
+        await executeConversion('test.pdf', { outputFolder: '/out' }, log);
+
+        expect(log).toHaveBeenCalledWith('Successfully processed 0 page(s).');
+    });
+});
+
+describe('getVersion', () => {
+    it('throws when package.json cannot be read', () => {
+        vi.spyOn(fs, 'readFileSync').mockImplementation(() => {
+            throw new Error('ENOENT');
+        });
+
+        expect(() => getVersion()).toThrow('Cannot determine package version: package.json missing or malformed');
+    });
+
+    it('throws when package.json has no version field', () => {
+        vi.spyOn(fs, 'readFileSync').mockReturnValue('{}');
+
+        expect(() => getVersion()).toThrow('Cannot determine package version: package.json missing or malformed');
+    });
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // CLI integration tests
 // ─────────────────────────────────────────────────────────────────────────────
@@ -118,22 +183,22 @@ describe('CLI run()', () => {
         expect(pdfToPng).not.toHaveBeenCalled();
     });
 
-    it('prints "vUnknown" when package.json cannot be read', async () => {
+    it('prints an error and exits 1 when package.json cannot be read for --version', async () => {
         vi.spyOn(fs, 'readFileSync').mockImplementation(() => {
             throw new Error('ENOENT');
         });
         setArgv('--version');
         await run();
-        expect(logSpy).toHaveBeenCalledWith('vUnknown');
-        expect(exitSpy).toHaveBeenCalledWith(0);
+        expect(errorSpy).toHaveBeenCalledWith('Cannot determine package version: package.json missing or malformed');
+        expect(exitSpy).toHaveBeenCalledWith(1);
     });
 
-    it('prints "vUnknown" when package.json has no version field', async () => {
+    it('prints an error and exits 1 when package.json has no version field for --version', async () => {
         vi.spyOn(fs, 'readFileSync').mockReturnValue('{}');
         setArgv('--version');
         await run();
-        expect(logSpy).toHaveBeenCalledWith('vUnknown');
-        expect(exitSpy).toHaveBeenCalledWith(0);
+        expect(errorSpy).toHaveBeenCalledWith('Cannot determine package version: package.json missing or malformed');
+        expect(exitSpy).toHaveBeenCalledWith(1);
     });
 
     // ── Parse errors ──────────────────────────────────────────────────────────
@@ -287,7 +352,7 @@ describe('CLI run()', () => {
             verbosityLevel: 1,
             processPagesInParallel: true,
             concurrencyLimit: 2,
-            returnMetadataOnly: undefined,
+            returnMetadataOnly: false,
             returnPageContent: false,
         });
         expect(logSpy).toHaveBeenCalledWith('Processing PDF: test.pdf');
@@ -336,7 +401,9 @@ describe('CLI run()', () => {
     // ── --return-metadata-only ─────────────────────────────────────────────────
 
     it('accepts --return-metadata-only without --output-folder', async () => {
-        vi.mocked(pdfToPng).mockResolvedValueOnce([{ pageNumber: 1, name: 'page_1.png', width: 595, height: 842, rotation: 0, path: '' }]);
+        vi.mocked(pdfToPng).mockResolvedValueOnce([
+            { kind: 'metadata', pageNumber: 1, name: 'page_1.png', width: 595, height: 842, rotation: 0, content: undefined, path: '' },
+        ]);
 
         setArgv('test.pdf', '--return-metadata-only');
         await run();
@@ -385,11 +452,13 @@ describe('CLI run()', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('module exports', () => {
-    it('exports run, HELP_TEXT, parseBoolean, and parseNumberList', () => {
+    it('exports run, HELP_TEXT, parseBoolean, parseNumberList, buildPdfToPngOptions, and executeConversion', () => {
         expect(typeof cli.run).toBe('function');
         expect(typeof cli.HELP_TEXT).toBe('string');
         expect(typeof cli.parseBoolean).toBe('function');
         expect(typeof cli.parseNumberList).toBe('function');
+        expect(typeof cli.buildPdfToPngOptions).toBe('function');
+        expect(typeof cli.executeConversion).toBe('function');
         expect(typeof cli.getVersion).toBe('function');
     });
 });

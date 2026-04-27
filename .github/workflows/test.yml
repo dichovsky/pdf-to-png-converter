@@ -20,6 +20,9 @@ jobs:
               run: npm ci
             - name: Audit dependencies
               run: npm audit --audit-level=high
+            - name: Strict type check
+              run: npm run build:strict
+              continue-on-error: true
             - name: Test
               run: npm test
             - name: Upload coverage

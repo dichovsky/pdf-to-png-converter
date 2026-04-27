@@ -1,7 +1,8 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test } from 'vitest';
-import { PngPageOutput, pdfToPng } from '../src';
+import type { PngPageOutput } from '../src';
+import { pdfToPng } from '../src';
 import { comparePNG } from './comparePNG';
 
 const pdfFilePath: string = resolve('./test-data/large_pdf.pdf');
@@ -14,7 +15,7 @@ test(`should convert PDF To PNG buffer (without saving to file)`, async () => {
     expect(pngPages.length).toBeGreaterThan(0);
     for (const pngPage of pngPages) {
         const expectedFilePath: string = resolve('./test-data/pdf.to.buffer/expected', pngPage.name);
-        const compareResult: number = comparePNG({
+        const compareResult: number = await comparePNG({
             actualFile: pngPage.content!,
             expectedFile: expectedFilePath,
             createExpectedFileIfMissing: false,

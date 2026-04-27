@@ -1,3 +1,4 @@
+import { promises as fsPromises } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test } from 'vitest';
 import { pdfToPng } from '../src';
@@ -6,6 +7,7 @@ const pdfFilePath: string = resolve('./test-data/sample.pdf');
 const outputFolder: string = './test-results/path-traversal-guard';
 
 test('should reject outputFileMaskFunc returning a path-traversal filename', async () => {
+    await fsPromises.rm(resolve(outputFolder), { recursive: true, force: true });
     await expect(
         pdfToPng(pdfFilePath, {
             outputFolder,
@@ -16,6 +18,7 @@ test('should reject outputFileMaskFunc returning a path-traversal filename', asy
 
 test('should reject outputFileMaskFunc returning an absolute path outside outputFolder', async () => {
     const absolutePathOutside = resolve(outputFolder, '..', 'evil.png');
+    await fsPromises.rm(resolve(outputFolder), { recursive: true, force: true });
     await expect(
         pdfToPng(pdfFilePath, {
             outputFolder,
@@ -26,6 +29,7 @@ test('should reject outputFileMaskFunc returning an absolute path outside output
 
 test('should accept outputFileMaskFunc returning a filename starting with .. (not a traversal)', async () => {
     const resolvedOutputFolder = resolve(outputFolder);
+    await fsPromises.rm(resolvedOutputFolder, { recursive: true, force: true });
     const pngPages = await pdfToPng(pdfFilePath, {
         outputFolder,
         outputFileMaskFunc: (pageNumber: number) => `..evil_page_${pageNumber}.png`,
@@ -40,6 +44,7 @@ test('should accept outputFileMaskFunc returning a filename starting with .. (no
 
 test('should accept outputFileMaskFunc returning a safe filename', async () => {
     const resolvedOutputFolder = resolve(outputFolder);
+    await fsPromises.rm(resolvedOutputFolder, { recursive: true, force: true });
     const pngPages = await pdfToPng(pdfFilePath, {
         outputFolder,
         outputFileMaskFunc: (pageNumber: number) => `safe_page_${pageNumber}.png`,

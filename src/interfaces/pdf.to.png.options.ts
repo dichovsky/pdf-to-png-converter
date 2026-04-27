@@ -1,3 +1,5 @@
+import type { VerbosityLevel } from '../types/index.js';
+
 /**
  * Options for the `pdfToPng` conversion function.
  *
@@ -48,14 +50,13 @@ export interface PdfToPngOptions {
      * When omitted, no files are written to disk.
      *
      * @remarks
-     * **Security (TOCTOU):** The write-containment guard resolves symlinks and checks that the
-     * output path stays within this folder, but a residual race window exists between the final
-     * check and the actual write. A local attacker could exploit this via
+     * **Security (TOCTOU):** The write-containment guard resolves symlinks, checks that the
+     * output path stays within this folder, and uses exclusive-create file opens to avoid
+     * overwriting pre-existing files or following a pre-planted target symlink at the final filename.
+     * A residual race window still exists for directory-component swaps. A local attacker could exploit this via
      * (a) atomically replacing the folder with a symlink during that window, or (b) creating or
-     * pre-populating a symlink at the destination filename inside this folder that redirects
-     * `writeFile()` elsewhere. To reduce exposure on multi-user or shared systems, ensure this
-     * directory is private, not writable by untrusted users, and does not contain untrusted,
-     * pre-existing symlinks at the filenames that will be written.
+     * pre-populating an unsafe directory layout inside this folder before the containment checks run.
+     * To reduce exposure on multi-user or shared systems, ensure this directory is private and not writable by untrusted users.
      */
     outputFolder?: string;
 
@@ -70,7 +71,8 @@ export interface PdfToPngOptions {
     outputFileMaskFunc?: (pageNumber: number) => string;
 
     /**
-     * 1-based page numbers to convert. Pages outside the valid range (1 to `numPages`) are silently ignored.
+     * 1-based integer page numbers to convert. Non-integer values and values less than or equal to zero throw immediately.
+     * Pages above the document page count are silently ignored.
      * When omitted, all pages in the document are processed.
      * @since 3.3.0
      */
@@ -81,7 +83,7 @@ export interface PdfToPngOptions {
      * `VerbosityLevel.ERRORS` (0), `VerbosityLevel.WARNINGS` (1), `VerbosityLevel.INFOS` (5).
      * Default: `VerbosityLevel.ERRORS` (0).
      */
-    verbosityLevel?: number;
+    verbosityLevel?: VerbosityLevel;
 
     /**
      * When `true`, each `PngPageOutput` will include a `content` property containing the PNG image as a `Buffer`.
@@ -104,8 +106,8 @@ export interface PdfToPngOptions {
     returnMetadataOnly?: boolean;
 
     /**
-     * When `true`, all selected pages are rendered concurrently using `Promise.all` in batches
-     * controlled by `concurrencyLimit`. When `false`, pages are processed one at a time in order.
+     * When `true`, selected pages are rendered concurrently through a sliding-window scheduler
+     * that keeps up to `concurrencyLimit` pages active. When `false`, pages are processed one at a time in order.
      * Default: `false`.
      * @since 3.7.0
      */

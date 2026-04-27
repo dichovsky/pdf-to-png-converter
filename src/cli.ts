@@ -5,6 +5,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { pdfToPng } from './pdfToPng.js';
 import type { PdfToPngOptions } from './interfaces/pdf.to.png.options.js';
+import { normalizePdfToPngOptions } from './normalizePdfToPngOptions.js';
 
 /**
  * Help text shown for `--help` and on invalid usage.
@@ -52,6 +53,26 @@ const CLI_OPTIONS = {
     help: { type: 'boolean' },
 } as const;
 
+type ParsedValues = {
+    'output-folder'?: string;
+    'viewport-scale'?: string;
+    'use-system-fonts'?: boolean;
+    'disable-font-face'?: string;
+    'enable-xfa'?: string;
+    'pdf-file-password'?: string;
+    'pages-to-process'?: string;
+    'verbosity-level'?: string;
+    'return-metadata-only'?: boolean;
+    'return-page-content'?: boolean;
+    'process-pages-in-parallel'?: boolean;
+    'concurrency-limit'?: string;
+    silent?: boolean;
+    version?: boolean;
+    help?: boolean;
+};
+
+type CliParseResult = { values: ParsedValues; positionals: string[] };
+
 /**
  * Parses a CLI string value as a boolean.
  *
@@ -86,18 +107,136 @@ export function parseNumberList(val: string | undefined): number[] | undefined {
     });
 }
 
+function parseNumericOption(value: string | undefined, errorMessage: string): number | undefined {
+    if (value === undefined) {
+        return undefined;
+    }
+
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) {
+        throw new Error(errorMessage);
+    }
+
+    return parsed;
+}
+
+function parseIntegerOption(value: string | undefined, errorMessage: string): number | undefined {
+    if (value === undefined) {
+        return undefined;
+    }
+
+    const parsed = Number(value);
+    if (!Number.isInteger(parsed)) {
+        throw new Error(errorMessage);
+    }
+
+    return parsed;
+}
+
+function safeParseArgs(): CliParseResult | null {
+    try {
+        return parseArgs({ options: CLI_OPTIONS, allowPositionals: true }) as CliParseResult;
+    } catch (err: unknown) {
+        /* v8 ignore next */
+        console.error(err instanceof Error ? err.message : String(err));
+        console.error(HELP_TEXT);
+        process.exit(1);
+        return null;
+    }
+}
+
+export function buildPdfToPngOptions(values: ParsedValues, positionals: string[]): { pdfFilePath: string } & PdfToPngOptions {
+    const pdfFilePath = positionals[0];
+    if (!pdfFilePath) {
+        throw new Error('<pdf-file-path> is required.');
+    }
+
+    const rawOptions: PdfToPngOptions = {
+        outputFolder: values['output-folder'],
+        viewportScale: parseNumericOption(values['viewport-scale'], '--viewport-scale must be a valid number.'),
+        useSystemFonts: values['use-system-fonts'],
+        disableFontFace: parseBoolean(values['disable-font-face']),
+        enableXfa: parseBoolean(values['enable-xfa']),
+        pdfFilePassword: values['pdf-file-password'],
+        pagesToProcess: parseNumberList(values['pages-to-process']),
+        verbosityLevel: parseIntegerOption(values['verbosity-level'], '--verbosity-level must be a valid integer.'),
+        returnMetadataOnly: values['return-metadata-only'],
+        returnPageContent: values['return-page-content'] ?? false,
+        processPagesInParallel: values['process-pages-in-parallel'],
+        concurrencyLimit: parseIntegerOption(values['concurrency-limit'], '--concurrency-limit must be a valid integer.'),
+    };
+
+    const normalizedOptions = normalizePdfToPngOptions(rawOptions);
+
+    return {
+        pdfFilePath,
+        outputFolder: normalizedOptions.outputFolder,
+        viewportScale: normalizedOptions.viewportScale,
+        useSystemFonts: normalizedOptions.useSystemFonts,
+        disableFontFace: normalizedOptions.disableFontFace,
+        enableXfa: normalizedOptions.enableXfa,
+        pdfFilePassword: normalizedOptions.pdfFilePassword,
+        pagesToProcess: normalizedOptions.pagesToProcess,
+        verbosityLevel: normalizedOptions.verbosityLevel,
+        returnMetadataOnly: normalizedOptions.returnMetadataOnly,
+        returnPageContent: normalizedOptions.returnPageContent,
+        processPagesInParallel: normalizedOptions.processPagesInParallel,
+        concurrencyLimit: normalizedOptions.concurrencyLimit,
+    };
+}
+
+export async function executeConversion(pdfFilePath: string, options: PdfToPngOptions, log: (...msgs: unknown[]) => void): Promise<void> {
+    try {
+        const results = await pdfToPng(pdfFilePath, options);
+        if (options.returnMetadataOnly) {
+            log('Metadata extraction complete:');
+            log(JSON.stringify(results, null, 2));
+            return;
+        }
+
+        log(`Successfully processed ${results.length} page(s).`);
+    } catch (err: unknown) {
+        throw new Error(err instanceof Error ? err.message : String(err), {
+            cause: err,
+        });
+    }
+}
+
+function createLogger(silent: boolean | undefined): (...msgs: unknown[]) => void {
+    return (...msgs: unknown[]): void => {
+        if (!silent) console.log(...msgs);
+    };
+}
+
+function handleRunError(err: unknown): void {
+    if (err instanceof Error && err.cause !== undefined) {
+        console.error('Error:');
+        console.error(err.message);
+    } else {
+        console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
+    }
+
+    if (err instanceof Error && err.message === '<pdf-file-path> is required.') {
+        console.error(HELP_TEXT);
+    }
+
+    process.exit(1);
+}
+
 /**
  * Reads the package version from the adjacent `package.json`.
- * Falls back to `'Unknown'` on any I/O or parse error so that `--version`
- * always returns a printable string.
+ * Throws when `package.json` is missing or malformed so packaging defects surface immediately.
  */
 export function getVersion(): string {
     try {
         const pkgPath = path.resolve(__dirname, '../package.json');
         const pkgInfo = JSON.parse(fs.readFileSync(pkgPath, 'utf-8')) as { version?: string };
-        return pkgInfo.version ?? 'Unknown';
+        if (typeof pkgInfo.version !== 'string' || pkgInfo.version.length === 0) {
+            throw new Error('Cannot determine package version: package.json missing or malformed');
+        }
+        return pkgInfo.version;
     } catch {
-        return 'Unknown';
+        throw new Error('Cannot determine package version: package.json missing or malformed');
     }
 }
 
@@ -109,22 +248,7 @@ export function getVersion(): string {
  * spawning a child process.
  */
 export async function run(): Promise<void> {
-    // parseArgs throws on unknown flags (strict mode is on by default).
-    // Wrap in an IIFE that returns null on failure so the outer scope
-    // can use a const binding and guard cleanly when process.exit is mocked.
-    const parseResult = (() => {
-        try {
-            return parseArgs({ options: CLI_OPTIONS, allowPositionals: true });
-        } catch (err: unknown) {
-            /* v8 ignore next */
-            console.error(err instanceof Error ? err.message : String(err));
-            console.error(HELP_TEXT);
-            process.exit(1);
-            return null; // only reached when process.exit is mocked (e.g. unit tests)
-        }
-    })();
-
-    // Guard: if process.exit was mocked and parseArgs failed, return early.
+    const parseResult = safeParseArgs();
     if (!parseResult) return;
 
     const { values, positionals } = parseResult;
@@ -136,111 +260,26 @@ export async function run(): Promise<void> {
     }
 
     if (values.version) {
-        console.log(`v${getVersion()}`);
-        process.exit(0);
-        return;
-    }
-
-    const pdfFilePath = positionals[0];
-
-    if (!pdfFilePath) {
-        console.error('Error: <pdf-file-path> is required.');
-        console.error(HELP_TEXT);
-        process.exit(1);
-        return;
-    }
-
-    // ── Validate numeric options up-front for actionable error messages ───────
-
-    let viewportScale: number | undefined;
-    if (values['viewport-scale'] !== undefined) {
-        viewportScale = Number(values['viewport-scale']);
-        if (!Number.isFinite(viewportScale)) {
-            console.error('Error: --viewport-scale must be a valid number.');
+        try {
+            console.log(`v${getVersion()}`);
+            process.exit(0);
+        } catch (err: unknown) {
+            console.error(err instanceof Error ? err.message : String(err));
             process.exit(1);
-            return;
         }
-    }
-
-    let verbosityLevel: number | undefined;
-    if (values['verbosity-level'] !== undefined) {
-        verbosityLevel = Number(values['verbosity-level']);
-        if (!Number.isInteger(verbosityLevel)) {
-            console.error('Error: --verbosity-level must be a valid integer.');
-            process.exit(1);
-            return;
-        }
-    }
-
-    let concurrencyLimit: number | undefined;
-    if (values['concurrency-limit'] !== undefined) {
-        concurrencyLimit = Number(values['concurrency-limit']);
-        if (!Number.isInteger(concurrencyLimit)) {
-            console.error('Error: --concurrency-limit must be a valid integer.');
-            process.exit(1);
-            return;
-        }
-    }
-
-    // ── Validate boolean / list options (helpers throw on bad input) ──────────
-
-    let disableFontFace: boolean | undefined;
-    let enableXfa: boolean | undefined;
-    let pagesToProcess: number[] | undefined;
-
-    try {
-        disableFontFace = parseBoolean(values['disable-font-face']);
-        enableXfa = parseBoolean(values['enable-xfa']);
-        pagesToProcess = parseNumberList(values['pages-to-process']);
-    } catch (err: unknown) {
-        /* v8 ignore next */
-        console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
-        process.exit(1);
         return;
-    }
-
-    // ── Build options and invoke pdfToPng ─────────────────────────────────────
-
-    /** Logs to stdout unless `--silent` is set. */
-    const log = (...msgs: unknown[]): void => {
-        if (!values.silent) console.log(...msgs);
-    };
-
-    // All PdfToPngOptions properties are set explicitly (to undefined when not provided)
-    // so the object passed to pdfToPng is fully predictable and easy to assert in tests.
-    const options: PdfToPngOptions = {
-        outputFolder: values['output-folder'],
-        viewportScale,
-        useSystemFonts: values['use-system-fonts'],
-        disableFontFace,
-        enableXfa,
-        pdfFilePassword: values['pdf-file-password'],
-        pagesToProcess,
-        verbosityLevel,
-        returnMetadataOnly: values['return-metadata-only'],
-        returnPageContent: values['return-page-content'] ?? false,
-        processPagesInParallel: values['process-pages-in-parallel'],
-        concurrencyLimit,
-    };
-
-    log(`Processing PDF: ${pdfFilePath}`);
-    if (options.outputFolder) {
-        log(`Output folder: ${options.outputFolder}`);
     }
 
     try {
-        const results = await pdfToPng(pdfFilePath, options);
-
-        if (values['return-metadata-only']) {
-            log('Metadata extraction complete:');
-            log(JSON.stringify(results, null, 2));
-        } else {
-            log(`Successfully processed ${results.length} page(s).`);
+        const { pdfFilePath, ...options } = buildPdfToPngOptions(values, positionals);
+        const log = createLogger(values.silent);
+        log(`Processing PDF: ${pdfFilePath}`);
+        if (options.outputFolder) {
+            log(`Output folder: ${options.outputFolder}`);
         }
+        await executeConversion(pdfFilePath, options, log);
     } catch (err: unknown) {
-        console.error('Error:');
-        console.error(err instanceof Error ? err.message : String(err));
-        process.exit(1);
+        handleRunError(err);
     }
 }
 

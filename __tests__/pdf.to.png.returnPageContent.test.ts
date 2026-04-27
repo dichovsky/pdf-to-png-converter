@@ -4,12 +4,13 @@ import { promises as fsPromises } from 'node:fs';
 import { join } from 'node:path';
 
 describe('pdfToPng returnPageContent', () => {
-
     it('should return content when returnPageContent is true', async () => {
         const pdfFilePath = 'test-data/sample.pdf';
         const outputFolder = 'test-results/pdf.to.png.returnPageContent.true';
+        const resolvedOutputFolder = join(process.cwd(), outputFolder);
 
-        await fsPromises.mkdir(join(process.cwd(), outputFolder), { recursive: true });
+        await fsPromises.rm(resolvedOutputFolder, { recursive: true, force: true });
+        await fsPromises.mkdir(resolvedOutputFolder, { recursive: true });
 
         const result = await pdfToPng(pdfFilePath, {
             outputFolder,
@@ -25,8 +26,10 @@ describe('pdfToPng returnPageContent', () => {
     it('should return content when returnPageContent is not provided', async () => {
         const pdfFilePath = 'test-data/sample.pdf';
         const outputFolder = 'test-results/pdf.to.png.returnPageContent.undefined';
+        const resolvedOutputFolder = join(process.cwd(), outputFolder);
 
-        await fsPromises.mkdir(join(process.cwd(), outputFolder), { recursive: true });
+        await fsPromises.rm(resolvedOutputFolder, { recursive: true, force: true });
+        await fsPromises.mkdir(resolvedOutputFolder, { recursive: true });
 
         const result = await pdfToPng(pdfFilePath, {
             outputFolder,

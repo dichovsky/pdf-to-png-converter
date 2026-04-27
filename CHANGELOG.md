@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `pull_request` trigger added to test workflow
 
 ### Changed
+- **Breaking (major):** `PngPageOutput` is now a discriminated union with `kind: 'metadata' | 'content' | 'file'`; consumers should branch on `kind` before using mode-specific fields like `path` or `content`
 - Docker base image switched from `node:22.19.0` to `node:22.19.0-slim`
 - Dockerfile now runs as non-root `node` user
 - Dockerfile converted to multi-stage build with dependency layer caching
