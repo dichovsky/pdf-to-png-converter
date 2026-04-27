@@ -4,7 +4,7 @@ Thank you for taking the time to contribute!
 
 ## Prerequisites
 
-- **Node.js 20+** (use `.nvmrc`: `nvm use`)
+- **Node.js 22.13+** (use `.nvmrc`: `nvm use`)
 - **npm 10+**
 
 ## Getting Started
@@ -57,7 +57,7 @@ Types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`, `ci`
 - [ ] `npm test` passes locally
 - [ ] `npm run lint` reports no errors
 - [ ] New behaviour is covered by tests (coverage thresholds: lines 90%, functions 90%, branches 85%)
-- [ ] `CHANGELOG.md` updated under `## [Unreleased]` with a brief description
+- [ ] `CHANGELOG.md` updated under `## [Unreleased]` (or moved into the release section when cutting a release)
 
 ## Reporting Bugs / Security Issues
 

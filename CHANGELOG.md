@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+No unreleased changes yet.
+
+---
+
+## [4.0.0] — 2026-04-28
+
 ### Security
 
 - Pinned GitHub Actions to full commit SHAs to prevent supply-chain attacks via mutable tags
@@ -123,7 +129,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - File path and `ArrayBuffer` input support
 - `outputFolder`, `viewportScale`, `pdfFilePassword`, `disableFontFace`, `useSystemFonts`, `enableXfa` options
 
-[Unreleased]: https://github.com/dichovsky/pdf-to-png-converter/compare/v3.15.0...HEAD
+[Unreleased]: https://github.com/dichovsky/pdf-to-png-converter/compare/v4.0.0...HEAD
+[4.0.0]: https://github.com/dichovsky/pdf-to-png-converter/compare/v3.15.0...v4.0.0
 [3.15.0]: https://github.com/dichovsky/pdf-to-png-converter/compare/release/v3.14.0...v3.15.0
 [3.14.0]: https://github.com/dichovsky/pdf-to-png-converter/compare/release/v3.7.0...release/v3.14.0
 [3.7.0]: https://github.com/dichovsky/pdf-to-png-converter/compare/release/v3.3.0...release/v3.7.0

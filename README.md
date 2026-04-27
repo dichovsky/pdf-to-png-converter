@@ -61,7 +61,7 @@ npm install pdf-to-png-converter
 yarn add pdf-to-png-converter
 ```
 
-> **Node.js Requirement:** Node.js 20 or higher is required.
+> **Node.js Requirement:** Node.js 22.13 or higher is required.
 
 ---
 
@@ -94,7 +94,7 @@ const pngPages: PngPageOutput[] = await pdfToPng('document.pdf', {
 
 ## Migration Guide
 
-Recent backlog work introduced public and behavioral changes that existing consumers may need to adopt:
+Version **4.0.0** introduced public and behavioral changes that existing consumers may need to adopt:
 
 1. **`PngPageOutput` is now discriminated.** Branch on `page.kind` before reading `page.path` or assuming `page.content` is present.
 2. **`verbosityLevel` is now typed as `VerbosityLevel`.** Prefer `VerbosityLevel.ERRORS`, `VerbosityLevel.WARNINGS`, or `VerbosityLevel.INFOS` instead of raw numeric literals.
@@ -203,7 +203,9 @@ const { pdfToPng } = require('pdf-to-png-converter');
 
 ### Advanced Configuration
 
-```javascript
+```typescript
+import { pdfToPng, VerbosityLevel } from 'pdf-to-png-converter';
+
 const pngPages = await pdfToPng('document.pdf', {
     // Rendering
     viewportScale: 2.0, // 2x zoom for higher resolution
@@ -220,7 +222,7 @@ const pngPages = await pdfToPng('document.pdf', {
     concurrencyLimit: 8,
 
     // Logging
-    verbosityLevel: 1, // Log warnings
+    verbosityLevel: VerbosityLevel.WARNINGS, // Log warnings
 });
 ```
 

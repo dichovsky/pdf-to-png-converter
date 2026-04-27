@@ -2,6 +2,8 @@
 
 This backlog captures architectural, typing, maintainability, reliability, performance, and security findings from a deep review of the current TypeScript codebase.
 
+> **Release status:** All backlog items below shipped in **v4.0.0**. This file is retained as the implementation record for that release.
+
 > **AI-agent execution notes (apply to every item below)**
 >
 > These items are intended to be implemented by an AI coding agent. The following ground rules apply across all items and should be treated as hard constraints:
@@ -18,7 +20,7 @@ This backlog captures architectural, typing, maintainability, reliability, perfo
 
 ## P1
 
-### [ ] ARCH-001 Fix absolute `outputFolder` resolution
+### [x] ARCH-001 Fix absolute `outputFolder` resolution
 
 - **Problem:** In `src/pdfToPng.ts` (line 142), `resolvedOutputFolder` is built with `join(process.cwd(), props.outputFolder)`. This silently rewrites absolute paths under `process.cwd()`, breaking the documented contract that `outputFolder` may be relative or absolute.
 - **Technical rationale:** This is a correctness bug. It can write files to the wrong location and makes behavior depend on an implementation detail of `path.join()`.
@@ -32,7 +34,7 @@ This backlog captures architectural, typing, maintainability, reliability, perfo
     3. A new test in `__tests__/pdf.to.png.absolute.output.folder.test.ts` covers both cases and passes.
     4. `npm test` passes with no changes to any other source file.
 
-### [ ] ARCH-002 Introduce a single option normalization and validation layer
+### [x] ARCH-002 Introduce a single option normalization and validation layer
 
 - **Problem:** Validation and defaulting are split across `src/cli.ts` (lines 155–200) and `src/pdfToPng.ts` (lines 108–127), leaving gaps: `pagesToProcess` accepts `0` and negative numbers, `verbosityLevel` accepts any integer, and `outputFolder: ''` silently resolves to `process.cwd()`.
 - **Technical rationale:** A single normalization boundary reduces duplicated rules, makes behavior consistent across API and CLI entry points, and creates a stable seam for testing.
@@ -50,7 +52,7 @@ This backlog captures architectural, typing, maintainability, reliability, perfo
     5. A new test file `__tests__/normalize.pdf.to.png.options.test.ts` covers all branches above plus the happy-path case where all defaults are applied correctly.
     6. `npm test` and `npm run lint` pass.
 
-### [ ] ARCH-003 Split `src/pdfToPng.ts` into composable modules
+### [x] ARCH-003 Split `src/pdfToPng.ts` into composable modules
 
 - **Problem:** At ~490 lines, `src/pdfToPng.ts` simultaneously owns input loading, pdfjs bootstrap, render orchestration, filename generation, parallel batching, file writing, path security, and cleanup.
 - **Technical rationale:** This concentration prevents isolated unit testing of any single responsibility and will slow additions of new output sinks, alternative renderers, or stronger isolation tests.
@@ -73,7 +75,7 @@ This backlog captures architectural, typing, maintainability, reliability, perfo
     4. `npm run lint` passes with no new suppressions.
     5. All existing tests pass without modification — this is a pure refactor; no test file may be changed.
 
-### [ ] ARCH-004 Harden file writes against symlink and TOCTOU races
+### [x] ARCH-004 Harden file writes against symlink and TOCTOU races
 
 - **Problem:** `savePNGfile()` (lines 437–479 of `src/pdfToPng.ts`) ends with `fsPromises.writeFile()`, which follows symlinks at the target filename, defeating the containment model that the preceding checks establish.
 - **Technical rationale:** The containment checks are strong, but the final write can still be redirected by a symlink planted at the output filename before the write. `fsPromises.open` with exclusive-create flags blocks this on POSIX systems.
@@ -99,7 +101,7 @@ This backlog captures architectural, typing, maintainability, reliability, perfo
 
 ## P2
 
-### [ ] TYPE-001 Replace ambiguous output shapes with discriminated result types
+### [x] TYPE-001 Replace ambiguous output shapes with discriminated result types
 
 - **Semver impact:** `major` — `PngPageOutput` is a public type; callers that access `.content` or `.path` without a `kind` guard will require updates.
 - **Problem:** `PngPageOutput` represents three modes at once — metadata-only, in-memory render, and rendered-to-disk — forcing consumers to infer validity from `content?: Buffer` and the sentinel `path: ''`.
@@ -141,7 +143,7 @@ This backlog captures architectural, typing, maintainability, reliability, perfo
     4. `CHANGELOG.md` and `README.md` are updated.
     5. `npm test` passes.
 
-### [ ] ARCH-005 Remove hidden mutation from the page processing pipeline
+### [x] ARCH-005 Remove hidden mutation from the page processing pipeline
 
 - **Problem:** `savePNGfile()` mutates `pngPageOutput.path` (line 461 of `src/pdfToPng.ts`) and `processAndSavePage()` mutates `pageOutput.content = undefined` (line 99). These are hidden side effects on objects created elsewhere.
 - **Technical rationale:** Hidden mutation makes object lifecycle non-obvious, complicates debugging, and makes refactors riskier.
@@ -158,7 +160,7 @@ This backlog captures architectural, typing, maintainability, reliability, perfo
     2. `grep -n 'pageOutput\.' src/pdfToPng.ts` (or the relevant extracted module) returns zero assignment expressions on `pageOutput` fields after the initial object construction.
     3. `npm test` passes.
 
-### [ ] TYPE-002 Eliminate unsafe assertions and non-null casts
+### [x] TYPE-002 Eliminate unsafe assertions and non-null casts
 
 - **Problem:** `src/pdfToPng.ts` uses `pdfFile as Buffer` (line 263), `pdf.canvasFactory as NodeCanvasFactory` (line 372), `canvas!` (line 380), and `pngPageOutput.content as Buffer` (line 479).
 - **Technical rationale:** These casts bypass the type system at process, filesystem, and external-library boundaries — the places where runtime surprises are most likely.
@@ -172,7 +174,7 @@ This backlog captures architectural, typing, maintainability, reliability, perfo
     2. `grep -n '!' src/pdfToPng.ts` returns zero results for non-null assertions on runtime values.
     3. `npm run lint` and `npm test` pass.
 
-### [ ] ARCH-006 Manage PDF.js lifecycle explicitly, including `destroy()`
+### [x] ARCH-006 Manage PDF.js lifecycle explicitly, including `destroy()`
 
 - **Problem:** `pdfToPng()` calls `pdfDocument.cleanup()` in `finally` (line 203) but never calls `pdfDocument.destroy()`. The `getDocument()` loading task is discarded without teardown on error paths.
 - **Technical rationale:** `cleanup()` clears cached render resources; `destroy()` terminates the document and worker transport. Omitting `destroy()` can retain memory and worker threads between calls.
@@ -185,7 +187,7 @@ This backlog captures architectural, typing, maintainability, reliability, perfo
     2. A new test covering the render-failure path asserts `destroy()` was called.
     3. `npm test` passes.
 
-### [ ] ARCH-007 Make the CLI a thin adapter over a reusable execution API
+### [x] ARCH-007 Make the CLI a thin adapter over a reusable execution API
 
 - **Problem:** `run()` in `src/cli.ts` is ~134 lines mixing `parseArgs`, numeric validation, boolean parsing, options assembly, logging, error formatting, and `process.exit()`.
 - **Technical rationale:** Mixing these concerns makes CLI behavior hard to test without mocking `process.exit()` and prevents reuse of the execution logic.
@@ -200,7 +202,7 @@ This backlog captures architectural, typing, maintainability, reliability, perfo
     3. `npm test` passes including all existing CLI tests.
     4. `npm run build:test` and `npm run lint` pass.
 
-### [ ] ARCH-008 Confirm and document the CJS-only module packaging strategy
+### [x] ARCH-008 Confirm and document the CJS-only module packaging strategy
 
 - **Problem:** The package mixes `"type": "commonjs"`, `nodenext` TypeScript module resolution, and `.js` import specifiers in source, but lacks a contract test asserting the published `require()` / `import` surface.
 - **Technical rationale:** The packaging is already consistent (CJS-only), but without a contract test, a future change to `package.json` or `tsconfig.prod.json` could silently break consumers.
@@ -213,7 +215,7 @@ This backlog captures architectural, typing, maintainability, reliability, perfo
     1. `__tests__/exports.contract.test.ts` exists and passes.
     2. `npm test` passes.
 
-### [ ] TYPE-003 Strengthen public option and metadata types
+### [x] TYPE-003 Strengthen public option and metadata types
 
 - **Problem:** `verbosityLevel?: number` accepts any integer, `pagesToProcess?: number[]` accepts any number, and `rotation: number` is wider than the four valid PDF rotation values.
 - **Technical rationale:** Weak public types reduce IDE guidance and allow invalid values to flow further into the system.
@@ -228,7 +230,7 @@ This backlog captures architectural, typing, maintainability, reliability, perfo
     3. The `normalizeRotation` unit test passes.
     4. `npm run lint` passes.
 
-### [ ] PERF-001a Output-sink abstraction (prerequisite for PERF-001b)
+### [x] PERF-001a Output-sink abstraction (prerequisite for PERF-001b)
 
 - **Problem:** Rendering is tightly coupled to in-memory `Buffer` retention. There is no way to write page output directly to disk without first building a full in-memory PNG buffer.
 - **Technical rationale:** Decoupling rendering from the output sink is the prerequisite for any memory or scheduling improvement.
@@ -247,7 +249,7 @@ This backlog captures architectural, typing, maintainability, reliability, perfo
     2. `npm run build:test` and `npm run lint` pass.
     3. `src/interfaces/output.sink.ts`, `src/filesystemSink.ts`, and `src/nullSink.ts` all exist.
 
-### [ ] PERF-001b Sliding-window page scheduler (depends on PERF-001a)
+### [x] PERF-001b Sliding-window page scheduler (depends on PERF-001a)
 
 - **Problem:** The parallel render loop (lines 166–184 of `src/pdfToPng.ts`) uses lock-step `Promise.all` chunking: page 3 does not start until pages 1 and 2 both finish, leaving concurrency slots idle when one page finishes early.
 - **Technical rationale:** A sliding-window scheduler keeps exactly `concurrencyLimit` tasks active, improving throughput on documents with variable-duration pages.
@@ -259,7 +261,7 @@ This backlog captures architectural, typing, maintainability, reliability, perfo
     2. All existing parallel-mode tests pass unchanged.
     3. `npm test` passes.
 
-### [ ] TEST-001 Expand contract and security tests
+### [x] TEST-001 Expand contract and security tests
 
 - **Problem:** The test suite is strong on integration render scenarios but lacks contract tests for option normalization, absolute path handling, and adversarial filename/symlink cases.
 - **Technical rationale:** Architectural regressions happen at boundaries. Contract tests are cheaper and faster than render-based integration tests.
@@ -288,7 +290,7 @@ This backlog captures architectural, typing, maintainability, reliability, perfo
 
 ## P3
 
-### [ ] CLI-001 Stop silently swallowing `getVersion()` failures
+### [x] CLI-001 Stop silently swallowing `getVersion()` failures
 
 - **Problem:** `getVersion()` in `src/cli.ts` (lines 94–102) catches all errors and returns `'Unknown'`, masking packaging defects.
 - **Technical rationale:** A missing or malformed `package.json` is a packaging bug, not an expected runtime condition. Hiding it delays diagnosis.
@@ -301,7 +303,7 @@ This backlog captures architectural, typing, maintainability, reliability, perfo
     2. `--version` from a correctly packaged build still outputs the correct semver string.
     3. `npm test` passes.
 
-### [ ] DX-001 Add a stricter type-check job for release validation
+### [x] DX-001 Add a stricter type-check job for release validation
 
 - **Problem:** `tsconfig.json` uses `skipLibCheck: true`, which hides incompatibilities at external type boundaries (`pdfjs-dist`, `@napi-rs/canvas`).
 - **Technical rationale:** The project's correctness depends on these third-party adapters. Suppressing upstream type issues weakens confidence at the most important integration points.
