@@ -1,6 +1,6 @@
-import { MAX_VIEWPORT_SCALE, PDF_TO_PNG_OPTIONS_DEFAULTS } from './const';
-import type { PdfToPngOptions } from './interfaces/pdf.to.png.options';
-import { VerbosityLevel } from './types/verbosity.level';
+import { MAX_VIEWPORT_SCALE, PDF_TO_PNG_OPTIONS_DEFAULTS } from './const.js';
+import type { PdfToPngOptions } from './interfaces/pdf.to.png.options.js';
+import { VerbosityLevel } from './types/verbosity.level.js';
 
 export interface NormalizedPdfToPngOptions {
     viewportScale: number;

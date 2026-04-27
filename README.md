@@ -24,6 +24,7 @@
 A high-performance Node.js library for converting PDF files and buffers to PNG images. Perfect for web applications, document processing pipelines, and image generation workflows.
 
 **Key Benefits:**
+
 - ✨ **No Build-Time Compilation** - Pre-built native binaries included via `@napi-rs/canvas`, no `node-gyp` or compiler toolchain required
 - 🚀 **High Performance** - Supports parallel page processing
 - 🔐 **Encrypted PDFs** - Handle password-protected documents
@@ -60,7 +61,7 @@ npm install pdf-to-png-converter
 yarn add pdf-to-png-converter
 ```
 
-> **Node.js Requirement:** Node.js 20 or higher is required.
+> **Node.js Requirement:** Node.js 22.13 or higher is required.
 
 ---
 
@@ -93,7 +94,7 @@ const pngPages: PngPageOutput[] = await pdfToPng('document.pdf', {
 
 ## Migration Guide
 
-Recent backlog work introduced public and behavioral changes that existing consumers may need to adopt:
+Version **4.0.0** introduced public and behavioral changes that existing consumers may need to adopt:
 
 1. **`PngPageOutput` is now discriminated.** Branch on `page.kind` before reading `page.path` or assuming `page.content` is present.
 2. **`verbosityLevel` is now typed as `VerbosityLevel`.** Prefer `VerbosityLevel.ERRORS`, `VerbosityLevel.WARNINGS`, or `VerbosityLevel.INFOS` instead of raw numeric literals.
@@ -111,6 +112,7 @@ npx pdf-to-png-converter my-document.pdf --output-folder ./output
 ```
 
 **Options:**
+
 - `--output-folder <dir>`: Directory to save PNG files.
 - `--viewport-scale <number>`: Scale factor applied to each page viewport.
 - `--use-system-fonts`: Attempt to use fonts installed on the host system.
@@ -137,10 +139,10 @@ Converts PDF pages to PNG images.
 
 **Parameters:**
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `input` | `string \| ArrayBufferLike \| Uint8Array` | PDF file path, ArrayBuffer, or Uint8Array/Buffer |
-| `options` | `PdfToPngOptions` | Optional configuration object |
+| Parameter | Type                                      | Description                                      |
+| --------- | ----------------------------------------- | ------------------------------------------------ |
+| `input`   | `string \| ArrayBufferLike \| Uint8Array` | PDF file path, ArrayBuffer, or Uint8Array/Buffer |
+| `options` | `PdfToPngOptions`                         | Optional configuration object                    |
 
 **Returns:** `Promise<PngPageOutput[]>` - Array of converted PNG pages
 
@@ -201,24 +203,26 @@ const { pdfToPng } = require('pdf-to-png-converter');
 
 ### Advanced Configuration
 
-```javascript
+```typescript
+import { pdfToPng, VerbosityLevel } from 'pdf-to-png-converter';
+
 const pngPages = await pdfToPng('document.pdf', {
     // Rendering
-    viewportScale: 2.0,              // 2x zoom for higher resolution
-    disableFontFace: false,          // Use font face rendering
-    useSystemFonts: true,            // Fallback to system fonts
-    
+    viewportScale: 2.0, // 2x zoom for higher resolution
+    disableFontFace: false, // Use font face rendering
+    useSystemFonts: true, // Fallback to system fonts
+
     // Output
     outputFolder: './pdf-images',
     outputFileMaskFunc: (pageNumber) => `page-${String(pageNumber).padStart(3, '0')}.png`,
     returnPageContent: true,
-    
+
     // Performance
     processPagesInParallel: true,
     concurrencyLimit: 8,
-    
+
     // Logging
-    verbosityLevel: 1,               // Log warnings
+    verbosityLevel: VerbosityLevel.WARNINGS, // Log warnings
 });
 ```
 
@@ -227,7 +231,7 @@ const pngPages = await pdfToPng('document.pdf', {
 ```javascript
 const pngPages = await pdfToPng('document.pdf', {
     outputFolder: './output',
-    pagesToProcess: [1, 3, 5],       // Only convert first, third, and fifth pages
+    pagesToProcess: [1, 3, 5], // Only convert first, third, and fifth pages
 });
 ```
 
@@ -259,13 +263,13 @@ const pngPages = await pdfToPng(pdfBuffer, {
 // Without returning page content (saves memory for large PDFs)
 const pngPages = await pdfToPng('large-document.pdf', {
     outputFolder: './output',
-    returnPageContent: false,        // Don't keep PNG buffers in memory
-    processPagesInParallel: true,    // Process multiple pages concurrently
+    returnPageContent: false, // Don't keep PNG buffers in memory
+    processPagesInParallel: true, // Process multiple pages concurrently
     concurrencyLimit: 4,
 });
 
 // Pages are written to disk, content property will be undefined
-pngPages.forEach(page => {
+pngPages.forEach((page) => {
     if (page.kind === 'file') {
         console.log(`Saved: ${page.path}`);
     }
@@ -280,7 +284,7 @@ const pages = await pdfToPng('document.pdf', {
     returnMetadataOnly: true,
 });
 
-pages.forEach(page => {
+pages.forEach((page) => {
     console.log(`Page ${page.pageNumber}: ${page.width}x${page.height}px, rotation=${page.rotation}`);
 });
 ```

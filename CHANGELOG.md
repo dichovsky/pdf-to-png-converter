@@ -9,12 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+No unreleased changes yet.
+
+---
+
+## [4.0.0] — 2026-04-28
+
 ### Security
+
 - Pinned GitHub Actions to full commit SHAs to prevent supply-chain attacks via mutable tags
 - Added explicit `permissions: contents: read` to all workflows
 - Added `npm audit --audit-level=high` step to CI and publish workflows
 
 ### Added
+
 - `SECURITY.md` with vulnerability disclosure policy
 - `CHANGELOG.md` (this file)
 - `CONTRIBUTING.md` with contributor guide
@@ -22,7 +30,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `.editorconfig` for consistent editor settings across contributors
 - `.github/dependabot.yml` for automated weekly npm and GitHub Actions updates
 - `docker-compose.yml` for local Docker test runs
-- `tsconfig.test.json` to type-check `__tests__/` in CI alongside `src/`
 - `prepublishOnly` script to prevent stale local publishes
 - Pre-commit hooks via husky + lint-staged (ESLint + Prettier on staged files)
 - `license-checker` as a pinned devDependency (replaces `npx license-checker`)
@@ -31,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `pull_request` trigger added to test workflow
 
 ### Changed
+
 - **Breaking (major):** `PngPageOutput` is now a discriminated union with `kind: 'metadata' | 'content' | 'file'`; consumers should branch on `kind` before using mode-specific fields like `path` or `content`
 - Docker base image switched from `node:22.19.0` to `node:22.19.0-slim`
 - Dockerfile now runs as non-root `node` user
@@ -45,10 +53,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - All optional properties in README options table now marked with `?`
 
 ### Fixed
+
 - Wrong import path in `props.to.pdf.doc.init.params.test.ts` (`../src/types/...` → `../src/interfaces/...`)
 - Split `import type { Canvas}` with missing space in `canvas.and.context.ts` merged into single import
 
 ### Refactored
+
 - Extracted `processAndSavePage` helper to eliminate duplicated render+save logic in parallel and sequential paths
 - Eliminated redundant `pngPagesOutput` outer array in `pdfToPng`
 - Split `processPdfPage` into `getPageMetadata` (metadata-only path) and `renderPdfPage` (render path)
@@ -59,6 +69,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [3.15.0] — 2026-03-31
 
 ### Fixed
+
 - `viewportScale` maximum limit updated to 100; error messages updated accordingly
 - Canvas pixel-area cap added to prevent OOM on extreme viewport scales
 - `pageViewportScale` captured before first `await` to prevent mutation between validation and rendering
@@ -72,11 +83,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [3.14.0] — 2026-02-26
 
 ### Added
+
 - `returnMetadataOnly` option: returns page dimensions and rotation without rendering
 - `concurrencyLimit` option for parallel page processing
 - `outputFileMaskFunc` for custom page filename generation
 
 ### Changed
+
 - Migrated canvas dependency to `@napi-rs/canvas` (pre-built binaries, no node-gyp)
 - Updated `pdfjs-dist` to v5
 
@@ -85,6 +98,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [3.7.0] — 2025-03-06
 
 ### Added
+
 - `processPagesInParallel` option using `Promise.all` with configurable concurrency
 
 ---
@@ -92,6 +106,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [3.3.0] — 2024-08-30
 
 ### Added
+
 - `pagesToProcess` option to convert specific pages
 
 ---
@@ -99,6 +114,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [3.0.0] — 2023-04-09
 
 ### Changed
+
 - Module type changed to CommonJS (`"type": "commonjs"`)
 - `"moduleResolution": "node16"` — `.js` extensions required in relative imports
 
@@ -107,12 +123,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.0.0] — 2022-05-07
 
 ### Added
+
 - Initial stable release
 - `pdfToPng(pdfFile, options?)` public API
 - File path and `ArrayBuffer` input support
 - `outputFolder`, `viewportScale`, `pdfFilePassword`, `disableFontFace`, `useSystemFonts`, `enableXfa` options
 
-[Unreleased]: https://github.com/dichovsky/pdf-to-png-converter/compare/v3.15.0...HEAD
+[Unreleased]: https://github.com/dichovsky/pdf-to-png-converter/compare/v4.0.0...HEAD
+[4.0.0]: https://github.com/dichovsky/pdf-to-png-converter/compare/v3.15.0...v4.0.0
 [3.15.0]: https://github.com/dichovsky/pdf-to-png-converter/compare/release/v3.14.0...v3.15.0
 [3.14.0]: https://github.com/dichovsky/pdf-to-png-converter/compare/release/v3.7.0...release/v3.14.0
 [3.7.0]: https://github.com/dichovsky/pdf-to-png-converter/compare/release/v3.3.0...release/v3.7.0

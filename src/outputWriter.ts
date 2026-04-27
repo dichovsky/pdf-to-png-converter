@@ -1,6 +1,6 @@
 import { promises as fsPromises } from 'node:fs';
 import { dirname, isAbsolute, join, relative, sep } from 'node:path';
-export function isEscapingRelativePath(rel: string): boolean {
+function isEscapingRelativePath(rel: string): boolean {
     return rel === '..' || rel.startsWith('..' + sep) || isAbsolute(rel);
 }
 
