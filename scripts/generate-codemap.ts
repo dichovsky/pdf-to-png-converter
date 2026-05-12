@@ -153,11 +153,7 @@ async function discoverSources(config: CodemapConfig): Promise<string[]> {
         )
     ).flat();
     return all
-        .filter((abs) => {
-            const rel = toPosix(relative(ROOT, abs));
-            if (compiled.some((rx) => rx.test(rel))) return false;
-            return !rel.endsWith('.d.ts') || rel.startsWith('src/types/');
-        })
+        .filter((abs) => !compiled.some((rx) => rx.test(toPosix(relative(ROOT, abs)))))
         .sort(cmp);
 }
 
@@ -455,9 +451,9 @@ function collectPublicApi(
             entries.push({
                 name: stmt.exportClause.name.text,
                 kind: 'namespace',
-                file: target,
+                file: relPath,
                 line: getLine(sf, stmt),
-                signature: `export * as ${stmt.exportClause.name.text} from '${target}'`,
+                signature: normalizeSignature(sf.text.slice(stmt.getStart(sf), stmt.getEnd()), ctx.maxLen),
                 jsdoc: '',
                 typeOnly: t,
             });

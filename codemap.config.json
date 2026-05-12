@@ -4,6 +4,7 @@
     "exclude": [
         "**/*.test.ts",
         "**/*.spec.ts",
+        "**/*.d.ts",
         "__tests__/**",
         "e2e/**",
         "test-data/**",
