@@ -53,6 +53,7 @@
         "build:test": "tsc --pretty --noEmit --project tsconfig.json",
         "clean": "rimraf ./out ./test-results",
         "codemap": "ts-node scripts/generate-codemap.ts",
+        "codemap:check": "ts-node scripts/generate-codemap.ts --check",
         "docker:build": "docker build --build-arg NODE_VERSION=$(cat .nvmrc) --compress -t test-pdf-to-png-converter .",
         "docker:run": "docker run --rm -it -v ${PWD}/test-results:/usr/pkg/test-results test-pdf-to-png-converter",
         "docker:test": "vitest run --coverage",
@@ -61,7 +62,7 @@
         "lint": "eslint .",
         "prepare": "husky",
         "prepublishOnly": "npm test && npm run build",
-        "pretest": "npm run clean && npm run build:test && npm run lint && npm run test:license",
+        "pretest": "npm run clean && npm run build:test && npm run codemap:check && npm run lint && npm run test:license",
         "test": "vitest run --coverage",
         "test:docker": "npm run clean && npm run docker:build && npm run docker:run",
         "test:fast": "vitest run --reporter=dot --no-coverage",
@@ -77,25 +78,25 @@
         ]
     },
     "dependencies": {
-        "@napi-rs/canvas": "~0.1.100",
+        "@napi-rs/canvas": "~1.0.0",
         "pdfjs-dist": "~5.7.284"
     },
     "devDependencies": {
         "@eslint/js": "^10.0.1",
-        "@types/node": "^25.6.0",
-        "@typescript-eslint/eslint-plugin": "^8.59.1",
-        "@typescript-eslint/parser": "^8.59.1",
-        "@vitest/coverage-v8": "^4.1.5",
-        "eslint": "^10.2.1",
+        "@types/node": "^25.7.0",
+        "@typescript-eslint/eslint-plugin": "^8.59.3",
+        "@typescript-eslint/parser": "^8.59.3",
+        "@vitest/coverage-v8": "^4.1.6",
+        "eslint": "^10.3.0",
         "husky": "^9.1.7",
         "license-checker": "^25.0.1",
-        "lint-staged": "^16.4.0",
+        "lint-staged": "^17.0.4",
         "png-visual-compare": "^6.0.0",
         "prettier": "^3.8.3",
         "rimraf": "^6.1.3",
         "ts-node": "^10.9.2",
         "typescript": "^6.0.3",
-        "vitest": "^4.1.5"
+        "vitest": "^4.1.6"
     },
     "packageManager": "npm@11.13.0",
     "engines": {

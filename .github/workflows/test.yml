@@ -23,6 +23,8 @@ jobs:
             - name: Strict type check
               run: npm run build:strict
               continue-on-error: true
+            - name: Verify CODEMAP.md is up to date
+              run: npm run codemap:check
             - name: Test
               run: npm test
             - name: Upload coverage
