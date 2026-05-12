@@ -90,7 +90,7 @@
         "eslint": "^10.3.0",
         "husky": "^9.1.7",
         "license-checker": "^25.0.1",
-        "lint-staged": "^16.4.0",
+        "lint-staged": "^17.0.4",
         "png-visual-compare": "^6.0.0",
         "prettier": "^3.8.3",
         "rimraf": "^6.1.3",
