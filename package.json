@@ -62,7 +62,7 @@
         "lint": "eslint .",
         "prepare": "husky",
         "prepublishOnly": "npm test && npm run build",
-        "pretest": "npm run clean && npm run build:strict && npm run codemap:check && npm run lint && npm run test:license",
+        "pretest": "npm run clean && npm run build:test && npm run build:strict && npm run codemap:check && npm run lint && npm run test:license",
         "test": "vitest run --coverage",
         "test:docker": "npm run clean && npm run docker:build && npm run docker:run",
         "test:fast": "vitest run --reporter=dot --no-coverage",

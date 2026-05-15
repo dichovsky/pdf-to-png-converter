@@ -35,7 +35,9 @@ npx vitest run __tests__/<filename>.test.ts
 
 `npm run build:strict` runs `tsc` against `tsconfig.strict.json`, which disables `skipLibCheck` to surface type regressions in `pdfjs-dist` and `@napi-rs/canvas`. This step blocks CI and is part of `pretest`, so it also runs on every local `npm test` and on `prepublishOnly`.
 
-If `build:strict` fails because of an upstream type, suppress at the import site with `// @ts-expect-error <reason> — upstream <pkg>@<range>` (see `src/pageRenderer.ts` for the canonical example). `@ts-expect-error` is self-cleaning: when the upstream typing is fixed, strict reports the unused suppression and you can remove the line.
+If `build:strict` fails because of an upstream type, suppress on the line immediately above the failing call or assignment with `// @ts-expect-error <reason> — upstream <pkg>@<range>`. `@ts-expect-error` is self-cleaning: when the upstream typing is fixed, strict reports the unused suppression and you can remove the line.
+
+**Exception — when to use `@ts-ignore` instead.** `@ts-expect-error` fails if no error exists. If the upstream type error is only visible under `build:strict`'s `skipLibCheck: false` (i.e. it disappears when `build:test` runs the same file with `skipLibCheck: true`), `@ts-expect-error` reports as an "unused directive" under `build:test` and breaks the pretest chain. In that case, use `// eslint-disable-next-line @typescript-eslint/ban-ts-comment` + `// @ts-ignore <reason> — upstream <pkg>@<range>` instead. The canonical example is the `page.render(...)` call in `src/pageRenderer.ts`, where the `SKRSContext2D` vs `CanvasRenderingContext2D` mismatch is hidden by `skipLibCheck:true`.
 
 Do not work around `build:strict` failures by adding `continue-on-error` to the workflow or `|| true` to the script.
 

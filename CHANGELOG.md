@@ -11,11 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- CI now blocks on `npm run build:strict`; the strict type-check is no longer advisory (`continue-on-error: true` removed from `.github/workflows/test.yml`). `pretest` runs `build:strict` instead of `build:test`, so local `npm test` and `prepublishOnly` also gate on strict. The standalone `build:test` script remains for ad-hoc dev type-checking.
+- CI now blocks on `npm run build:strict`; the strict type-check is no longer advisory. `continue-on-error: true` is removed from `.github/workflows/test.yml` and the dedicated CI "Strict type check" step is replaced by `pretest` gating (avoiding a double run on CI). `pretest` now runs `build:strict` alongside `build:test` — the two type-checks enforce different contracts: `build:test` (using `tsconfig.json`, no DOM lib) gates `src/` against accidental DOM globals (`document`, `window`) that production builds would reject; `build:strict` (using `tsconfig.strict.json`, `skipLibCheck: false` + DOM lib for `@napi-rs/canvas` type resolution) gates against upstream type regressions in `pdfjs-dist` / `@napi-rs/canvas`. Local `npm test` and `prepublishOnly` now gate on both.
 
 ### Refactored
 
-- Migrated the upstream-type suppression in `src/pageRenderer.ts` from `@ts-ignore` to `@ts-expect-error`, so the suppression self-cleans when `pdfjs-dist` / `@napi-rs/canvas` typings improve. Added a comment in `tsconfig.strict.json` explaining the intentional DOM-lib divergence from `tsconfig.json`. Added a "Strict type-check" section to `CONTRIBUTING.md` documenting the failure-handling playbook.
+- Updated the stale version pin in the existing `@ts-ignore` suppression in `src/pageRenderer.ts` from `pdfjs-dist@~5.6.205` to `pdfjs-dist@~5.7.x` and clarified why `@ts-ignore` (not `@ts-expect-error`) is required for this site — the underlying type error is hidden by `build:test`'s `skipLibCheck:true`, which would cause `@ts-expect-error` to report as unused. Added a comment in `tsconfig.strict.json` explaining the intentional DOM-lib divergence from `tsconfig.json`. Added a "Strict type-check" section to `CONTRIBUTING.md` documenting the failure-handling playbook (default `@ts-expect-error` for self-cleaning; `@ts-ignore` exception for `skipLibCheck`-hidden errors).
 
 ---
 
