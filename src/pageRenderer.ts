@@ -72,8 +72,7 @@ export async function renderPdfPage(
         if (!canvas) {
             throw new Error('NodeCanvasFactory.create returned a null canvas');
         }
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore — upstream pdfjs-dist@~5.6.205 expects DOM CanvasRenderingContext2D, but @napi-rs/canvas exposes SKRSContext2D here.
+        // @ts-expect-error — upstream pdfjs-dist@~5.7.x expects DOM CanvasRenderingContext2D, but @napi-rs/canvas exposes SKRSContext2D here.
         await page.render({ canvasContext: context, viewport, canvas }).promise;
         return {
             kind: 'content',

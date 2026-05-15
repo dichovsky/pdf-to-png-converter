@@ -1,6 +1,8 @@
 {
     "extends": "./tsconfig.json",
     "compilerOptions": {
+        // DOM lib is required here so skipLibCheck:false can resolve @napi-rs/canvas types that reference HTMLCanvasElement / CanvasRenderingContext2D.
+        // It is intentionally NOT in tsconfig.json — production builds (tsconfig.prod.json) and build:test should not see DOM globals in src/.
         "lib": ["ES2024", "ESNext.Array", "ESNext.Collection", "ESNext.Iterator", "DOM"],
         "skipLibCheck": false,
         "noEmit": true

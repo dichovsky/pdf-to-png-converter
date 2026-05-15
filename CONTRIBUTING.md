@@ -31,6 +31,14 @@ Run a single test file:
 npx vitest run __tests__/<filename>.test.ts
 ```
 
+## Strict type-check
+
+`npm run build:strict` runs `tsc` against `tsconfig.strict.json`, which disables `skipLibCheck` to surface type regressions in `pdfjs-dist` and `@napi-rs/canvas`. This step blocks CI and is part of `pretest`, so it also runs on every local `npm test` and on `prepublishOnly`.
+
+If `build:strict` fails because of an upstream type, suppress at the import site with `// @ts-expect-error <reason> — upstream <pkg>@<range>` (see `src/pageRenderer.ts` for the canonical example). `@ts-expect-error` is self-cleaning: when the upstream typing is fixed, strict reports the unused suppression and you can remove the line.
+
+Do not work around `build:strict` failures by adding `continue-on-error` to the workflow or `|| true` to the script.
+
 ## Coding Conventions
 
 - **Language:** TypeScript (strict mode). All source lives under `src/`.

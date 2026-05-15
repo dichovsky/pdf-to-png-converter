@@ -9,7 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-No unreleased changes yet.
+### Changed
+
+- CI now blocks on `npm run build:strict`; the strict type-check is no longer advisory (`continue-on-error: true` removed from `.github/workflows/test.yml`). `pretest` runs `build:strict` instead of `build:test`, so local `npm test` and `prepublishOnly` also gate on strict. The standalone `build:test` script remains for ad-hoc dev type-checking.
+
+### Refactored
+
+- Migrated the upstream-type suppression in `src/pageRenderer.ts` from `@ts-ignore` to `@ts-expect-error`, so the suppression self-cleans when `pdfjs-dist` / `@napi-rs/canvas` typings improve. Added a comment in `tsconfig.strict.json` explaining the intentional DOM-lib divergence from `tsconfig.json`. Added a "Strict type-check" section to `CONTRIBUTING.md` documenting the failure-handling playbook.
 
 ---
 
