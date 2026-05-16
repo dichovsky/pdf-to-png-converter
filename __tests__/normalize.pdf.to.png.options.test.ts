@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest';
+import { MAX_CONCURRENCY_LIMIT, MAX_INPUT_BYTES } from '../src/const';
 import type { PdfToPngOptions } from '../src/interfaces/pdf.to.png.options.js';
 import { normalizePdfToPngOptions } from '../src/normalizePdfToPngOptions';
 
@@ -17,6 +18,7 @@ test('should apply defaults when options are undefined', () => {
         returnMetadataOnly: false,
         processPagesInParallel: false,
         concurrencyLimit: 4,
+        maxInputBytes: MAX_INPUT_BYTES,
     });
 });
 
@@ -38,6 +40,7 @@ test('should preserve explicitly provided happy-path values', () => {
             returnMetadataOnly: true,
             processPagesInParallel: true,
             concurrencyLimit: 2,
+            maxInputBytes: 1024,
         }),
     ).toEqual({
         viewportScale: 2,
@@ -53,7 +56,32 @@ test('should preserve explicitly provided happy-path values', () => {
         returnMetadataOnly: true,
         processPagesInParallel: true,
         concurrencyLimit: 2,
+        maxInputBytes: 1024,
     });
+});
+
+test('should reject concurrencyLimit values above MAX_CONCURRENCY_LIMIT when parallel is enabled', () => {
+    expect(() => normalizePdfToPngOptions({ processPagesInParallel: true, concurrencyLimit: MAX_CONCURRENCY_LIMIT + 1 })).toThrow(
+        `concurrencyLimit must be between 1 and ${MAX_CONCURRENCY_LIMIT}`,
+    );
+    expect(() => normalizePdfToPngOptions({ processPagesInParallel: true, concurrencyLimit: Number.MAX_SAFE_INTEGER })).toThrow(
+        `concurrencyLimit must be between 1 and ${MAX_CONCURRENCY_LIMIT}`,
+    );
+});
+
+test('should allow concurrencyLimit equal to MAX_CONCURRENCY_LIMIT', () => {
+    expect(() => normalizePdfToPngOptions({ processPagesInParallel: true, concurrencyLimit: MAX_CONCURRENCY_LIMIT })).not.toThrow();
+});
+
+test('should ignore concurrencyLimit upper bound when parallel mode is disabled', () => {
+    expect(() => normalizePdfToPngOptions({ concurrencyLimit: Number.MAX_SAFE_INTEGER })).not.toThrow();
+});
+
+test('should reject non-positive or non-integer maxInputBytes', () => {
+    expect(() => normalizePdfToPngOptions({ maxInputBytes: 0 })).toThrow('maxInputBytes must be a positive integer');
+    expect(() => normalizePdfToPngOptions({ maxInputBytes: -1 })).toThrow('maxInputBytes must be a positive integer');
+    expect(() => normalizePdfToPngOptions({ maxInputBytes: 1.5 })).toThrow('maxInputBytes must be a positive integer');
+    expect(() => normalizePdfToPngOptions({ maxInputBytes: Number.NaN })).toThrow('maxInputBytes must be a positive integer');
 });
 
 test('should reject an empty outputFolder before any I/O', () => {

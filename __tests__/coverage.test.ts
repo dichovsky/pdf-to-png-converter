@@ -14,12 +14,15 @@ vi.mock('node:fs', () => ({
             close: vi.fn().mockResolvedValue(undefined),
         }),
         realpath: vi.fn(),
+        stat: vi.fn(),
     },
 }));
 
 vi.mock('pdfjs-dist/legacy/build/pdf.mjs', () => ({
     getDocument: vi.fn(),
 }));
+
+const defaultStat = { size: 8, isFile: (): boolean => true } as Awaited<ReturnType<typeof fsPromises.stat>>;
 
 beforeEach(() => {
     (fsPromises.readFile as Mock).mockReset();
@@ -29,6 +32,7 @@ beforeEach(() => {
         close: vi.fn().mockResolvedValue(undefined),
     });
     (fsPromises.realpath as Mock).mockReset();
+    (fsPromises.stat as Mock).mockReset().mockResolvedValue(defaultStat);
     (getDocument as Mock).mockReset();
 });
 

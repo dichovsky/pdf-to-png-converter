@@ -324,3 +324,91 @@ This backlog captures architectural, typing, maintainability, reliability, perfo
     2. `npm run build:strict` runs without a script error (exit 0 or `|| true`).
     3. `.github/workflows/test.yml` includes the `build:strict` step.
     4. `npm test` passes unchanged.
+
+---
+
+## Security Findings (Post-v4.0.0 CTF Hunt)
+
+> CTF-style vulnerability findings discovered after the v4.0.0 release. Each item below is unshipped and uses the same agent-execution rules as the items above.
+
+### [x] SEC-001 Reject path-separator characters in resolved page names (close TOCTOU on intermediate directories)
+
+- **Severity:** High in multi-tenant / co-tenant write contexts; Low for single-user CLI usage.
+- **Problem:** `outputFileMaskFunc` is a user-supplied callback whose returned filename flows through `resolvePageName()` (`src/pageOrchestrator.ts:15`) directly into `savePNGfile()` (`src/outputWriter.ts:18`). The containment check in `outputWriter.ts` is:
+    1. `isAbsolute(name)` — rejects absolute paths.
+    2. `relative(resolvedOutputFolder, join(resolvedOutputFolder, name))` — rejects strings that escape upward via `..`.
+    3. `fsPromises.realpath(dirname(resolvedFilePath))` — informational realpath of the **parent directory** of the target file.
+    4. `fsPromises.realpath(resolvedOutputFolder)` re-check — only verifies the **top-level** output folder is still the expected real path.
+    5. `fsPromises.open(resolvedFilePath, 'wx')` — the `'wx'` flag prevents overwriting an existing target, but `open()` still follows symlinks present in **intermediate** path components.
+       When `name` contains a path separator (e.g. an attacker-controlled `outputFileMaskFunc` returning `"sub/page.png"`, or any consumer who legitimately wants subdirectory output), step 4 does not cover the intermediate `sub/` component. Between step 3's `realpath(dirname)` and step 5's `open()`, a co-tenant or attacker with write access to `resolvedOutputFolder` can swap `sub` for a symlink pointing outside the output folder. The write then lands at an attacker-chosen path. The `savePNGfile` JSDoc explicitly admits this: _"A residual TOCTOU window still exists for directory-component swaps."_
+- **Technical rationale:** The library currently accepts `name` strings that contain path separators (POSIX `/`, Windows `\`) without rejecting them, even though the containment guarantee only holds for **flat** filenames (no separators). Closing this gap by rejecting separators in `name` eliminates the entire TOCTOU class for intermediate directories — without requiring `openat()` (which Node.js does not expose directly). It also matches the de facto contract of the existing tests in `__tests__/path.traversal.test.ts`, which only cover flat filenames.
+- **Reproducer (conceptual):**
+    1. Two-user shared output folder `/shared/out` (mode `0777`).
+    2. Victim calls `pdfToPng('doc.pdf', { outputFolder: '/shared/out', outputFileMaskFunc: () => 'sub/page.png' })` after attacker creates `/shared/out/sub` as a real directory.
+    3. Attacker runs a tight loop: `unlink('/shared/out/sub'); symlink('/etc/cron.d', '/shared/out/sub')`.
+    4. Eventually the swap wins the race between `realpath(dirname(...))` and `open(..., 'wx')`. Write lands at `/etc/cron.d/page.png`.
+- **Implementation direction:**
+    1. In `src/pageOrchestrator.ts`, modify `resolvePageName` so that, after either the default-mask or the `outputFileMaskFunc` branch produces `name`, it throws `Error('outputFileMaskFunc returned a filename containing a path separator: <name>')` when `name` contains any of `/`, `\\`, or `path.sep` (use `/[\\\\\\/]/.test(name)`).
+    2. Add the same guard at the top of `src/outputWriter.ts:savePNGfile` (defense in depth — `savePNGfile` is also `export`ed and reachable via the `FilesystemSink`).
+    3. Update the JSDoc on `savePNGfile` to remove the _"residual TOCTOU"_ admission and replace it with a one-line statement that `name` must be a flat filename (no separators).
+- **Acceptance criteria:**
+    1. `resolvePageName(1, 'doc', () => 'sub/page.png')` throws synchronously.
+    2. `resolvePageName(1, 'doc', () => 'sub\\\\page.png')` throws synchronously (Windows separator rejected on all platforms).
+    3. `resolvePageName(1, 'doc', () => 'page.png')` returns `'page.png'` unchanged.
+    4. `savePNGfile('sub/page.png', Buffer.from([]), '/tmp/out', '/tmp/out')` throws synchronously before any filesystem call.
+    5. A new test row is added to `__tests__/path.traversal.test.ts` asserting the rejection for both POSIX and Windows separators.
+    6. All existing tests in `__tests__/path.traversal.test.ts` and `__tests__/security.path.test.ts` still pass unchanged.
+    7. `npm test`, `npm run build:test`, and `npm run lint` pass.
+
+### [x] SEC-002 Bound input PDF size to prevent OOM denial-of-service
+
+- **Severity:** High in service / multi-tenant contexts where `pdfFile` paths or buffers originate from untrusted callers; N/A for trusted local CLI usage.
+- **Problem:** `getPdfFileBuffer()` (`src/pdfInput.ts:5`) reads the entire input via `await fsPromises.readFile(pdfFile)` with no size cap. On Linux, passing `'/dev/zero'` (or a sparse multi-TB file, or a fifo backed by a streaming producer) consumes memory until the Node.js process is OOM-killed. There is also no `maxInputBytes` validation on the `ArrayBufferLike | Uint8Array` branch — a caller (or upstream untrusted source feeding a buffer) can supply an arbitrarily large buffer that pdfjs will then attempt to parse, multiplying memory pressure. The existing `MAX_VIEWPORT_SCALE` and `MAX_CANVAS_PIXELS` guards (`src/const.ts:8,14`) cap rendering memory but not parsing memory.
+- **Technical rationale:** OOM on a long-running Node service is a clean DoS — restart costs cascade, in-flight requests die, and on Kubernetes the pod is killed and rescheduled. A pre-read `stat()` is essentially free compared to a `readFile()` of an unbounded path, and rejecting oversized buffers in the buffer branch is a single length check.
+- **Reproducer (Linux):**
+    ```ts
+    await pdfToPng('/dev/zero'); // Process RSS climbs until OOM-killer fires.
+    ```
+    ```ts
+    await pdfToPng(new Uint8Array(2 ** 31 - 1)); // ~2 GiB buffer, pdfjs parses garbage.
+    ```
+- **Implementation direction:**
+    1. Add `MAX_INPUT_BYTES = 256 * 1024 * 1024` (256 MiB) to `src/const.ts` with a JSDoc explaining the rationale (a generous bound for legitimate PDFs while keeping a single conversion below typical container memory limits).
+    2. Extend `PdfToPngOptions` (`src/interfaces/pdf.to.png.options.ts`) with `maxInputBytes?: number` — optional override capped at `Number.MAX_SAFE_INTEGER`. Document it in JSDoc and in `README.md`.
+    3. In `src/normalizePdfToPngOptions.ts`, add validation: throw `Error('maxInputBytes must be a positive integer')` for non-integer or `<= 0` values. Default to `MAX_INPUT_BYTES`.
+    4. In `src/pdfInput.ts`, before `fsPromises.readFile`, call `await fsPromises.stat(pdfFile)` on the path branch and throw `Error(\`Input PDF exceeds maxInputBytes (\${stats.size} > \${maxInputBytes})\`)`if`stats.size > maxInputBytes`. Also reject when `stats.isFile() === false`(this fails closed for`/dev/zero`, fifos, sockets, and directories, all of which have `isFile() === false` on Linux).
+    5. On the buffer branch (`Buffer.isBuffer`, `ArrayBufferLike`, `Uint8Array`), throw the same error when `byteLength > maxInputBytes`.
+    6. Update `getPdfFileBuffer()` to accept `maxInputBytes` as a parameter; `pdfToPng()` passes the normalized value through.
+- **Acceptance criteria:**
+    1. `pdfToPng('/dev/zero')` rejects synchronously with the "exceeds maxInputBytes" error (or "not a regular file" error) — does NOT hang or grow memory unboundedly. Verified by a test using `vi.mock('node:fs')` to simulate `stat` returning `{ size: Infinity, isFile: () => false }`.
+    2. `pdfToPng(new Uint8Array(MAX_INPUT_BYTES + 1))` rejects synchronously with the same error.
+    3. `pdfToPng('test-data/sample.pdf', { maxInputBytes: 100 })` rejects (sample.pdf is larger than 100 bytes).
+    4. `pdfToPng('test-data/sample.pdf', { maxInputBytes: 100 * 1024 * 1024 })` succeeds.
+    5. `normalizePdfToPngOptions({ maxInputBytes: 0 })` and `normalizePdfToPngOptions({ maxInputBytes: -1 })` throw.
+    6. A new test file `__tests__/input.size.limit.test.ts` covers each case above.
+    7. `npm test`, `npm run build:test`, and `npm run lint` pass.
+
+### [x] SEC-003 Cap `concurrencyLimit` upper bound to prevent canvas-allocation OOM
+
+- **Severity:** High in service / multi-tenant contexts where `PdfToPngOptions` and the input PDF originate from untrusted callers; Low for trusted local CLI usage.
+- **Problem:** `normalizePdfToPngOptions()` validates only the **lower** bound of `concurrencyLimit` (`src/normalizePdfToPngOptions.ts:47-50`): `if (processPagesInParallel && (!Number.isInteger(concurrencyLimit) || concurrencyLimit < 1))` — any positive integer is accepted, up to `Number.MAX_SAFE_INTEGER`. The sliding-window scheduler then spawns `Math.min(concurrencyLimit, pageNumbers.length)` workers (`src/pdfToPng.ts:35`), so for a multi-page document the worker count grows linearly with the smaller of the two. Each worker allocates a canvas whose area is bounded by `MAX_CANVAS_PIXELS = 100_000_000` (~400 MB of raw bitmap memory at 4 bytes/pixel, per `src/const.ts:14`). The per-page guard in `renderPdfPage()` (`src/pageRenderer.ts:61`) protects against a single oversized canvas, but it does **not** protect against many simultaneous canvases.
+- **Technical rationale:** With both knobs attacker-controlled, peak memory ≈ `min(concurrencyLimit, pages) × MAX_CANVAS_PIXELS × 4 bytes`. Upload a 1000-page PDF with modest per-page dimensions, set `processPagesInParallel: true, concurrencyLimit: 1000`, and the process attempts ~400 GB of bitmap allocations — far above any realistic container memory limit, triggering immediate OOM. Even at moderate values (`concurrencyLimit: 64`, full-bleed pages near the pixel cap), peak memory ≈ 25 GB, well above typical service limits. Capping `concurrencyLimit` to a sane upper bound is a one-line validation change; the default `4` is unaffected.
+- **Reproducer (conceptual):**
+    ```ts
+    // Attacker uploads a 500-page PDF with full-bleed-near-cap pages, then:
+    await pdfToPng(attackerPdf, { processPagesInParallel: true, concurrencyLimit: 500 });
+    // Process RSS spikes; OOM-killer fires before any page completes.
+    ```
+- **Implementation direction:**
+    1. Add `MAX_CONCURRENCY_LIMIT = 16` to `src/const.ts` with a JSDoc explaining the bound: peak memory at this cap ≈ `16 × 400 MB = 6.4 GB`, which is a defensible ceiling for typical Node.js service containers and still allows realistic parallelism.
+    2. In `src/normalizePdfToPngOptions.ts`, extend the existing validation block (lines 47–50) to also reject values `> MAX_CONCURRENCY_LIMIT`: throw `Error(\`concurrencyLimit must be between 1 and \${MAX_CONCURRENCY_LIMIT}, received: \${concurrencyLimit}\`)`.
+    3. Apply the cap **only when `processPagesInParallel === true`** to preserve the documented default behavior of `concurrencyLimit: 4` for sequential mode (where the value is effectively unused).
+    4. Update the JSDoc for `concurrencyLimit` in `src/interfaces/pdf.to.png.options.ts` (lines 116–124) to document the upper bound and its rationale.
+    5. Update `README.md` to document the cap.
+- **Acceptance criteria:**
+    1. `pdfToPng('test-data/sample.pdf', { processPagesInParallel: true, concurrencyLimit: 17 })` throws synchronously with the new bounded error message.
+    2. `pdfToPng('test-data/sample.pdf', { processPagesInParallel: true, concurrencyLimit: 16 })` succeeds.
+    3. `pdfToPng('test-data/sample.pdf', { processPagesInParallel: true, concurrencyLimit: Number.MAX_SAFE_INTEGER })` throws synchronously — no canvas is ever allocated.
+    4. `pdfToPng('test-data/sample.pdf')` (sequential default) still succeeds with no impact from this cap.
+    5. The existing test `__tests__/pdf.to.png.concurrency.limit.validation.test.ts` is extended with three new cases: `concurrencyLimit: MAX_CONCURRENCY_LIMIT` (passes), `concurrencyLimit: MAX_CONCURRENCY_LIMIT + 1` (throws), `concurrencyLimit: Number.MAX_SAFE_INTEGER` with `processPagesInParallel: true` (throws).
+    6. `npm test`, `npm run build:test`, and `npm run lint` pass.

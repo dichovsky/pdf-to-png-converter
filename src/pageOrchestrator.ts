@@ -3,6 +3,16 @@ import type { FilePngPageOutput, PngPageOutput } from './interfaces/index.js';
 import type { OutputSink } from './interfaces/output.sink.js';
 import { getPageMetadata, renderPdfPage } from './pageRenderer.js';
 
+const PATH_SEPARATOR_PATTERN = /[\\/]/;
+
+function assertFlatFilename(name: string, pageNumber: number): void {
+    if (PATH_SEPARATOR_PATTERN.test(name)) {
+        throw new Error(
+            `outputFileMaskFunc returned a filename containing a path separator for page ${pageNumber}: "${name}". The filename must be a flat name with no "/" or "\\" characters.`,
+        );
+    }
+}
+
 export function resolvePageName(
     pageNumber: number,
     defaultMask: string,
@@ -18,6 +28,8 @@ export function resolvePageName(
             `outputFileMaskFunc returned an empty filename for page ${pageNumber}. Provide a non-empty string including the .png extension.`,
         );
     }
+
+    assertFlatFilename(name, pageNumber);
 
     return name;
 }

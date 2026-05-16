@@ -9,6 +9,7 @@ vi.mock('node:fs', () => ({
         mkdir: vi.fn(),
         writeFile: vi.fn(),
         realpath: vi.fn(),
+        stat: vi.fn().mockResolvedValue({ size: 1024, isFile: (): boolean => true }),
     },
 }));
 

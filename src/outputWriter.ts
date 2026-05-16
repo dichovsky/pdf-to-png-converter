@@ -1,5 +1,8 @@
 import { promises as fsPromises } from 'node:fs';
 import { dirname, isAbsolute, join, relative, sep } from 'node:path';
+
+const PATH_SEPARATOR_PATTERN = /[\\/]/;
+
 function isEscapingRelativePath(rel: string): boolean {
     return rel === '..' || rel.startsWith('..' + sep) || isAbsolute(rel);
 }
@@ -7,15 +10,20 @@ function isEscapingRelativePath(rel: string): boolean {
 /**
  * Writes a rendered PNG page to disk using an exclusive-create open (`'wx'`) and returns the final path.
  *
- * This prevents overwriting an existing file and blocks following a pre-existing symlink
- * at the target filename on POSIX systems. Callers should clear the output folder before
- * re-running the same conversion if they expect to reuse the same output names. The input
- * object is not mutated; callers receive the resolved path from the return value.
- *
- * A residual TOCTOU window still exists for directory-component swaps, so the containment
- * checks and final realpath re-check remain necessary.
+ * The `name` argument must be a flat filename containing no `/` or `\` characters; rejecting
+ * separators here closes the TOCTOU window on intermediate directory components (an attacker
+ * with write access to the output folder could otherwise swap a sub-directory for a symlink
+ * between the realpath check and the `open()` call). The `'wx'` flag additionally prevents
+ * overwriting an existing target and blocks following a pre-existing symlink at the target
+ * filename on POSIX systems. Callers should clear the output folder before re-running the same
+ * conversion if they expect to reuse the same output names. The input object is not mutated;
+ * callers receive the resolved path from the return value.
  */
 export async function savePNGfile(name: string, content: Buffer, resolvedOutputFolder: string, realOutputFolder: string): Promise<string> {
+    if (PATH_SEPARATOR_PATTERN.test(name)) {
+        throw new Error(`Output file name must be a flat filename without path separators: ${name}`);
+    }
+
     if (isAbsolute(name)) {
         throw new Error(`Output file name escapes the output folder: ${name}`);
     }

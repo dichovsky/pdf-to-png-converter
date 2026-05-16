@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { MAX_CONCURRENCY_LIMIT } from '../src/const';
 import { pdfToPng } from '../src/pdfToPng';
 
 describe('pdfToPng concurrencyLimit validation', () => {
@@ -75,15 +76,44 @@ describe('pdfToPng concurrencyLimit validation', () => {
     });
 
     it('should return all pages when concurrencyLimit exceeds the page count', async () => {
-        // concurrencyLimit: 100 on a 2-page PDF — entire PDF fits in a single batch
+        // concurrencyLimit at the upper cap on a 2-page PDF — entire PDF fits in a single batch
         const result = await pdfToPng(pdfFilePath, {
             processPagesInParallel: true,
-            concurrencyLimit: 100,
+            concurrencyLimit: MAX_CONCURRENCY_LIMIT,
             returnMetadataOnly: true,
         });
         expect(result.length).toBe(2); // sample.pdf has 2 pages
         expect(result[0].pageNumber).toBe(1);
         expect(result[1].pageNumber).toBe(2);
+    });
+
+    it('should throw when concurrencyLimit exceeds MAX_CONCURRENCY_LIMIT', async () => {
+        await expect(
+            pdfToPng(pdfFilePath, {
+                processPagesInParallel: true,
+                concurrencyLimit: MAX_CONCURRENCY_LIMIT + 1,
+            }),
+        ).rejects.toThrow(`concurrencyLimit must be between 1 and ${MAX_CONCURRENCY_LIMIT}`);
+    });
+
+    it('should throw when concurrencyLimit is Number.MAX_SAFE_INTEGER', async () => {
+        await expect(
+            pdfToPng(pdfFilePath, {
+                processPagesInParallel: true,
+                concurrencyLimit: Number.MAX_SAFE_INTEGER,
+            }),
+        ).rejects.toThrow(`concurrencyLimit must be between 1 and ${MAX_CONCURRENCY_LIMIT}`);
+    });
+
+    it('should accept concurrencyLimit equal to MAX_CONCURRENCY_LIMIT', async () => {
+        const result = await pdfToPng(pdfFilePath, {
+            processPagesInParallel: true,
+            concurrencyLimit: MAX_CONCURRENCY_LIMIT,
+            returnMetadataOnly: true,
+            pagesToProcess: [1],
+        });
+        expect(result.length).toBe(1);
+        expect(result[0].pageNumber).toBe(1);
     });
 
     it('should return one page when processPagesInParallel is true with a single page requested', async () => {
