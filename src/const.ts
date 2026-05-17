@@ -43,6 +43,7 @@ export const PDF_TO_PNG_OPTIONS_DEFAULTS = {
     outputFileMask: 'buffer',
     pdfFilePassword: undefined,
     concurrencyLimit: 4,
+    maxInputBytes: MAX_INPUT_BYTES,
 };
 
 /**

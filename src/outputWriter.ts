@@ -1,7 +1,12 @@
 import { promises as fsPromises } from 'node:fs';
 import { dirname, isAbsolute, join, relative, sep } from 'node:path';
 
-const PATH_SEPARATOR_PATTERN = /[\\/]/;
+// Reject only characters the host OS treats as path separators. On POSIX, "\" is a valid
+// filename character (e.g. PDFs named `foo\bar.pdf` produce a default mask of `foo\bar`) so
+// rejecting it would break legitimate flat-filename conversions there. See SEC-001 in
+// CHANGELOG / BACKLOG for the threat model.
+const PATH_SEPARATOR_PATTERN = sep === '\\' ? /[\\/]/ : /\//;
+const SEPARATOR_DESCRIPTION = sep === '\\' ? '"/" or "\\"' : '"/"';
 
 function isEscapingRelativePath(rel: string): boolean {
     return rel === '..' || rel.startsWith('..' + sep) || isAbsolute(rel);
@@ -21,7 +26,7 @@ function isEscapingRelativePath(rel: string): boolean {
  */
 export async function savePNGfile(name: string, content: Buffer, resolvedOutputFolder: string, realOutputFolder: string): Promise<string> {
     if (PATH_SEPARATOR_PATTERN.test(name)) {
-        throw new Error(`Output file name must be a flat filename without path separators: ${name}`);
+        throw new Error(`Output file name must be a flat filename without ${SEPARATOR_DESCRIPTION} path separators: ${name}`);
     }
 
     if (isAbsolute(name)) {

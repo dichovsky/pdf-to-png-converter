@@ -10,7 +10,7 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
     "name": "pdf-to-png-converter",
     "version": "4.0.0"
   },
-  "sourceHash": "81d018f58055fe9747d759262b47d3f222cc51242edb1158947773eaaaf2dc7b",
+  "sourceHash": "f2d7efe3d0f5442c5d4d5b39d057e52069da1219fda341c8908211717fe80c88",
   "entrypoints": [
     "src/index.ts"
   ],
@@ -243,21 +243,21 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
         {
           "name": "CMAP_RELATIVE_URL",
           "kind": "variable",
-          "line": 55,
+          "line": 56,
           "exported": true,
           "signature": "export const CMAP_RELATIVE_URL = './node_modules/pdfjs-dist/cmaps/'"
         },
         {
           "name": "STANDARD_FONTS_RELATIVE_URL",
           "kind": "variable",
-          "line": 56,
+          "line": 57,
           "exported": true,
           "signature": "export const STANDARD_FONTS_RELATIVE_URL = './node_modules/pdfjs-dist/standard_fonts/'"
         },
         {
           "name": "DOCUMENT_INIT_PARAMS_DEFAULTS",
           "kind": "variable",
-          "line": 68,
+          "line": 69,
           "exported": true,
           "signature": "export const DOCUMENT_INIT_PARAMS_DEFAULTS: DocumentInitParameters = { cMapUrl: CMAP_RELATIVE_URL, cMapPacked: true, standardFontDataUrl: STANDARD_FONTS_RELATIVE_URL, }"
         }
@@ -582,7 +582,6 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
           "from": "./const.js",
           "names": [
             "MAX_CONCURRENCY_LIMIT",
-            "MAX_INPUT_BYTES",
             "MAX_VIEWPORT_SCALE",
             "PDF_TO_PNG_OPTIONS_DEFAULTS"
           ]
@@ -636,21 +635,28 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
         {
           "name": "PATH_SEPARATOR_PATTERN",
           "kind": "variable",
-          "line": 4,
+          "line": 8,
           "exported": false,
-          "signature": "const PATH_SEPARATOR_PATTERN = /[\\\\/]/"
+          "signature": "const PATH_SEPARATOR_PATTERN = sep === '\\\\' ? /[\\\\/]/ : /\\"
+        },
+        {
+          "name": "SEPARATOR_DESCRIPTION",
+          "kind": "variable",
+          "line": 9,
+          "exported": false,
+          "signature": "const SEPARATOR_DESCRIPTION = sep === '\\\\' ? '\"/\" or \"\\\\\"' : '\"/\"'"
         },
         {
           "name": "isEscapingRelativePath",
           "kind": "function",
-          "line": 6,
+          "line": 11,
           "exported": false,
           "signature": "function isEscapingRelativePath(rel: string): boolean"
         },
         {
           "name": "savePNGfile",
           "kind": "function",
-          "line": 22,
+          "line": 27,
           "exported": true,
           "signature": "export async function savePNGfile(name: string, content: Buffer, resolvedOutputFolder: string, realOutputFolder: string): Promise<string>"
         }
@@ -681,28 +687,35 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
         {
           "name": "PATH_SEPARATOR_PATTERN",
           "kind": "variable",
-          "line": 6,
+          "line": 11,
           "exported": false,
-          "signature": "const PATH_SEPARATOR_PATTERN = /[\\\\/]/"
+          "signature": "const PATH_SEPARATOR_PATTERN = sep === '\\\\' ? /[\\\\/]/ : /\\"
+        },
+        {
+          "name": "SEPARATOR_DESCRIPTION",
+          "kind": "variable",
+          "line": 12,
+          "exported": false,
+          "signature": "const SEPARATOR_DESCRIPTION = sep === '\\\\' ? '\"/\" or \"\\\\\"' : '\"/\"'"
         },
         {
           "name": "assertFlatFilename",
           "kind": "function",
-          "line": 8,
+          "line": 14,
           "exported": false,
           "signature": "function assertFlatFilename(name: string, pageNumber: number): void"
         },
         {
           "name": "resolvePageName",
           "kind": "function",
-          "line": 16,
+          "line": 22,
           "exported": true,
           "signature": "export function resolvePageName( pageNumber: number, defaultMask: string, outputFileMaskFunc: ((page: number) => string) | undefined, ): string"
         },
         {
           "name": "processAndSavePage",
           "kind": "function",
-          "line": 37,
+          "line": 43,
           "exported": true,
           "signature": "export async function processAndSavePage( pdfDocument: PDFDocumentProxy, pageName: string, pageNumber: number, pageViewportScale: number, shouldReturnContent: boolean, returnMetadataOnly: boolean, out…"
         }
@@ -726,6 +739,12 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
           "names": [
             "getPageMetadata",
             "renderPdfPage"
+          ]
+        },
+        {
+          "from": "node:path",
+          "names": [
+            "sep"
           ]
         },
         {

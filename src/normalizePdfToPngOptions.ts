@@ -1,4 +1,4 @@
-import { MAX_CONCURRENCY_LIMIT, MAX_INPUT_BYTES, MAX_VIEWPORT_SCALE, PDF_TO_PNG_OPTIONS_DEFAULTS } from './const.js';
+import { MAX_CONCURRENCY_LIMIT, MAX_VIEWPORT_SCALE, PDF_TO_PNG_OPTIONS_DEFAULTS } from './const.js';
 import type { PdfToPngOptions } from './interfaces/pdf.to.png.options.js';
 import { VerbosityLevel } from './types/verbosity.level.js';
 
@@ -55,7 +55,7 @@ export function normalizePdfToPngOptions(props: PdfToPngOptions | undefined): No
         }
     }
 
-    const maxInputBytes: number = props?.maxInputBytes ?? MAX_INPUT_BYTES;
+    const maxInputBytes: number = props?.maxInputBytes ?? PDF_TO_PNG_OPTIONS_DEFAULTS.maxInputBytes;
     if (!Number.isInteger(maxInputBytes) || maxInputBytes <= 0) {
         throw new Error(`maxInputBytes must be a positive integer, received: ${maxInputBytes}`);
     }
