@@ -18,6 +18,10 @@ export async function getPdfFileBuffer(
         rejectOversized(stats.size, maxInputBytes);
 
         const buffer = await fsPromises.readFile(pdfFile);
+        // Post-read re-check: closes the TOCTOU window between stat() and readFile().
+        // If the file was replaced or grew between the two calls, the buffer may exceed
+        // maxInputBytes — reject it before it propagates further into pdfjs parsing.
+        rejectOversized(buffer.byteLength, maxInputBytes);
         if (buffer instanceof ArrayBuffer) {
             return buffer;
         }

@@ -71,3 +71,18 @@ test('getPdfFileBuffer rejects a buffer one byte above maxInputBytes', async () 
     const input = new Uint8Array(9);
     await expect(getPdfFileBuffer(input, 8)).rejects.toThrow(/exceeds maxInputBytes/);
 });
+
+test('getPdfFileBuffer rejects when the file grows between stat() and readFile() (TOCTOU)', async () => {
+    // Pre-check sees a 100-byte file (passes), but readFile() returns a 1 KiB buffer —
+    // simulating an attacker growing the file between the two syscalls. The post-read
+    // re-check must reject the oversized payload.
+    vi.spyOn(fsPromises, 'stat').mockResolvedValueOnce({
+        size: 100,
+        isFile: (): boolean => true,
+    } as Awaited<ReturnType<typeof fsPromises.stat>>);
+    (vi.spyOn(fsPromises, 'readFile') as unknown as { mockResolvedValueOnce: (value: unknown) => unknown }).mockResolvedValueOnce(
+        Buffer.alloc(1024),
+    );
+
+    await expect(getPdfFileBuffer('/pretend/grew-mid-read.pdf', 512)).rejects.toThrow(/exceeds maxInputBytes/);
+});
