@@ -59,20 +59,23 @@ export async function pdfToPngCore(
     const pageViewportScale = normalizedProps.viewportScale;
     const pdfFileBuffer: Uint8Array | ArrayBufferLike = await getPdfFileBuffer(pdfFile, normalizedProps.maxInputBytes);
     const pdfDocument: PDFDocumentProxy = await getPdfDocument(pdfFileBuffer, normalizedProps);
-    const pagesToProcess: number[] =
-        normalizedProps.pagesToProcess ?? Array.from({ length: pdfDocument.numPages }, (_, index) => index + 1);
-    const validPagesToProcess: number[] = pagesToProcess.filter((pageNumber) => pageNumber <= pdfDocument.numPages && pageNumber >= 1);
-    const returnMetadataOnly = normalizedProps.returnMetadataOnly;
-    const resolvedOutputFolder: string | undefined =
-        normalizedProps.outputFolder !== undefined && !returnMetadataOnly ? resolve(normalizedProps.outputFolder) : undefined;
-    if (resolvedOutputFolder !== undefined) {
-        await fsPromises.mkdir(resolvedOutputFolder, { recursive: true });
-    }
-    const realOutputFolder: string | undefined =
-        resolvedOutputFolder !== undefined ? await fsPromises.realpath(resolvedOutputFolder) : undefined;
-    const pngPageOutputs: PngPageOutput[] = [];
 
+    // Wrap ALL post-load work in this try so the worker is destroyed even if setup steps
+    // (path resolution, mkdir, realpath, sink construction) throw — not just render-time errors.
     try {
+        const pagesToProcess: number[] =
+            normalizedProps.pagesToProcess ?? Array.from({ length: pdfDocument.numPages }, (_, index) => index + 1);
+        const validPagesToProcess: number[] = pagesToProcess.filter((pageNumber) => pageNumber <= pdfDocument.numPages && pageNumber >= 1);
+        const returnMetadataOnly = normalizedProps.returnMetadataOnly;
+        const resolvedOutputFolder: string | undefined =
+            normalizedProps.outputFolder !== undefined && !returnMetadataOnly ? resolve(normalizedProps.outputFolder) : undefined;
+        if (resolvedOutputFolder !== undefined) {
+            await fsPromises.mkdir(resolvedOutputFolder, { recursive: true });
+        }
+        const realOutputFolder: string | undefined =
+            resolvedOutputFolder !== undefined ? await fsPromises.realpath(resolvedOutputFolder) : undefined;
+        const pngPageOutputs: PngPageOutput[] = [];
+
         const defaultMask: string = typeof pdfFile === 'string' ? parse(pdfFile).name : PDF_TO_PNG_OPTIONS_DEFAULTS.outputFileMask;
         const shouldReturnContent: boolean = returnMetadataOnly
             ? false
@@ -106,9 +109,9 @@ export async function pdfToPngCore(
                 pngPageOutputs.push(await processPage(pageNumber));
             }
         }
+
+        return pngPageOutputs;
     } finally {
         await pdfDocument.destroy();
     }
-
-    return pngPageOutputs;
 }

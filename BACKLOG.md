@@ -5,7 +5,7 @@
 ## ⚙️ ARCH / Core
 
 - [ ] 🟡 ♻️ ARCH-009 Core: per-page PageMode replaces 4-flag boolean web
-    - extract `optionsToPageMode()` in pdfToPng.ts; processAndSavePage takes one PageMode
+    - extract `optionsToPageMode()` in pdfToPngCore.ts; processAndSavePage takes one PageMode
     - kills the `resolvedPath === ''` sentinel; option-puzzle becomes pure + table-testable
 - [ ] 🟡 ♻️ ARCH-010 Core: evolve OutputSink to drop sentinel + NullSink (with ARCH-009)
     - write() → Promise<string | undefined>; delete NullSink; FilesystemSink kept as the seam

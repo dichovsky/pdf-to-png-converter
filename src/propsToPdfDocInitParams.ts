@@ -1,7 +1,7 @@
 import type * as pdfApiTypes from 'pdfjs-dist/types/src/display/api';
-import { CMAP_RELATIVE_URL, DOCUMENT_INIT_PARAMS_DEFAULTS, STANDARD_FONTS_RELATIVE_URL } from './const';
-import { normalizePath } from './normalizePath';
-import type { NormalizedPdfToPngOptions } from './normalizePdfToPngOptions';
+import { CMAP_RELATIVE_URL, DOCUMENT_INIT_PARAMS_DEFAULTS, STANDARD_FONTS_RELATIVE_URL } from './const.js';
+import { normalizePath } from './normalizePath.js';
+import type { NormalizedPdfToPngOptions } from './normalizePdfToPngOptions.js';
 
 /**
  * Maps a fully-validated `NormalizedPdfToPngOptions` to a pdfjs `DocumentInitParameters`.

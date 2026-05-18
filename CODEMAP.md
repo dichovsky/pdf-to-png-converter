@@ -10,7 +10,7 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
     "name": "pdf-to-png-converter",
     "version": "4.0.0"
   },
-  "sourceHash": "184379012a2852d6896fe46a03ade56a37210e47fb11592654711bb9dc90204f",
+  "sourceHash": "256159348bba9675dd057b6acdfd2070eec1d11a216772957dc976068582b7b3",
   "entrypoints": [
     "src/index.ts"
   ],
@@ -1037,7 +1037,7 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
       ],
       "imports": [
         {
-          "from": "./const",
+          "from": "./const.js",
           "names": [
             "CMAP_RELATIVE_URL",
             "DOCUMENT_INIT_PARAMS_DEFAULTS",
@@ -1045,13 +1045,13 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
           ]
         },
         {
-          "from": "./normalizePath",
+          "from": "./normalizePath.js",
           "names": [
             "normalizePath"
           ]
         },
         {
-          "from": "./normalizePdfToPngOptions",
+          "from": "./normalizePdfToPngOptions.js",
           "names": [
             "NormalizedPdfToPngOptions"
           ]
