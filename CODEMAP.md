@@ -10,7 +10,7 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
     "name": "pdf-to-png-converter",
     "version": "4.0.0"
   },
-  "sourceHash": "738ffcbc35ad19fc804eaef774f10e2f4074a917c2c2f8026683e64838992dbe",
+  "sourceHash": "184379012a2852d6896fe46a03ade56a37210e47fb11592654711bb9dc90204f",
   "entrypoints": [
     "src/index.ts"
   ],
@@ -46,9 +46,9 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
       "name": "pdfToPng",
       "kind": "function",
       "file": "src/pdfToPng.ts",
-      "line": 45,
+      "line": 16,
       "signature": "export async function pdfToPng(pdfFile: string | ArrayBufferLike | Uint8Array, props?: PdfToPngOptions): Promise<PngPageOutput[]>",
-      "jsdoc": "",
+      "jsdoc": "Convert PDF pages to PNG buffers and/or files.",
       "typeOnly": false
     }
   ],
@@ -122,42 +122,42 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
         {
           "name": "buildPdfToPngOptions",
           "kind": "function",
-          "line": 148,
+          "line": 153,
           "exported": true,
-          "signature": "export function buildPdfToPngOptions(values: ParsedValues, positionals: string[]): { pdfFilePath: string } & PdfToPngOptions"
+          "signature": "export function buildPdfToPngOptions( values: ParsedValues, positionals: string[], ): { pdfFilePath: string; options: NormalizedPdfToPngOptions }"
         },
         {
           "name": "executeConversion",
           "kind": "function",
-          "line": 188,
+          "line": 183,
           "exported": true,
-          "signature": "export async function executeConversion(pdfFilePath: string, options: PdfToPngOptions, log: (...msgs: unknown[]) => void): Promise<void>"
+          "signature": "export async function executeConversion( pdfFilePath: string, options: NormalizedPdfToPngOptions, log: (...msgs: unknown[]) => void, ): Promise<void>"
         },
         {
           "name": "createLogger",
           "kind": "function",
-          "line": 205,
+          "line": 204,
           "exported": false,
           "signature": "function createLogger(silent: boolean | undefined): (...msgs: unknown[]) => void"
         },
         {
           "name": "handleRunError",
           "kind": "function",
-          "line": 211,
+          "line": 210,
           "exported": false,
           "signature": "function handleRunError(err: unknown): void"
         },
         {
           "name": "getVersion",
           "kind": "function",
-          "line": 230,
+          "line": 229,
           "exported": true,
           "signature": "export function getVersion(): string"
         },
         {
           "name": "run",
           "kind": "function",
-          "line": 250,
+          "line": 249,
           "exported": true,
           "signature": "export async function run(): Promise<void>"
         }
@@ -172,13 +172,14 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
         {
           "from": "./normalizePdfToPngOptions.js",
           "names": [
+            "NormalizedPdfToPngOptions",
             "normalizePdfToPngOptions"
           ]
         },
         {
-          "from": "./pdfToPng.js",
+          "from": "./pdfToPngCore.js",
           "names": [
-            "pdfToPng"
+            "pdfToPngCore"
           ]
         },
         {
@@ -850,6 +851,40 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
       "path": "src/pdfToPng.ts",
       "symbols": [
         {
+          "name": "pdfToPng",
+          "kind": "function",
+          "line": 16,
+          "exported": true,
+          "signature": "export async function pdfToPng(pdfFile: string | ArrayBufferLike | Uint8Array, props?: PdfToPngOptions): Promise<PngPageOutput[]>"
+        }
+      ],
+      "imports": [
+        {
+          "from": "./interfaces/index.js",
+          "names": [
+            "PdfToPngOptions",
+            "PngPageOutput"
+          ]
+        },
+        {
+          "from": "./normalizePdfToPngOptions.js",
+          "names": [
+            "normalizePdfToPngOptions"
+          ]
+        },
+        {
+          "from": "./pdfToPngCore.js",
+          "names": [
+            "pdfToPngCore"
+          ]
+        }
+      ],
+      "reExports": []
+    },
+    {
+      "path": "src/pdfToPngCore.ts",
+      "symbols": [
+        {
           "name": "processPagesWithSlidingWindow",
           "kind": "function",
           "line": 14,
@@ -857,11 +892,11 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
           "signature": "async function processPagesWithSlidingWindow<T>( pageNumbers: number[], concurrencyLimit: number, processPage: (pageNumber: number) => Promise<T>, ): Promise<T[]>"
         },
         {
-          "name": "pdfToPng",
+          "name": "pdfToPngCore",
           "kind": "function",
-          "line": 45,
+          "line": 55,
           "exported": true,
-          "signature": "export async function pdfToPng(pdfFile: string | ArrayBufferLike | Uint8Array, props?: PdfToPngOptions): Promise<PngPageOutput[]>"
+          "signature": "export async function pdfToPngCore( pdfFile: string | ArrayBufferLike | Uint8Array, normalizedProps: NormalizedPdfToPngOptions, ): Promise<PngPageOutput[]>"
         }
       ],
       "imports": [
@@ -880,7 +915,6 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
         {
           "from": "./interfaces/index.js",
           "names": [
-            "PdfToPngOptions",
             "PngPageOutput"
           ]
         },
@@ -893,7 +927,7 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
         {
           "from": "./normalizePdfToPngOptions.js",
           "names": [
-            "normalizePdfToPngOptions"
+            "NormalizedPdfToPngOptions"
           ]
         },
         {
@@ -958,14 +992,14 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
           "kind": "function",
           "line": 8,
           "exported": true,
-          "signature": "export async function getPdfDocument(pdfFileBuffer: Uint8Array | ArrayBufferLike, props?: PdfToPngOptions): Promise<PDFDocumentProxy>"
+          "signature": "export async function getPdfDocument( pdfFileBuffer: Uint8Array | ArrayBufferLike, opts: NormalizedPdfToPngOptions, ): Promise<PDFDocumentProxy>"
         }
       ],
       "imports": [
         {
-          "from": "./interfaces/index.js",
+          "from": "./normalizePdfToPngOptions.js",
           "names": [
-            "PdfToPngOptions"
+            "NormalizedPdfToPngOptions"
           ]
         },
         {
@@ -996,9 +1030,9 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
         {
           "name": "propsToPdfDocInitParams",
           "kind": "function",
-          "line": 23,
+          "line": 26,
           "exported": true,
-          "signature": "export function propsToPdfDocInitParams(props?: PdfToPngOptions): pdfApiTypes.DocumentInitParameters"
+          "signature": "export function propsToPdfDocInitParams(opts: NormalizedPdfToPngOptions): pdfApiTypes.DocumentInitParameters"
         }
       ],
       "imports": [
@@ -1007,14 +1041,7 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
           "names": [
             "CMAP_RELATIVE_URL",
             "DOCUMENT_INIT_PARAMS_DEFAULTS",
-            "PDF_TO_PNG_OPTIONS_DEFAULTS",
             "STANDARD_FONTS_RELATIVE_URL"
-          ]
-        },
-        {
-          "from": "./interfaces/pdf.to.png.options",
-          "names": [
-            "PdfToPngOptions"
           ]
         },
         {
@@ -1024,9 +1051,9 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
           ]
         },
         {
-          "from": "./types/verbosity.level",
+          "from": "./normalizePdfToPngOptions",
           "names": [
-            "VerbosityLevel"
+            "NormalizedPdfToPngOptions"
           ]
         },
         {
