@@ -38,7 +38,7 @@ test('should reject outputFileMaskFunc values that escape the output folder via 
                 pagesToProcess: [1],
                 returnPageContent: false,
             }),
-        ).rejects.toThrow('Output file name escapes the output folder');
+        ).rejects.toThrow(/path separator|escapes the output folder/);
     } finally {
         await fsPromises.rm(outputFolder, { recursive: true, force: true });
     }
@@ -55,7 +55,7 @@ test('should reject absolute outputFileMaskFunc values', async () => {
                 pagesToProcess: [1],
                 returnPageContent: false,
             }),
-        ).rejects.toThrow('Output file name escapes the output folder');
+        ).rejects.toThrow(/path separator|escapes the output folder/);
     } finally {
         await fsPromises.rm(outputFolder, { recursive: true, force: true });
     }

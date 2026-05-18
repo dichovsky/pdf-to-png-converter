@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **SEC-001**: `outputFileMaskFunc` filenames are now rejected synchronously when they contain a `/` or `\` path separator, closing a residual TOCTOU window where a co-tenant with write access to `outputFolder` could swap an intermediate directory for a symlink between the `realpath(dirname(...))` check and the `open(..., 'wx')` call in `savePNGfile()`. The guard fires both in `resolvePageName` (early) and in `savePNGfile` (defense in depth). The existing flat-filename contract is unchanged.
+- **SEC-002**: Added `PdfToPngOptions.maxInputBytes` (default `256 MiB` via `MAX_INPUT_BYTES`) bounding input PDF size. The path branch of `getPdfFileBuffer()` now runs `fs.stat()` before `fs.readFile()` and rejects (a) non-regular files (`/dev/zero`, FIFOs, sockets, character devices) and (b) inputs whose size exceeds `maxInputBytes`. The buffer / `Uint8Array` branch validates `byteLength` against the same cap. Together these block unbounded memory consumption from untrusted input paths and oversized buffers.
+- **SEC-003**: `concurrencyLimit` now enforces an upper bound of `MAX_CONCURRENCY_LIMIT` (`16`) when `processPagesInParallel` is `true`. At the cap, peak in-flight canvas memory ≈ `16 × MAX_CANVAS_PIXELS × 4 bytes ≈ 6.4 GiB` — a defensible ceiling for typical service containers. Values above `16` (e.g. `Number.MAX_SAFE_INTEGER`) throw synchronously before any rendering starts. The default `4` and lower values are unaffected.
+
 ### Changed
 
 - CI now blocks on `npm run build:strict`; the strict type-check is no longer advisory. `continue-on-error: true` is removed from `.github/workflows/test.yml` and the dedicated CI "Strict type check" step is replaced by `pretest` gating (avoiding a double run on CI). `pretest` now runs `build:strict` alongside `build:test` — the two type-checks enforce different contracts: `build:test` (using `tsconfig.json`, no DOM lib) gates `src/` against accidental DOM globals (`document`, `window`) that production builds would reject; `build:strict` (using `tsconfig.strict.json`, `skipLibCheck: false` + DOM lib for `@napi-rs/canvas` type resolution) gates against upstream type regressions in `pdfjs-dist` / `@napi-rs/canvas`. Local `npm test` and `prepublishOnly` now gate on both.

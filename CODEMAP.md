@@ -10,7 +10,7 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
     "name": "pdf-to-png-converter",
     "version": "4.0.0"
   },
-  "sourceHash": "4a4b7d835e7866fdda1b58e05d0a68f0bda1de784750172e8de5ce46e2e6589e",
+  "sourceHash": "738ffcbc35ad19fc804eaef774f10e2f4074a917c2c2f8026683e64838992dbe",
   "entrypoints": [
     "src/index.ts"
   ],
@@ -220,30 +220,44 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
           "signature": "export const MAX_CANVAS_PIXELS = 100_000_000"
         },
         {
+          "name": "MAX_INPUT_BYTES",
+          "kind": "variable",
+          "line": 23,
+          "exported": true,
+          "signature": "export const MAX_INPUT_BYTES = 256 * 1024 * 1024"
+        },
+        {
+          "name": "MAX_CONCURRENCY_LIMIT",
+          "kind": "variable",
+          "line": 31,
+          "exported": true,
+          "signature": "export const MAX_CONCURRENCY_LIMIT = 16"
+        },
+        {
           "name": "PDF_TO_PNG_OPTIONS_DEFAULTS",
           "kind": "variable",
-          "line": 20,
+          "line": 37,
           "exported": true,
           "signature": "export const PDF_TO_PNG_OPTIONS_DEFAULTS = { viewportScale: 1, disableFontFace: true, useSystemFonts: false, enableXfa: true, outputFileMask: 'buffer', pdfFilePassword: undefined, concurrencyLimit: 4,…"
         },
         {
           "name": "CMAP_RELATIVE_URL",
           "kind": "variable",
-          "line": 38,
+          "line": 56,
           "exported": true,
           "signature": "export const CMAP_RELATIVE_URL = './node_modules/pdfjs-dist/cmaps/'"
         },
         {
           "name": "STANDARD_FONTS_RELATIVE_URL",
           "kind": "variable",
-          "line": 39,
+          "line": 57,
           "exported": true,
           "signature": "export const STANDARD_FONTS_RELATIVE_URL = './node_modules/pdfjs-dist/standard_fonts/'"
         },
         {
           "name": "DOCUMENT_INIT_PARAMS_DEFAULTS",
           "kind": "variable",
-          "line": 51,
+          "line": 69,
           "exported": true,
           "signature": "export const DOCUMENT_INIT_PARAMS_DEFAULTS: DocumentInitParameters = { cMapUrl: CMAP_RELATIVE_URL, cMapPacked: true, standardFontDataUrl: STANDARD_FONTS_RELATIVE_URL, }"
         }
@@ -558,7 +572,7 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
         {
           "name": "normalizePdfToPngOptions",
           "kind": "function",
-          "line": 21,
+          "line": 22,
           "exported": true,
           "signature": "export function normalizePdfToPngOptions(props: PdfToPngOptions | undefined): NormalizedPdfToPngOptions"
         }
@@ -567,6 +581,7 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
         {
           "from": "./const.js",
           "names": [
+            "MAX_CONCURRENCY_LIMIT",
             "MAX_VIEWPORT_SCALE",
             "PDF_TO_PNG_OPTIONS_DEFAULTS"
           ]
@@ -618,16 +633,30 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
       "path": "src/outputWriter.ts",
       "symbols": [
         {
+          "name": "PATH_SEPARATOR_PATTERN",
+          "kind": "variable",
+          "line": 8,
+          "exported": false,
+          "signature": "const PATH_SEPARATOR_PATTERN = sep === '\\\\' ? /[\\\\/]/ : /\\"
+        },
+        {
+          "name": "SEPARATOR_DESCRIPTION",
+          "kind": "variable",
+          "line": 9,
+          "exported": false,
+          "signature": "const SEPARATOR_DESCRIPTION = sep === '\\\\' ? '\"/\" or \"\\\\\"' : '\"/\"'"
+        },
+        {
           "name": "isEscapingRelativePath",
           "kind": "function",
-          "line": 3,
+          "line": 11,
           "exported": false,
           "signature": "function isEscapingRelativePath(rel: string): boolean"
         },
         {
           "name": "savePNGfile",
           "kind": "function",
-          "line": 18,
+          "line": 29,
           "exported": true,
           "signature": "export async function savePNGfile(name: string, content: Buffer, resolvedOutputFolder: string, realOutputFolder: string): Promise<string>"
         }
@@ -656,16 +685,37 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
       "path": "src/pageOrchestrator.ts",
       "symbols": [
         {
+          "name": "PATH_SEPARATOR_PATTERN",
+          "kind": "variable",
+          "line": 11,
+          "exported": false,
+          "signature": "const PATH_SEPARATOR_PATTERN = sep === '\\\\' ? /[\\\\/]/ : /\\"
+        },
+        {
+          "name": "SEPARATOR_DESCRIPTION",
+          "kind": "variable",
+          "line": 12,
+          "exported": false,
+          "signature": "const SEPARATOR_DESCRIPTION = sep === '\\\\' ? '\"/\" or \"\\\\\"' : '\"/\"'"
+        },
+        {
+          "name": "assertFlatFilename",
+          "kind": "function",
+          "line": 14,
+          "exported": false,
+          "signature": "function assertFlatFilename(name: string, pageNumber: number): void"
+        },
+        {
           "name": "resolvePageName",
           "kind": "function",
-          "line": 6,
+          "line": 22,
           "exported": true,
           "signature": "export function resolvePageName( pageNumber: number, defaultMask: string, outputFileMaskFunc: ((page: number) => string) | undefined, ): string"
         },
         {
           "name": "processAndSavePage",
           "kind": "function",
-          "line": 25,
+          "line": 43,
           "exported": true,
           "signature": "export async function processAndSavePage( pdfDocument: PDFDocumentProxy, pageName: string, pageNumber: number, pageViewportScale: number, shouldReturnContent: boolean, returnMetadataOnly: boolean, out…"
         }
@@ -689,6 +739,12 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
           "names": [
             "getPageMetadata",
             "renderPdfPage"
+          ]
+        },
+        {
+          "from": "node:path",
+          "names": [
+            "sep"
           ]
         },
         {
@@ -766,11 +822,18 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
       "path": "src/pdfInput.ts",
       "symbols": [
         {
-          "name": "getPdfFileBuffer",
+          "name": "rejectOversized",
           "kind": "function",
           "line": 3,
+          "exported": false,
+          "signature": "function rejectOversized(byteLength: number, maxInputBytes: number): void"
+        },
+        {
+          "name": "getPdfFileBuffer",
+          "kind": "function",
+          "line": 9,
           "exported": true,
-          "signature": "export async function getPdfFileBuffer(pdfFile: string | ArrayBufferLike | Uint8Array): Promise<Uint8Array | ArrayBufferLike>"
+          "signature": "export async function getPdfFileBuffer( pdfFile: string | ArrayBufferLike | Uint8Array, maxInputBytes: number, ): Promise<Uint8Array | ArrayBufferLike>"
         }
       ],
       "imports": [

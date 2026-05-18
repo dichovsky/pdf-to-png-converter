@@ -50,13 +50,12 @@ export interface PdfToPngOptions {
      * When omitted, no files are written to disk.
      *
      * @remarks
-     * **Security (TOCTOU):** The write-containment guard resolves symlinks, checks that the
-     * output path stays within this folder, and uses exclusive-create file opens to avoid
-     * overwriting pre-existing files or following a pre-planted target symlink at the final filename.
-     * A residual race window still exists for directory-component swaps. A local attacker could exploit this via
-     * (a) atomically replacing the folder with a symlink during that window, or (b) creating or
-     * pre-populating an unsafe directory layout inside this folder before the containment checks run.
-     * To reduce exposure on multi-user or shared systems, ensure this directory is private and not writable by untrusted users.
+     * **Security (TOCTOU):** The write-containment guard rejects filenames that contain path
+     * separators (so the target is always a direct child of this folder), resolves symlinks,
+     * checks that the output path stays within this folder, and uses exclusive-create file opens
+     * to avoid overwriting pre-existing files or following a pre-planted target symlink at the
+     * final filename. To reduce exposure on multi-user or shared systems, ensure this directory
+     * is private and not writable by untrusted users.
      */
     outputFolder?: string;
 
@@ -115,11 +114,24 @@ export interface PdfToPngOptions {
 
     /**
      * Maximum number of pages rendered simultaneously when `processPagesInParallel` is `true`.
-     * Must be a positive integer (`>= 1`). Non-integer or sub-1 values throw immediately (before any I/O).
-     * Higher values increase throughput at the cost of memory.
-     * Only applies when `processPagesInParallel` is `true`.
+     * Must be a positive integer between `1` and `16` (inclusive); values outside that range throw
+     * immediately (before any I/O). The upper bound caps peak in-flight canvas memory at roughly
+     * `16 × MAX_CANVAS_PIXELS × 4 bytes ≈ 6.4 GiB` so a single conversion cannot exhaust container
+     * memory. Higher values increase throughput at the cost of memory. Only applies when
+     * `processPagesInParallel` is `true`.
      * Default: `4`.
      * @since 3.14.0
      */
     concurrencyLimit?: number;
+
+    /**
+     * Maximum allowed input PDF size in bytes. Inputs larger than this throw immediately,
+     * before any rendering work is started. Applies to both the file path branch (validated via
+     * `fs.stat()`) and the buffer / `Uint8Array` branch (validated via `byteLength`). The path
+     * branch additionally rejects non-regular files (FIFOs, sockets, character devices such as
+     * `/dev/zero`) to prevent unbounded reads. Must be a positive integer.
+     * Default: `256 * 1024 * 1024` (256 MiB).
+     * @since 4.1.0
+     */
+    maxInputBytes?: number;
 }

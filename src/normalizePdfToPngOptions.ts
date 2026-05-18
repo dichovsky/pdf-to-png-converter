@@ -1,4 +1,4 @@
-import { MAX_VIEWPORT_SCALE, PDF_TO_PNG_OPTIONS_DEFAULTS } from './const.js';
+import { MAX_CONCURRENCY_LIMIT, MAX_VIEWPORT_SCALE, PDF_TO_PNG_OPTIONS_DEFAULTS } from './const.js';
 import type { PdfToPngOptions } from './interfaces/pdf.to.png.options.js';
 import { VerbosityLevel } from './types/verbosity.level.js';
 
@@ -16,6 +16,7 @@ export interface NormalizedPdfToPngOptions {
     returnMetadataOnly: boolean;
     processPagesInParallel: boolean;
     concurrencyLimit: number;
+    maxInputBytes: number;
 }
 
 export function normalizePdfToPngOptions(props: PdfToPngOptions | undefined): NormalizedPdfToPngOptions {
@@ -45,8 +46,18 @@ export function normalizePdfToPngOptions(props: PdfToPngOptions | undefined): No
 
     const processPagesInParallel = props?.processPagesInParallel ?? false;
     const concurrencyLimit: number = props?.concurrencyLimit ?? PDF_TO_PNG_OPTIONS_DEFAULTS.concurrencyLimit;
-    if (processPagesInParallel && (!Number.isInteger(concurrencyLimit) || concurrencyLimit < 1)) {
-        throw new Error(`concurrencyLimit must be a positive integer >= 1, received: ${concurrencyLimit}`);
+    if (processPagesInParallel) {
+        if (!Number.isInteger(concurrencyLimit) || concurrencyLimit < 1) {
+            throw new Error(`concurrencyLimit must be a positive integer >= 1, received: ${concurrencyLimit}`);
+        }
+        if (concurrencyLimit > MAX_CONCURRENCY_LIMIT) {
+            throw new Error(`concurrencyLimit must be between 1 and ${MAX_CONCURRENCY_LIMIT}, received: ${concurrencyLimit}`);
+        }
+    }
+
+    const maxInputBytes: number = props?.maxInputBytes ?? PDF_TO_PNG_OPTIONS_DEFAULTS.maxInputBytes;
+    if (!Number.isInteger(maxInputBytes) || maxInputBytes <= 0) {
+        throw new Error(`maxInputBytes must be a positive integer, received: ${maxInputBytes}`);
     }
 
     return {
@@ -63,5 +74,6 @@ export function normalizePdfToPngOptions(props: PdfToPngOptions | undefined): No
         returnMetadataOnly: props?.returnMetadataOnly ?? false,
         processPagesInParallel,
         concurrencyLimit,
+        maxInputBytes,
     };
 }

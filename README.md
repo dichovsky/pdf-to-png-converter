@@ -158,6 +158,8 @@ Converts PDF pages to PNG images.
     // Output Options
     outputFolder?: string,           // Directory to save PNG files
     outputFileMaskFunc?: (pageNumber: number) => string, // Custom filename function
+                                     // Must return a flat filename — names containing "/" or "\"
+                                     // path separators are rejected synchronously.
 
     // Rendering Options
     viewportScale?: number,          // PNG scale/zoom level (default: 1.0, max: 100)
@@ -166,12 +168,17 @@ Converts PDF pages to PNG images.
 
     // Security
     pdfFilePassword?: string,        // Password for encrypted PDFs
+    maxInputBytes?: number,          // Max input PDF size in bytes (default: 256 * 1024 * 1024)
+                                     // Path inputs are stat()'d before reading and non-regular files
+                                     // (FIFOs, sockets, /dev/zero) are rejected. Buffer / Uint8Array
+                                     // inputs are validated against the same cap by byteLength.
 
     // Processing
     pagesToProcess?: number[],       // 1-indexed integer pages to convert (e.g., [1, 3, 5])
                                     // Non-integer and <= 0 values throw; pages beyond the PDF length are ignored
     processPagesInParallel?: boolean, // Enable parallel processing (default: false)
-    concurrencyLimit?: number,       // Max concurrent pages, positive integer (default: 4)
+    concurrencyLimit?: number,       // Max concurrent pages when parallel: integer 1..16 (default: 4)
+                                     // The upper bound caps peak in-flight canvas memory at ~6.4 GiB.
 
     // Output Control
     returnPageContent?: boolean,     // Include PNG buffer in output (default: true)
