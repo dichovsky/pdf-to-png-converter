@@ -6,6 +6,7 @@ import { STANDARD_CMAPS, STANDARD_FONTS } from './test-data-constants';
 import { propsToPdfDocInitParams } from '../src/propsToPdfDocInitParams';
 import type { PdfToPngOptions } from '../src/interfaces/pdf.to.png.options.js';
 import { normalizePath } from '../src/normalizePath.js';
+import { normalizePdfToPngOptions } from '../src/normalizePdfToPngOptions.js';
 
 // Resolved at test-run time so the expected values match what propsToPdfDocInitParams() returns
 // (which also resolves at call time). This avoids the module-load-time lock-in of the old approach.
@@ -163,7 +164,9 @@ const testDataArray: { id: string; props?: PdfToPngOptions; expectedPdfDocInitPa
 
 for (const testData of testDataArray) {
     test(`should convert props to PdfDocInitParams when ${testData.id}`, async () => {
-        const actualPdfDocInitParams: DocumentInitParameters = propsToPdfDocInitParams(testData.props);
+        // propsToPdfDocInitParams now consumes NormalizedPdfToPngOptions exclusively;
+        // raw PdfToPngOptions must be normalized first (single validation boundary).
+        const actualPdfDocInitParams: DocumentInitParameters = propsToPdfDocInitParams(normalizePdfToPngOptions(testData.props));
 
         expect(actualPdfDocInitParams).toEqual(testData.expectedPdfDocInitParams);
 
