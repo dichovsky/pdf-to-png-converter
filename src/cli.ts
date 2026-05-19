@@ -3,9 +3,9 @@
 import { parseArgs } from 'node:util';
 import path from 'node:path';
 import fs from 'node:fs';
-import { pdfToPng } from './pdfToPng.js';
+import { pdfToPngCore } from './pdfToPngCore.js';
 import type { PdfToPngOptions } from './interfaces/pdf.to.png.options.js';
-import { normalizePdfToPngOptions } from './normalizePdfToPngOptions.js';
+import { normalizePdfToPngOptions, type NormalizedPdfToPngOptions } from './normalizePdfToPngOptions.js';
 
 /**
  * Help text shown for `--help` and on invalid usage.
@@ -145,7 +145,15 @@ function safeParseArgs(): CliParseResult | null {
     }
 }
 
-export function buildPdfToPngOptions(values: ParsedValues, positionals: string[]): { pdfFilePath: string } & PdfToPngOptions {
+/**
+ * Parses raw CLI flags into a validated `NormalizedPdfToPngOptions` plus the positional
+ * `pdfFilePath`. Single source of normalization — downstream {@link executeConversion}
+ * passes the result straight to {@link pdfToPngCore} so the library does NOT re-normalize.
+ */
+export function buildPdfToPngOptions(
+    values: ParsedValues,
+    positionals: string[],
+): { pdfFilePath: string; options: NormalizedPdfToPngOptions } {
     const pdfFilePath = positionals[0];
     if (!pdfFilePath) {
         throw new Error('<pdf-file-path> is required.');
@@ -166,28 +174,19 @@ export function buildPdfToPngOptions(values: ParsedValues, positionals: string[]
         concurrencyLimit: parseIntegerOption(values['concurrency-limit'], '--concurrency-limit must be a valid integer.'),
     };
 
-    const normalizedOptions = normalizePdfToPngOptions(rawOptions);
-
     return {
         pdfFilePath,
-        outputFolder: normalizedOptions.outputFolder,
-        viewportScale: normalizedOptions.viewportScale,
-        useSystemFonts: normalizedOptions.useSystemFonts,
-        disableFontFace: normalizedOptions.disableFontFace,
-        enableXfa: normalizedOptions.enableXfa,
-        pdfFilePassword: normalizedOptions.pdfFilePassword,
-        pagesToProcess: normalizedOptions.pagesToProcess,
-        verbosityLevel: normalizedOptions.verbosityLevel,
-        returnMetadataOnly: normalizedOptions.returnMetadataOnly,
-        returnPageContent: normalizedOptions.returnPageContent,
-        processPagesInParallel: normalizedOptions.processPagesInParallel,
-        concurrencyLimit: normalizedOptions.concurrencyLimit,
+        options: normalizePdfToPngOptions(rawOptions),
     };
 }
 
-export async function executeConversion(pdfFilePath: string, options: PdfToPngOptions, log: (...msgs: unknown[]) => void): Promise<void> {
+export async function executeConversion(
+    pdfFilePath: string,
+    options: NormalizedPdfToPngOptions,
+    log: (...msgs: unknown[]) => void,
+): Promise<void> {
     try {
-        const results = await pdfToPng(pdfFilePath, options);
+        const results = await pdfToPngCore(pdfFilePath, options);
         if (options.returnMetadataOnly) {
             log('Metadata extraction complete:');
             log(JSON.stringify(results, null, 2));
@@ -243,9 +242,9 @@ export function getVersion(): string {
 /**
  * Main CLI entry point.
  *
- * Parses `process.argv`, validates all options up-front with actionable error messages,
- * and delegates to {@link pdfToPng}. Exported so it can be unit-tested without
- * spawning a child process.
+ * Parses `process.argv`, validates all options up-front through
+ * {@link normalizePdfToPngOptions} via {@link buildPdfToPngOptions}, and delegates to
+ * {@link pdfToPngCore}. Exported so it can be unit-tested without spawning a child process.
  */
 export async function run(): Promise<void> {
     const parseResult = safeParseArgs();
@@ -271,7 +270,7 @@ export async function run(): Promise<void> {
     }
 
     try {
-        const { pdfFilePath, ...options } = buildPdfToPngOptions(values, positionals);
+        const { pdfFilePath, options } = buildPdfToPngOptions(values, positionals);
         const log = createLogger(values.silent);
         log(`Processing PDF: ${pdfFilePath}`);
         if (options.outputFolder) {

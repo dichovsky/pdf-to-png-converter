@@ -2,10 +2,11 @@ import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } fr
 import fs from 'node:fs';
 import * as cli from '../src/cli.js';
 import { buildPdfToPngOptions, executeConversion, getVersion, HELP_TEXT, parseBoolean, parseNumberList, run } from '../src/cli.js';
-import { pdfToPng } from '../src/pdfToPng.js';
+import { pdfToPngCore } from '../src/pdfToPngCore.js';
+import { normalizePdfToPngOptions } from '../src/normalizePdfToPngOptions.js';
 
-vi.mock('../src/pdfToPng.js', () => ({
-    pdfToPng: vi.fn().mockResolvedValue([]),
+vi.mock('../src/pdfToPngCore.js', () => ({
+    pdfToPngCore: vi.fn().mockResolvedValue([]),
 }));
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -73,37 +74,41 @@ describe('parseNumberList', () => {
 });
 
 describe('buildPdfToPngOptions', () => {
-    it('returns parsed and normalized options without touching process.exit', () => {
-        expect(
-            buildPdfToPngOptions(
-                {
-                    'output-folder': '/out',
-                    'viewport-scale': '2',
-                    'use-system-fonts': true,
-                    'disable-font-face': 'false',
-                    'enable-xfa': 'true',
-                    'pages-to-process': '1,2,3',
-                    'verbosity-level': '1',
-                    'process-pages-in-parallel': true,
-                    'concurrency-limit': '2',
-                },
-                ['test.pdf'],
-            ),
-        ).toEqual({
-            pdfFilePath: 'test.pdf',
-            outputFolder: '/out',
-            viewportScale: 2,
-            useSystemFonts: true,
-            disableFontFace: false,
-            enableXfa: true,
-            pdfFilePassword: undefined,
-            pagesToProcess: [1, 2, 3],
-            verbosityLevel: 1,
-            returnMetadataOnly: false,
-            returnPageContent: false,
-            processPagesInParallel: true,
-            concurrencyLimit: 2,
-        });
+    it('returns the pdf path and a fully-normalized options object', () => {
+        const built = buildPdfToPngOptions(
+            {
+                'output-folder': '/out',
+                'viewport-scale': '2',
+                'use-system-fonts': true,
+                'disable-font-face': 'false',
+                'enable-xfa': 'true',
+                'pages-to-process': '1,2,3',
+                'verbosity-level': '1',
+                'process-pages-in-parallel': true,
+                'concurrency-limit': '2',
+            },
+            ['test.pdf'],
+        );
+
+        expect(built.pdfFilePath).toBe('test.pdf');
+        // Returned options shape is NormalizedPdfToPngOptions — produced by a single
+        // call to normalizePdfToPngOptions inside buildPdfToPngOptions (ARCH-011).
+        expect(built.options).toEqual(
+            normalizePdfToPngOptions({
+                outputFolder: '/out',
+                viewportScale: 2,
+                useSystemFonts: true,
+                disableFontFace: false,
+                enableXfa: true,
+                pdfFilePassword: undefined,
+                pagesToProcess: [1, 2, 3],
+                verbosityLevel: 1,
+                processPagesInParallel: true,
+                concurrencyLimit: 2,
+                returnMetadataOnly: undefined,
+                returnPageContent: false,
+            }),
+        );
     });
 
     it('throws when no pdf path is provided', () => {
@@ -115,7 +120,7 @@ describe('executeConversion', () => {
     it('logs success output without using process.exit', async () => {
         const log = vi.fn();
 
-        await executeConversion('test.pdf', { outputFolder: '/out' }, log);
+        await executeConversion('test.pdf', normalizePdfToPngOptions({ outputFolder: '/out' }), log);
 
         expect(log).toHaveBeenCalledWith('Successfully processed 0 page(s).');
     });
@@ -168,8 +173,8 @@ describe('CLI run()', () => {
         expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Usage: pdf-to-png-converter'));
         expect(exitSpy).toHaveBeenCalledWith(0);
         expect(exitSpy).toHaveBeenCalledTimes(1);
-        // Execution must stop after --help; pdfToPng should never be called
-        expect(pdfToPng).not.toHaveBeenCalled();
+        // Execution must stop after --help; the core must never be called
+        expect(pdfToPngCore).not.toHaveBeenCalled();
     });
 
     // ── --version ─────────────────────────────────────────────────────────────
@@ -180,7 +185,7 @@ describe('CLI run()', () => {
         expect(logSpy).toHaveBeenCalledWith(expect.stringMatching(/^v\d+\.\d+\.\d+/));
         expect(exitSpy).toHaveBeenCalledWith(0);
         expect(exitSpy).toHaveBeenCalledTimes(1);
-        expect(pdfToPng).not.toHaveBeenCalled();
+        expect(pdfToPngCore).not.toHaveBeenCalled();
     });
 
     it('prints an error and exits 1 when package.json cannot be read for --version', async () => {
@@ -209,7 +214,7 @@ describe('CLI run()', () => {
         expect(errorSpy).toHaveBeenCalled();
         expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining(HELP_TEXT));
         expect(exitSpy).toHaveBeenCalledWith(1);
-        expect(pdfToPng).not.toHaveBeenCalled();
+        expect(pdfToPngCore).not.toHaveBeenCalled();
     });
 
     // ── Required argument validation ──────────────────────────────────────────
@@ -229,7 +234,7 @@ describe('CLI run()', () => {
         await run();
         expect(errorSpy).toHaveBeenCalledWith('Error: --viewport-scale must be a valid number.');
         expect(exitSpy).toHaveBeenCalledWith(1);
-        expect(pdfToPng).not.toHaveBeenCalled();
+        expect(pdfToPngCore).not.toHaveBeenCalled();
     });
 
     it('exits 1 when --viewport-scale is a partially-valid string (e.g. "2x")', async () => {
@@ -237,7 +242,7 @@ describe('CLI run()', () => {
         await run();
         expect(errorSpy).toHaveBeenCalledWith('Error: --viewport-scale must be a valid number.');
         expect(exitSpy).toHaveBeenCalledWith(1);
-        expect(pdfToPng).not.toHaveBeenCalled();
+        expect(pdfToPngCore).not.toHaveBeenCalled();
     });
 
     it('exits 1 when --verbosity-level is not a valid integer', async () => {
@@ -245,7 +250,7 @@ describe('CLI run()', () => {
         await run();
         expect(errorSpy).toHaveBeenCalledWith('Error: --verbosity-level must be a valid integer.');
         expect(exitSpy).toHaveBeenCalledWith(1);
-        expect(pdfToPng).not.toHaveBeenCalled();
+        expect(pdfToPngCore).not.toHaveBeenCalled();
     });
 
     it('exits 1 when --verbosity-level is a partially-valid string (e.g. "1x")', async () => {
@@ -253,7 +258,7 @@ describe('CLI run()', () => {
         await run();
         expect(errorSpy).toHaveBeenCalledWith('Error: --verbosity-level must be a valid integer.');
         expect(exitSpy).toHaveBeenCalledWith(1);
-        expect(pdfToPng).not.toHaveBeenCalled();
+        expect(pdfToPngCore).not.toHaveBeenCalled();
     });
 
     it('exits 1 when --verbosity-level is a float (e.g. "1.5")', async () => {
@@ -261,7 +266,7 @@ describe('CLI run()', () => {
         await run();
         expect(errorSpy).toHaveBeenCalledWith('Error: --verbosity-level must be a valid integer.');
         expect(exitSpy).toHaveBeenCalledWith(1);
-        expect(pdfToPng).not.toHaveBeenCalled();
+        expect(pdfToPngCore).not.toHaveBeenCalled();
     });
 
     it('exits 1 when --concurrency-limit is not a valid integer', async () => {
@@ -269,7 +274,7 @@ describe('CLI run()', () => {
         await run();
         expect(errorSpy).toHaveBeenCalledWith('Error: --concurrency-limit must be a valid integer.');
         expect(exitSpy).toHaveBeenCalledWith(1);
-        expect(pdfToPng).not.toHaveBeenCalled();
+        expect(pdfToPngCore).not.toHaveBeenCalled();
     });
 
     it('exits 1 when --concurrency-limit is a float (e.g. "2.5")', async () => {
@@ -277,7 +282,7 @@ describe('CLI run()', () => {
         await run();
         expect(errorSpy).toHaveBeenCalledWith('Error: --concurrency-limit must be a valid integer.');
         expect(exitSpy).toHaveBeenCalledWith(1);
-        expect(pdfToPng).not.toHaveBeenCalled();
+        expect(pdfToPngCore).not.toHaveBeenCalled();
     });
 
     it('exits 1 when --concurrency-limit is a partially-valid string (e.g. "2x")', async () => {
@@ -285,7 +290,7 @@ describe('CLI run()', () => {
         await run();
         expect(errorSpy).toHaveBeenCalledWith('Error: --concurrency-limit must be a valid integer.');
         expect(exitSpy).toHaveBeenCalledWith(1);
-        expect(pdfToPng).not.toHaveBeenCalled();
+        expect(pdfToPngCore).not.toHaveBeenCalled();
     });
 
     // ── Boolean / list option validation ─────────────────────────────────────
@@ -295,7 +300,7 @@ describe('CLI run()', () => {
         await run();
         expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Invalid boolean value: "maybe"'));
         expect(exitSpy).toHaveBeenCalledWith(1);
-        expect(pdfToPng).not.toHaveBeenCalled();
+        expect(pdfToPngCore).not.toHaveBeenCalled();
     });
 
     it('exits 1 when --enable-xfa has an invalid value', async () => {
@@ -304,7 +309,7 @@ describe('CLI run()', () => {
         await run();
         expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Invalid boolean value: "bad"'));
         expect(exitSpy).toHaveBeenCalledWith(1);
-        expect(pdfToPng).not.toHaveBeenCalled();
+        expect(pdfToPngCore).not.toHaveBeenCalled();
     });
 
     it('exits 1 when --pages-to-process contains an invalid integer', async () => {
@@ -312,12 +317,12 @@ describe('CLI run()', () => {
         await run();
         expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Invalid integer in list: "abc"'));
         expect(exitSpy).toHaveBeenCalledWith(1);
-        expect(pdfToPng).not.toHaveBeenCalled();
+        expect(pdfToPngCore).not.toHaveBeenCalled();
     });
 
     // ── Successful invocation ─────────────────────────────────────────────────
 
-    it('calls pdfToPng with all parsed options', async () => {
+    it('calls pdfToPngCore with a fully-normalized options object', async () => {
         setArgv(
             'test.pdf',
             '--output-folder',
@@ -340,21 +345,24 @@ describe('CLI run()', () => {
 
         await run();
 
-        expect(pdfToPng).toHaveBeenCalledTimes(1);
-        expect(pdfToPng).toHaveBeenCalledWith('test.pdf', {
-            outputFolder: '/out',
-            viewportScale: 2,
-            useSystemFonts: true,
-            disableFontFace: false,
-            enableXfa: true,
-            pdfFilePassword: undefined,
-            pagesToProcess: [1, 2, 3],
-            verbosityLevel: 1,
-            processPagesInParallel: true,
-            concurrencyLimit: 2,
-            returnMetadataOnly: false,
-            returnPageContent: false,
-        });
+        expect(pdfToPngCore).toHaveBeenCalledTimes(1);
+        expect(pdfToPngCore).toHaveBeenCalledWith(
+            'test.pdf',
+            normalizePdfToPngOptions({
+                outputFolder: '/out',
+                viewportScale: 2,
+                useSystemFonts: true,
+                disableFontFace: false,
+                enableXfa: true,
+                pdfFilePassword: undefined,
+                pagesToProcess: [1, 2, 3],
+                verbosityLevel: 1,
+                processPagesInParallel: true,
+                concurrencyLimit: 2,
+                returnMetadataOnly: undefined,
+                returnPageContent: false,
+            }),
+        );
         expect(logSpy).toHaveBeenCalledWith('Processing PDF: test.pdf');
         expect(logSpy).toHaveBeenCalledWith('Output folder: /out');
         expect(logSpy).toHaveBeenCalledWith('Successfully processed 0 page(s).');
@@ -366,7 +374,7 @@ describe('CLI run()', () => {
 
         await run();
 
-        expect(pdfToPng).toHaveBeenCalledWith(
+        expect(pdfToPngCore).toHaveBeenCalledWith(
             'test.pdf',
             expect.objectContaining({
                 pdfFilePassword: 'secret',
@@ -376,40 +384,43 @@ describe('CLI run()', () => {
         );
     });
 
-    it('passes --return-page-content flag through to pdfToPng', async () => {
+    it('passes --return-page-content flag through to pdfToPngCore', async () => {
         setArgv('test.pdf', '--output-folder', '/out', '--return-page-content');
         await run();
-        expect(pdfToPng).toHaveBeenCalledWith('test.pdf', expect.objectContaining({ returnPageContent: true }));
+        expect(pdfToPngCore).toHaveBeenCalledWith('test.pdf', expect.objectContaining({ returnPageContent: true }));
         expect(exitSpy).not.toHaveBeenCalled();
     });
 
-    it('calls pdfToPng without --output-folder (buffer / in-memory mode)', async () => {
+    it('calls pdfToPngCore without --output-folder (buffer / in-memory mode)', async () => {
         setArgv('test.pdf');
         await run();
-        expect(pdfToPng).toHaveBeenCalledTimes(1);
-        expect(pdfToPng).toHaveBeenCalledWith('test.pdf', expect.objectContaining({ outputFolder: undefined }));
+        expect(pdfToPngCore).toHaveBeenCalledTimes(1);
+        expect(pdfToPngCore).toHaveBeenCalledWith('test.pdf', expect.objectContaining({ outputFolder: undefined }));
         expect(exitSpy).not.toHaveBeenCalled();
     });
 
     it('does not log processing info in --silent mode', async () => {
         setArgv('test.pdf', '--output-folder', '/out', '--silent');
         await run();
-        expect(pdfToPng).toHaveBeenCalledTimes(1);
+        expect(pdfToPngCore).toHaveBeenCalledTimes(1);
         expect(logSpy).not.toHaveBeenCalled();
     });
 
     // ── --return-metadata-only ─────────────────────────────────────────────────
 
     it('accepts --return-metadata-only without --output-folder', async () => {
-        vi.mocked(pdfToPng).mockResolvedValueOnce([
+        vi.mocked(pdfToPngCore).mockResolvedValueOnce([
             { kind: 'metadata', pageNumber: 1, name: 'page_1.png', width: 595, height: 842, rotation: 0, content: undefined, path: '' },
         ]);
 
         setArgv('test.pdf', '--return-metadata-only');
         await run();
 
-        expect(pdfToPng).toHaveBeenCalledTimes(1);
-        expect(pdfToPng).toHaveBeenCalledWith('test.pdf', expect.objectContaining({ returnMetadataOnly: true, outputFolder: undefined }));
+        expect(pdfToPngCore).toHaveBeenCalledTimes(1);
+        expect(pdfToPngCore).toHaveBeenCalledWith(
+            'test.pdf',
+            expect.objectContaining({ returnMetadataOnly: true, outputFolder: undefined }),
+        );
         expect(logSpy).toHaveBeenCalledWith('Metadata extraction complete:');
         expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('"pageNumber": 1'));
         expect(exitSpy).not.toHaveBeenCalled();
@@ -418,15 +429,15 @@ describe('CLI run()', () => {
     it('suppresses metadata output in --silent --return-metadata-only mode', async () => {
         setArgv('test.pdf', '--return-metadata-only', '--silent');
         await run();
-        expect(pdfToPng).toHaveBeenCalledTimes(1);
+        expect(pdfToPngCore).toHaveBeenCalledTimes(1);
         expect(logSpy).not.toHaveBeenCalled();
         expect(exitSpy).not.toHaveBeenCalled();
     });
 
-    // ── Error from pdfToPng ───────────────────────────────────────────────────
+    // ── Error from pdfToPngCore ───────────────────────────────────────────────
 
-    it('exits 1 and prints the error when pdfToPng throws', async () => {
-        vi.mocked(pdfToPng).mockRejectedValueOnce(new Error('render failed'));
+    it('exits 1 and prints the error when pdfToPngCore throws', async () => {
+        vi.mocked(pdfToPngCore).mockRejectedValueOnce(new Error('render failed'));
 
         setArgv('test.pdf', '--output-folder', '/out');
         await run();
@@ -436,8 +447,8 @@ describe('CLI run()', () => {
         expect(exitSpy).toHaveBeenCalledWith(1);
     });
 
-    it('handles non-Error rejections from pdfToPng', async () => {
-        vi.mocked(pdfToPng).mockRejectedValueOnce('string error');
+    it('handles non-Error rejections from pdfToPngCore', async () => {
+        vi.mocked(pdfToPngCore).mockRejectedValueOnce('string error');
 
         setArgv('test.pdf', '--output-folder', '/out');
         await run();
