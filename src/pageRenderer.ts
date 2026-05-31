@@ -7,6 +7,18 @@ function isNodeCanvasFactory(factory: unknown): factory is NodeCanvasFactory {
     return typeof factory === 'object' && factory !== null && 'create' in factory && typeof factory.create === 'function';
 }
 
+/**
+ * Converts a (possibly fractional) viewport length into the integer pixel count the canvas
+ * will actually allocate. `@napi-rs/canvas` truncates fractional dimensions toward zero when a
+ * canvas is constructed (e.g. a 892.5-wide viewport yields an 892 px bitmap), so the reported
+ * `width`/`height` must be floored to match the rendered PNG. Viewport lengths are always
+ * non-negative, so `Math.floor` is equivalent to that truncation. Flooring here keeps the
+ * render path and the `returnMetadataOnly` path reporting identical, image-accurate pixel sizes.
+ */
+export function toPixelDimension(viewportLength: number): number {
+    return Math.floor(viewportLength);
+}
+
 export function normalizeRotation(raw: number): PageRotation {
     const normalized = ((raw % 360) + 360) % 360;
     switch (normalized) {
@@ -39,8 +51,8 @@ export async function getPageMetadata(
             name: pageName,
             content: undefined,
             path: '',
-            width: viewport.width,
-            height: viewport.height,
+            width: toPixelDimension(viewport.width),
+            height: toPixelDimension(viewport.height),
             rotation: normalizeRotation(page.rotate),
         };
     } finally {
@@ -65,8 +77,10 @@ export async function renderPdfPage(
         );
     }
 
+    const canvasWidth = toPixelDimension(viewport.width);
+    const canvasHeight = toPixelDimension(viewport.height);
     const canvasFactory = isNodeCanvasFactory(pdf.canvasFactory) ? pdf.canvasFactory : new NodeCanvasFactory();
-    const { canvas, context } = canvasFactory.create(viewport.width, viewport.height);
+    const { canvas, context } = canvasFactory.create(canvasWidth, canvasHeight);
 
     try {
         if (!canvas) {
@@ -81,8 +95,8 @@ export async function renderPdfPage(
             name: pageName,
             content: returnPageContent ? canvas.toBuffer('image/png') : undefined,
             path: '',
-            width: viewport.width,
-            height: viewport.height,
+            width: canvasWidth,
+            height: canvasHeight,
             rotation: normalizeRotation(page.rotate),
         };
     } finally {
