@@ -1,7 +1,7 @@
 # pdf-to-png-converter
 
 <p align="center">
-  <strong>🎯 Convert PDF pages to PNG images with zero native dependencies</strong>
+  <strong>🎯 Convert PDF pages to PNG images with no native compilation required</strong>
 </p>
 
 <p align="center">
@@ -38,11 +38,12 @@ A high-performance Node.js library for converting PDF files and buffers to PNG i
 
 - [Installation](#installation)
 - [Quick Start](#quick-start)
-- [Migration Guide](#migration-guide)
 - [CLI Usage](#cli-usage)
 - [API Reference](#api-reference)
 - [Examples](#examples)
 - [Output Format](#output-format)
+- [Migration Guide](#migration-guide)
+- [Project Links](#project-links)
 - [License](#license)
 
 ---
@@ -72,11 +73,13 @@ Convert a PDF file to PNG images in just a few lines:
 ```javascript
 const { pdfToPng } = require('pdf-to-png-converter');
 
-const pngPages = await pdfToPng('document.pdf', {
-    outputFolder: './output',
-});
+(async () => {
+    const pngPages = await pdfToPng('document.pdf', {
+        outputFolder: './output',
+    });
 
-console.log(`Converted ${pngPages.length} pages`);
+    console.log(`Converted ${pngPages.length} pages`);
+})();
 ```
 
 Or with TypeScript:
@@ -90,16 +93,7 @@ const pngPages: PngPageOutput[] = await pdfToPng('document.pdf', {
 });
 ```
 
----
-
-## Migration Guide
-
-Version **4.0.0** introduced public and behavioral changes that existing consumers may need to adopt:
-
-1. **`PngPageOutput` is now discriminated.** Branch on `page.kind` before reading `page.path` or assuming `page.content` is present.
-2. **`verbosityLevel` is now typed as `VerbosityLevel`.** Prefer `VerbosityLevel.ERRORS`, `VerbosityLevel.WARNINGS`, or `VerbosityLevel.INFOS` instead of raw numeric literals.
-3. **Invalid `pagesToProcess` values now throw early.** `0`, negative numbers, and non-integers are rejected immediately; page numbers above the document length are still ignored.
-4. **Disk writes are now exclusive-create (`'wx'`).** Re-running the same conversion into the same output filenames now throws `EEXIST`; clear the target directory or generate unique filenames between runs.
+> **Existing files are not overwritten.** Disk writes use exclusive-create mode. Re-running a conversion with the same output filenames throws `EEXIST`; clear the target directory or generate unique filenames between runs.
 
 ---
 
@@ -113,7 +107,7 @@ npx pdf-to-png-converter my-document.pdf --output-folder ./output
 
 **Options:**
 
-- `--output-folder <dir>`: Directory to save PNG files.
+- `--output-folder <dir>`: Directory to save PNG files. Existing files are not overwritten; duplicate output filenames throw `EEXIST`.
 - `--viewport-scale <number>`: Scale factor applied to each page viewport.
 - `--use-system-fonts`: Attempt to use fonts installed on the host system.
 - `--disable-font-face <true|false>`: Do not load embedded fonts.
@@ -148,7 +142,7 @@ Converts PDF pages to PNG images.
 
 ### Options
 
-```javascript
+```typescript
 {
     // Font & Rendering Options
     disableFontFace?: boolean,       // Disable font face rendering (default: true)
@@ -156,10 +150,10 @@ Converts PDF pages to PNG images.
     enableXfa?: boolean,             // Render XFA forms (default: true)
 
     // Output Options
-    outputFolder?: string,           // Directory to save PNG files
+    outputFolder?: string,           // Directory to save PNG files; existing files are not overwritten
     outputFileMaskFunc?: (pageNumber: number) => string, // Custom filename function
-                                     // Must return a flat filename — names containing "/" or "\"
-                                     // path separators are rejected synchronously.
+                                     // Must return a flat filename. "/" is rejected on all platforms;
+                                     // "\" is also rejected on Windows.
 
     // Rendering Options
     viewportScale?: number,          // PNG scale/zoom level (default: 1.0, max: 100)
@@ -302,12 +296,20 @@ This is significantly faster than full rendering and useful for checking page co
 
 ## Output Format
 
-The `pdfToPng` function returns an array of discriminated page objects:
+The `pdfToPng` function returns an array of discriminated page objects. Branch on `kind` before using mode-specific fields:
+
+| `kind`     | When returned                    | `path`    | `content`                                       |
+| ---------- | -------------------------------- | --------- | ----------------------------------------------- |
+| `metadata` | `returnMetadataOnly: true`       | `''`      | `undefined`                                     |
+| `content`  | Rendering without `outputFolder` | `''`      | PNG `Buffer`, unless `returnPageContent: false` |
+| `file`     | Rendering with `outputFolder`    | File path | PNG `Buffer`, unless `returnPageContent: false` |
+
+All output objects also include `pageNumber`, `name`, `width`, `height`, and `rotation`.
 
 ```javascript
 [
     {
-        kind: 'content',                   // 'metadata' | 'content' | 'file'
+        kind: 'content',
         pageNumber: 1,                      // Page number in the PDF
         name: 'document_page_1.png',        // PNG filename
         content: Buffer<...>,               // PNG image data
@@ -321,8 +323,6 @@ The `pdfToPng` function returns an array of discriminated page objects:
 ]
 ```
 
-Branch on `kind` before using mode-specific fields:
-
 ```javascript
 pngPages.forEach((page) => {
     if (page.kind === 'file') {
@@ -334,6 +334,28 @@ pngPages.forEach((page) => {
     }
 });
 ```
+
+---
+
+## Migration Guide
+
+Version **4.0.0** introduced public and behavioral changes that existing consumers may need to adopt:
+
+1. **`PngPageOutput` is now discriminated.** Branch on `page.kind` before reading `page.path` or assuming `page.content` is present.
+2. **`verbosityLevel` is now typed as `VerbosityLevel`.** Prefer `VerbosityLevel.ERRORS`, `VerbosityLevel.WARNINGS`, or `VerbosityLevel.INFOS` instead of raw numeric literals.
+3. **Invalid `pagesToProcess` values now throw early.** `0`, negative numbers, and non-integers are rejected immediately; page numbers above the document length are still ignored.
+4. **Disk writes are now exclusive-create (`'wx'`).** Re-running the same conversion into the same output filenames now throws `EEXIST`; clear the target directory or generate unique filenames between runs.
+
+See the [changelog](CHANGELOG.md) for the full release history.
+
+---
+
+## Project Links
+
+- [Changelog](CHANGELOG.md)
+- [Contributing Guide](CONTRIBUTING.md)
+- [Security Policy](SECURITY.md)
+- [Issue Tracker](https://github.com/dichovsky/pdf-to-png-converter/issues)
 
 ---
 
