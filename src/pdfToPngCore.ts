@@ -112,6 +112,6 @@ export async function pdfToPngCore(
 
         return pngPageOutputs;
     } finally {
-        await pdfDocument.destroy();
+        await pdfDocument.loadingTask.destroy();
     }
 }

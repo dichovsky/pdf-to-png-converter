@@ -12,15 +12,15 @@ afterEach(() => {
 /**
  * Regression guard for the PR-review fix.
  *
- * Before the fix, `pdfDocument.destroy()` lived in a `try/finally` that started AFTER
+ * Before the fix, `pdfDocument.loadingTask.destroy()` lived in a `try/finally` that started AFTER
  * `mkdir(outputFolder)` and `realpath(outputFolder)`. If either of those threw — which
  * is realistic for EACCES, EROFS, ENOENT on bind-mounted volumes — the PDF.js document
  * and worker would leak. The fix moves the `try` opening to right after `getPdfDocument()`
  * succeeds so the worker is always destroyed.
  */
-test('pdfDocument.destroy() runs even when mkdir(outputFolder) throws', async () => {
+test('pdfDocument.loadingTask.destroy() runs even when mkdir(outputFolder) throws', async () => {
     const destroy = vi.fn().mockResolvedValue(undefined);
-    const mockDocument = { numPages: 1, destroy } as unknown as PDFDocumentProxy;
+    const mockDocument = { numPages: 1, loadingTask: { destroy } } as unknown as PDFDocumentProxy;
     vi.spyOn(pdfjsLoader, 'getPdfDocument').mockResolvedValue(mockDocument);
 
     const mkdirError = new Error('EACCES: permission denied');

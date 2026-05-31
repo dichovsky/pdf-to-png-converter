@@ -15,7 +15,7 @@ function createDeferred(): { promise: Promise<void>; resolve: () => void } {
 
 test('should start the next page as soon as a parallel slot frees up', async () => {
     const destroy = vi.fn().mockResolvedValue(undefined);
-    const mockDocument = { numPages: 5, destroy } as unknown as PDFDocumentProxy;
+    const mockDocument = { numPages: 5, loadingTask: { destroy } } as unknown as PDFDocumentProxy;
     vi.spyOn(pdfjsLoader, 'getPdfDocument').mockResolvedValue(mockDocument);
 
     const startedPages: number[] = [];

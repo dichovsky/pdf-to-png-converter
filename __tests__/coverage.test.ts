@@ -142,7 +142,7 @@ describe('pdfToPng', () => {
             numPages: 1,
             getPage: vi.fn().mockResolvedValue(mockPage),
             cleanup: vi.fn(),
-            destroy: vi.fn().mockResolvedValue(undefined),
+            loadingTask: { destroy: vi.fn().mockResolvedValue(undefined) },
             canvasFactory: null,
         };
 
@@ -154,7 +154,7 @@ describe('pdfToPng', () => {
 
         await expect(pdfToPng('test.pdf')).rejects.toThrow('exceeds the');
         expect(mockPage.cleanup).toHaveBeenCalled();
-        expect(mockDocument.destroy).toHaveBeenCalled();
+        expect(mockDocument.loadingTask.destroy).toHaveBeenCalled();
     });
 
     it('should throw when outputFolder directory resolves outside outputFolder via symlink (symlink escape on dirname)', async () => {
@@ -175,7 +175,7 @@ describe('pdfToPng', () => {
             numPages: 1,
             getPage: vi.fn().mockResolvedValue(mockPage),
             cleanup: vi.fn(),
-            destroy: vi.fn().mockResolvedValue(undefined),
+            loadingTask: { destroy: vi.fn().mockResolvedValue(undefined) },
             canvasFactory: mockCanvasFactory,
         };
 
@@ -213,7 +213,7 @@ describe('pdfToPng', () => {
             numPages: 1,
             getPage: vi.fn().mockResolvedValue(mockPage),
             cleanup: vi.fn(),
-            destroy: vi.fn().mockResolvedValue(undefined),
+            loadingTask: { destroy: vi.fn().mockResolvedValue(undefined) },
             canvasFactory: mockCanvasFactory,
         };
 
@@ -249,7 +249,7 @@ describe('pdfToPng', () => {
             numPages: 1,
             getPage: vi.fn().mockResolvedValue(mockPage),
             cleanup: vi.fn(),
-            destroy: vi.fn().mockResolvedValue(undefined),
+            loadingTask: { destroy: vi.fn().mockResolvedValue(undefined) },
             canvasFactory: mockCanvasFactory,
         };
 
@@ -285,7 +285,7 @@ describe('pdfToPng', () => {
             numPages: 1,
             getPage: vi.fn().mockResolvedValue(mockPage),
             cleanup: vi.fn(),
-            destroy: vi.fn().mockResolvedValue(undefined),
+            loadingTask: { destroy: vi.fn().mockResolvedValue(undefined) },
             canvasFactory: {
                 create: vi.fn().mockReturnValue({ canvas: { toBuffer: vi.fn() }, context: {} }),
                 destroy: vi.fn(),
@@ -299,6 +299,6 @@ describe('pdfToPng', () => {
         });
 
         await expect(pdfToPng('test.pdf')).rejects.toThrow('render failed');
-        expect(mockDocument.destroy).toHaveBeenCalled();
+        expect(mockDocument.loadingTask.destroy).toHaveBeenCalled();
     });
 });
