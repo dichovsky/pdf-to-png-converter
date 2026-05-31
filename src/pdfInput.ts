@@ -37,5 +37,24 @@ export async function getPdfFileBuffer(
     }
 
     rejectOversized(pdfFile.byteLength, maxInputBytes);
+    // Defensive copy. pdfjs `getDocument()` lists the input's underlying ArrayBuffer as a
+    // transferable, which DETACHES it (byteLength → 0) when the data is a full-span Uint8Array.
+    // Returning the caller's buffer by reference would therefore neuter their input and break
+    // reuse across calls. The string-path and Node-Buffer branches above already allocate fresh
+    // memory; copy the Uint8Array / ArrayBuffer branch too so every supported input shape leaves
+    // the caller's buffer intact. Out-of-contract values fall through unchanged so pdfjs still
+    // raises its own validation error.
+    if (pdfFile instanceof Uint8Array) {
+        return Uint8Array.from(pdfFile);
+    }
+    if (pdfFile instanceof ArrayBuffer) {
+        return pdfFile.slice(0);
+    }
+    if (pdfFile instanceof SharedArrayBuffer) {
+        // `slice()` would yield another SharedArrayBuffer (non-transferable, shared) — copy into a
+        // fresh, regular-ArrayBuffer-backed Uint8Array so downstream pdfjs always receives
+        // unshared memory. `new Uint8Array(sab)` only views the SAB, so copy via `Uint8Array.from`.
+        return Uint8Array.from(new Uint8Array(pdfFile));
+    }
     return pdfFile;
 }
