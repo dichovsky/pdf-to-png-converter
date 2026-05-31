@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - CI now blocks on `npm run build:strict`; the strict type-check is no longer advisory. `continue-on-error: true` is removed from `.github/workflows/test.yml` and the dedicated CI "Strict type check" step is replaced by `pretest` gating (avoiding a double run on CI). `pretest` now runs `build:strict` alongside `build:test` — the two type-checks enforce different contracts: `build:test` (using `tsconfig.json`, no DOM lib) gates `src/` against accidental DOM globals (`document`, `window`) that production builds would reject; `build:strict` (using `tsconfig.strict.json`, `skipLibCheck: false` + DOM lib for `@napi-rs/canvas` type resolution) gates against upstream type regressions in `pdfjs-dist` / `@napi-rs/canvas`. Local `npm test` and `prepublishOnly` now gate on both.
+- Improved README accuracy and usability for npm consumers, and simplified the package funding metadata so `npm fund` exposes the Buy Me a Coffee URL.
 
 ### Refactored
 
