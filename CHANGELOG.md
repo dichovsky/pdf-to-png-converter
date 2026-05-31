@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- Removed the bespoke `NodeCanvasFactory` (`src/node.canvas.factory.ts`) and its tests. Rendering now uses pdf.js's built-in Node canvas factory (`PDFDocumentProxy.canvasFactory`, backed by `@napi-rs/canvas`) directly. The previous code selected this factory at runtime anyway — the `isNodeCanvasFactory()` duck-type guard always matched pdf.js's own factory, so the project's class and its `new NodeCanvasFactory()` fallback were never exercised on the render path. The `@napi-rs/canvas` dependency is unchanged (kept as a direct dependency so pdf.js's renderer is always able to load it). Rendered PNG output is unchanged — the visual-comparison suites pass. Resolves backlog item ARCH-015.
+
 ## [4.1.0] — 2026-05-31
 
 ### Security

@@ -28,7 +28,7 @@ The codebase is organized around one public library entrypoint (`pdfToPng`) plus
     - render path: `renderPdfPage()`
     - optional sink write
     - final conversion to the discriminated output shape
-6. `pageRenderer.ts` obtains the page, computes the viewport, normalizes `rotation`, renders through `NodeCanvasFactory`, and returns an in-memory page result.
+6. `pageRenderer.ts` obtains the page, computes the viewport, normalizes `rotation`, renders through pdf.js's built-in Node canvas factory (`pdf.canvasFactory`, backed by `@napi-rs/canvas`), and returns an in-memory page result.
 7. `outputWriter.ts` validates filename containment, checks realpaths, writes via `fs.promises.open(..., 'wx')`, and returns the absolute file path.
 8. `pdfToPng()` always calls `pdfDocument.destroy()` in `finally`.
 
@@ -45,7 +45,6 @@ The codebase is organized around one public library entrypoint (`pdfToPng`) plus
 | `src/outputWriter.ts`             | Path-containment enforcement and secure file writes          | `savePNGfile`                                                    |
 | `src/filesystemSink.ts`           | Disk-backed sink using `savePNGfile()`                       | `FilesystemSink`                                                 |
 | `src/nullSink.ts`                 | No-op sink for in-memory workflows                           | `NullSink`                                                       |
-| `src/node.canvas.factory.ts`      | `pdfjs-dist` canvas adapter backed by `@napi-rs/canvas`      | `NodeCanvasFactory`                                              |
 | `src/propsToPdfDocInitParams.ts`  | Maps library options to `pdfjs-dist` init params             | `propsToPdfDocInitParams`                                        |
 | `src/cli.ts`                      | CLI adapter and reusable CLI helpers                         | `run`, `buildPdfToPngOptions`, `executeConversion`, `getVersion` |
 

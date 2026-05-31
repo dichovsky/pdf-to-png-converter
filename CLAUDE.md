@@ -24,7 +24,7 @@ Published to npm as `pdf-to-png-converter`. Entry: `out/index.js`, types: `out/i
 3. `getPdfFileBuffer()` in `src/pdfInput.ts` — reads file path via `fsPromises.readFile` (with pre-stat regular-file + size check) or passes `ArrayBufferLike` through; normalises Node `Buffer` → `Uint8Array`
 4. `getPdfDocument()` in `src/pdfjsLoader.ts` — dynamically imports `pdfjs-dist/legacy/build/pdf.mjs`, calls `getDocument()` with params from `propsToPdfDocInitParams(NormalizedPdfToPngOptions)`
 5. Invalid page numbers (< 1 or > numPages) in `pagesToProcess` are silently filtered before the render loop
-6. `renderPdfPage()` / `getPageMetadata()` in `src/pageRenderer.ts` — when `returnMetadataOnly` is true returns dimensions and rotation immediately; otherwise creates a canvas via `NodeCanvasFactory`, renders via `page.render()`, encodes to PNG, cleans up in `finally`
+6. `renderPdfPage()` / `getPageMetadata()` in `src/pageRenderer.ts` — when `returnMetadataOnly` is true returns dimensions and rotation immediately; otherwise creates a canvas via pdf.js's built-in Node canvas factory (`pdf.canvasFactory`, backed by `@napi-rs/canvas`), renders via `page.render()`, encodes to PNG, cleans up in `finally`
 7. `processAndSavePage()` in `src/pageOrchestrator.ts` — composes the render → write step against an `OutputSink` (`FilesystemSink` or `NullSink`)
 8. `savePNGfile()` in `src/outputWriter.ts` — joins `outputFolder` + `name`, validates `content !== undefined`, writes with `fsPromises.writeFile` (with realpath-based path-traversal guard from SEC-001/002/003)
 9. Returns `PngPageOutput[]` — one entry per processed page
@@ -56,7 +56,6 @@ Key modules (current sizes are typical, not authoritative):
 - `src/pageOrchestrator.ts` — composes render → write through an `OutputSink`.
 - `src/outputWriter.ts` — `savePNGfile` with realpath-based path-traversal guard.
 - `src/filesystemSink.ts`, `src/nullSink.ts` — `OutputSink` implementations.
-- `src/node.canvas.factory.ts` — `NodeCanvasFactory` (pdfjs canvas contract via @napi-rs/canvas).
 - `src/const.ts` — runtime constants (limits + defaults); test-only asset lists are in `__tests__/test-data-constants.ts`.
 - `src/interfaces/` — PdfToPngOptions, PngPageOutput, OutputSink, CanvasAndContext.
 - `src/types/verbosity.level.ts` — VerbosityLevel enum (ERRORS=0, WARNINGS=1, INFOS=5).
