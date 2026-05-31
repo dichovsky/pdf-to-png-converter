@@ -149,7 +149,6 @@ describe('pdfToPng', () => {
         (fsPromises.readFile as Mock).mockResolvedValueOnce(new ArrayBuffer(8));
         (getDocument as Mock).mockReturnValueOnce({
             promise: Promise.resolve(mockDocument),
-            destroy: vi.fn().mockResolvedValue(undefined),
         });
 
         await expect(pdfToPng('test.pdf')).rejects.toThrow('exceeds the');
@@ -182,7 +181,6 @@ describe('pdfToPng', () => {
         (fsPromises.readFile as Mock).mockResolvedValueOnce(new ArrayBuffer(8));
         (getDocument as Mock).mockReturnValueOnce({
             promise: Promise.resolve(mockDocument),
-            destroy: vi.fn().mockResolvedValue(undefined),
         });
         (fsPromises.mkdir as Mock).mockResolvedValueOnce(undefined);
         // 1st realpath: resolvedOutputFolder in pdfToPng → establishes realOutputFolder
@@ -220,7 +218,6 @@ describe('pdfToPng', () => {
         (fsPromises.readFile as Mock).mockResolvedValueOnce(new ArrayBuffer(8));
         (getDocument as Mock).mockReturnValueOnce({
             promise: Promise.resolve(mockDocument),
-            destroy: vi.fn().mockResolvedValue(undefined),
         });
         (fsPromises.mkdir as Mock).mockResolvedValueOnce(undefined);
         // Both realpath calls return the same safe path so the symlink check (L457) passes;
@@ -256,7 +253,6 @@ describe('pdfToPng', () => {
         (fsPromises.readFile as Mock).mockResolvedValueOnce(new ArrayBuffer(8));
         (getDocument as Mock).mockReturnValueOnce({
             promise: Promise.resolve(mockDocument),
-            destroy: vi.fn().mockResolvedValue(undefined),
         });
         (fsPromises.mkdir as Mock).mockResolvedValueOnce(undefined);
         // 1st realpath: resolvedOutputFolder in pdfToPng (cached as realOutputFolder) — passes
@@ -295,7 +291,6 @@ describe('pdfToPng', () => {
         (fsPromises.readFile as Mock).mockResolvedValueOnce(new ArrayBuffer(8));
         (getDocument as Mock).mockReturnValueOnce({
             promise: Promise.resolve(mockDocument),
-            destroy: vi.fn().mockResolvedValue(undefined),
         });
 
         await expect(pdfToPng('test.pdf')).rejects.toThrow('render failed');
