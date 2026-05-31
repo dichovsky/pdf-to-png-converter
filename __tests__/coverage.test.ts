@@ -142,19 +142,18 @@ describe('pdfToPng', () => {
             numPages: 1,
             getPage: vi.fn().mockResolvedValue(mockPage),
             cleanup: vi.fn(),
-            destroy: vi.fn().mockResolvedValue(undefined),
+            loadingTask: { destroy: vi.fn().mockResolvedValue(undefined) },
             canvasFactory: null,
         };
 
         (fsPromises.readFile as Mock).mockResolvedValueOnce(new ArrayBuffer(8));
         (getDocument as Mock).mockReturnValueOnce({
             promise: Promise.resolve(mockDocument),
-            destroy: vi.fn().mockResolvedValue(undefined),
         });
 
         await expect(pdfToPng('test.pdf')).rejects.toThrow('exceeds the');
         expect(mockPage.cleanup).toHaveBeenCalled();
-        expect(mockDocument.destroy).toHaveBeenCalled();
+        expect(mockDocument.loadingTask.destroy).toHaveBeenCalled();
     });
 
     it('should throw when outputFolder directory resolves outside outputFolder via symlink (symlink escape on dirname)', async () => {
@@ -175,14 +174,13 @@ describe('pdfToPng', () => {
             numPages: 1,
             getPage: vi.fn().mockResolvedValue(mockPage),
             cleanup: vi.fn(),
-            destroy: vi.fn().mockResolvedValue(undefined),
+            loadingTask: { destroy: vi.fn().mockResolvedValue(undefined) },
             canvasFactory: mockCanvasFactory,
         };
 
         (fsPromises.readFile as Mock).mockResolvedValueOnce(new ArrayBuffer(8));
         (getDocument as Mock).mockReturnValueOnce({
             promise: Promise.resolve(mockDocument),
-            destroy: vi.fn().mockResolvedValue(undefined),
         });
         (fsPromises.mkdir as Mock).mockResolvedValueOnce(undefined);
         // 1st realpath: resolvedOutputFolder in pdfToPng → establishes realOutputFolder
@@ -213,14 +211,13 @@ describe('pdfToPng', () => {
             numPages: 1,
             getPage: vi.fn().mockResolvedValue(mockPage),
             cleanup: vi.fn(),
-            destroy: vi.fn().mockResolvedValue(undefined),
+            loadingTask: { destroy: vi.fn().mockResolvedValue(undefined) },
             canvasFactory: mockCanvasFactory,
         };
 
         (fsPromises.readFile as Mock).mockResolvedValueOnce(new ArrayBuffer(8));
         (getDocument as Mock).mockReturnValueOnce({
             promise: Promise.resolve(mockDocument),
-            destroy: vi.fn().mockResolvedValue(undefined),
         });
         (fsPromises.mkdir as Mock).mockResolvedValueOnce(undefined);
         // Both realpath calls return the same safe path so the symlink check (L457) passes;
@@ -249,14 +246,13 @@ describe('pdfToPng', () => {
             numPages: 1,
             getPage: vi.fn().mockResolvedValue(mockPage),
             cleanup: vi.fn(),
-            destroy: vi.fn().mockResolvedValue(undefined),
+            loadingTask: { destroy: vi.fn().mockResolvedValue(undefined) },
             canvasFactory: mockCanvasFactory,
         };
 
         (fsPromises.readFile as Mock).mockResolvedValueOnce(new ArrayBuffer(8));
         (getDocument as Mock).mockReturnValueOnce({
             promise: Promise.resolve(mockDocument),
-            destroy: vi.fn().mockResolvedValue(undefined),
         });
         (fsPromises.mkdir as Mock).mockResolvedValueOnce(undefined);
         // 1st realpath: resolvedOutputFolder in pdfToPng (cached as realOutputFolder) — passes
@@ -285,7 +281,7 @@ describe('pdfToPng', () => {
             numPages: 1,
             getPage: vi.fn().mockResolvedValue(mockPage),
             cleanup: vi.fn(),
-            destroy: vi.fn().mockResolvedValue(undefined),
+            loadingTask: { destroy: vi.fn().mockResolvedValue(undefined) },
             canvasFactory: {
                 create: vi.fn().mockReturnValue({ canvas: { toBuffer: vi.fn() }, context: {} }),
                 destroy: vi.fn(),
@@ -295,10 +291,9 @@ describe('pdfToPng', () => {
         (fsPromises.readFile as Mock).mockResolvedValueOnce(new ArrayBuffer(8));
         (getDocument as Mock).mockReturnValueOnce({
             promise: Promise.resolve(mockDocument),
-            destroy: vi.fn().mockResolvedValue(undefined),
         });
 
         await expect(pdfToPng('test.pdf')).rejects.toThrow('render failed');
-        expect(mockDocument.destroy).toHaveBeenCalled();
+        expect(mockDocument.loadingTask.destroy).toHaveBeenCalled();
     });
 });
