@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.1.0] — 2026-05-31
+
 ### Security
 
 - **SEC-001**: `outputFileMaskFunc` filenames are now rejected synchronously when they contain a `/` or `\` path separator, closing a residual TOCTOU window where a co-tenant with write access to `outputFolder` could swap an intermediate directory for a symlink between the `realpath(dirname(...))` check and the `open(..., 'wx')` call in `savePNGfile()`. The guard fires both in `resolvePageName` (early) and in `savePNGfile` (defense in depth). The existing flat-filename contract is unchanged.
@@ -17,12 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Migrated `pdfjs-dist` from `~5.7.284` to `~6.0.227`. pdf.js v6 removed `PDFDocumentProxy.destroy()`, so document/worker teardown now uses `pdfDocument.loadingTask.destroy()` (the `loadingTask` getter exists in both v5 and v6, and the removed `destroy()` previously delegated to it). The public API, default options, asset paths (`cmaps` / `standard_fonts`), the `legacy/build/pdf.mjs` import path, and rendered PNG output are all unchanged — the visual-comparison suites pass against the existing v5-generated reference images.
 - CI now blocks on `npm run build:strict`; the strict type-check is no longer advisory. `continue-on-error: true` is removed from `.github/workflows/test.yml` and the dedicated CI "Strict type check" step is replaced by `pretest` gating (avoiding a double run on CI). `pretest` now runs `build:strict` alongside `build:test` — the two type-checks enforce different contracts: `build:test` (using `tsconfig.json`, no DOM lib) gates `src/` against accidental DOM globals (`document`, `window`) that production builds would reject; `build:strict` (using `tsconfig.strict.json`, `skipLibCheck: false` + DOM lib for `@napi-rs/canvas` type resolution) gates against upstream type regressions in `pdfjs-dist` / `@napi-rs/canvas`. Local `npm test` and `prepublishOnly` now gate on both.
 - Improved README accuracy and usability for npm consumers, and simplified the package funding metadata so `npm fund` exposes the Buy Me a Coffee URL.
 
 ### Refactored
 
-- Updated the stale version pin in the existing `@ts-ignore` suppression in `src/pageRenderer.ts` from `pdfjs-dist@~5.6.205` to `pdfjs-dist@~5.7.x` and clarified why `@ts-ignore` (not `@ts-expect-error`) is required for this site — the underlying type error is hidden by `build:test`'s `skipLibCheck:true`, which would cause `@ts-expect-error` to report as unused. Added a comment in `tsconfig.strict.json` explaining the intentional DOM-lib divergence from `tsconfig.json`. Added a "Strict type-check" section to `CONTRIBUTING.md` documenting the failure-handling playbook (default `@ts-expect-error` for self-cleaning; `@ts-ignore` exception for `skipLibCheck`-hidden errors).
+- Updated the stale version pin in the existing `@ts-ignore` suppression in `src/pageRenderer.ts` from `pdfjs-dist@~5.6.205` to `pdfjs-dist@~6.0.x` and clarified why `@ts-ignore` (not `@ts-expect-error`) is required for this site — the underlying type error is hidden by `build:test`'s `skipLibCheck:true`, which would cause `@ts-expect-error` to report as unused. Added a comment in `tsconfig.strict.json` explaining the intentional DOM-lib divergence from `tsconfig.json`. Added a "Strict type-check" section to `CONTRIBUTING.md` documenting the failure-handling playbook (default `@ts-expect-error` for self-cleaning; `@ts-ignore` exception for `skipLibCheck`-hidden errors).
 
 ---
 
