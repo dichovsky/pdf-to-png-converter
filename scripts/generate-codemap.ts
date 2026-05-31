@@ -62,12 +62,7 @@ interface Codemap {
     files: FileEntry[];
 }
 
-type NamedDecl =
-    | ts.FunctionDeclaration
-    | ts.ClassDeclaration
-    | ts.InterfaceDeclaration
-    | ts.TypeAliasDeclaration
-    | ts.EnumDeclaration;
+type NamedDecl = ts.FunctionDeclaration | ts.ClassDeclaration | ts.InterfaceDeclaration | ts.TypeAliasDeclaration | ts.EnumDeclaration;
 
 const ROOT = process.cwd();
 const CONFIG_PATH = resolve(ROOT, 'codemap.config.json');
@@ -152,9 +147,7 @@ async function discoverSources(config: CodemapConfig): Promise<string[]> {
             }),
         )
     ).flat();
-    return all
-        .filter((abs) => !compiled.some((rx) => rx.test(toPosix(relative(ROOT, abs)))))
-        .sort(cmp);
+    return all.filter((abs) => !compiled.some((rx) => rx.test(toPosix(relative(ROOT, abs))))).sort(cmp);
 }
 
 function computeSourceHash(files: { path: string; content: string }[]): string {
@@ -176,10 +169,7 @@ function normalizeSignature(text: string, maxLen: number): string {
     while (tk !== ts.SyntaxKind.EndOfFileToken) {
         if (tk === ts.SyntaxKind.WhitespaceTrivia || tk === ts.SyntaxKind.NewLineTrivia) {
             if (out.length > 0 && !out.endsWith(' ')) out += ' ';
-        } else if (
-            tk !== ts.SyntaxKind.SingleLineCommentTrivia &&
-            tk !== ts.SyntaxKind.MultiLineCommentTrivia
-        ) {
+        } else if (tk !== ts.SyntaxKind.SingleLineCommentTrivia && tk !== ts.SyntaxKind.MultiLineCommentTrivia) {
             out += scanner.getTokenText();
         }
         tk = scanner.scan();
@@ -211,7 +201,10 @@ function extractJSDoc(node: ts.Node): string {
     const main = attached.find((n): n is ts.JSDoc => ts.isJSDoc(n));
     if (!main) return '';
     const commentText = readComment(main.comment);
-    const firstPara = commentText.split(/\n\s*\n/)[0].replace(/\s+/g, ' ').trim();
+    const firstPara = commentText
+        .split(/\n\s*\n/)[0]
+        .replace(/\s+/g, ' ')
+        .trim();
     const tags: string[] = [];
     let exampleUsed = false;
     for (const tag of main.tags ?? []) {
@@ -290,9 +283,7 @@ function buildFileEntry(sf: ts.SourceFile, relPath: string, maxLen: number): Fil
                 line: getLine(sf, named.decl),
                 exported,
                 signature: extractSignature(named.decl, sf, maxLen),
-                ...(ts.isClassDeclaration(named.decl)
-                    ? { members: collectClassMembers(sf, named.decl) }
-                    : {}),
+                ...(ts.isClassDeclaration(named.decl) ? { members: collectClassMembers(sf, named.decl) } : {}),
             });
             continue;
         }
@@ -325,11 +316,9 @@ function buildFileEntry(sf: ts.SourceFile, relPath: string, maxLen: number): Fil
             const from = (stmt.moduleSpecifier as ts.StringLiteral).text;
             const t = stmt.isTypeOnly;
             if (!stmt.exportClause) reExports.push({ from, name: '*', typeOnly: t });
-            else if (ts.isNamespaceExport(stmt.exportClause))
-                reExports.push({ from, name: stmt.exportClause.name.text, typeOnly: t });
+            else if (ts.isNamespaceExport(stmt.exportClause)) reExports.push({ from, name: stmt.exportClause.name.text, typeOnly: t });
             else if (ts.isNamedExports(stmt.exportClause))
-                for (const el of stmt.exportClause.elements)
-                    reExports.push({ from, name: el.name.text, typeOnly: t || el.isTypeOnly });
+                for (const el of stmt.exportClause.elements) reExports.push({ from, name: el.name.text, typeOnly: t || el.isTypeOnly });
         }
     }
 
@@ -376,11 +365,7 @@ function buildApiEntry(
     };
 }
 
-function findLocalApiEntries(
-    relPath: string,
-    typeOnlyHint: boolean,
-    ctx: ResolveContext,
-): PublicApiEntry[] {
+function findLocalApiEntries(relPath: string, typeOnlyHint: boolean, ctx: ResolveContext): PublicApiEntry[] {
     const sf = ctx.sourceFiles.get(relPath);
     if (!sf) return [];
     const entries: PublicApiEntry[] = [];
@@ -388,15 +373,7 @@ function findLocalApiEntries(
         const named = asNamedDecl(stmt);
         if (named && (isExported(named.decl) || isDefault(named.decl))) {
             entries.push(
-                buildApiEntry(
-                    sf,
-                    relPath,
-                    declName(named.decl),
-                    named.decl,
-                    named.kind,
-                    typeOnlyHint || named.typeOnlyDecl,
-                    ctx.maxLen,
-                ),
+                buildApiEntry(sf, relPath, declName(named.decl), named.decl, named.kind, typeOnlyHint || named.typeOnlyDecl, ctx.maxLen),
             );
             continue;
         }
@@ -435,11 +412,7 @@ function collectPublicApi(
 
     for (const stmt of sf.statements) {
         if (!ts.isExportDeclaration(stmt) || !stmt.moduleSpecifier) continue;
-        const target = resolveModuleToFile(
-            (stmt.moduleSpecifier as ts.StringLiteral).text,
-            importerAbs,
-            ctx.sourceFiles,
-        );
+        const target = resolveModuleToFile((stmt.moduleSpecifier as ts.StringLiteral).text, importerAbs, ctx.sourceFiles);
         if (!target) continue;
         const t = typeOnlyHint || stmt.isTypeOnly;
 
