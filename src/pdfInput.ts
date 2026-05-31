@@ -47,8 +47,14 @@ export async function getPdfFileBuffer(
     if (pdfFile instanceof Uint8Array) {
         return Uint8Array.from(pdfFile);
     }
-    if (pdfFile instanceof ArrayBuffer || (typeof SharedArrayBuffer !== 'undefined' && pdfFile instanceof SharedArrayBuffer)) {
+    if (pdfFile instanceof ArrayBuffer) {
         return pdfFile.slice(0);
+    }
+    if (pdfFile instanceof SharedArrayBuffer) {
+        // `slice()` would yield another SharedArrayBuffer (non-transferable, shared) — copy into a
+        // fresh, regular-ArrayBuffer-backed Uint8Array so downstream pdfjs always receives
+        // unshared memory. `new Uint8Array(sab)` only views the SAB, so copy via `Uint8Array.from`.
+        return Uint8Array.from(new Uint8Array(pdfFile));
     }
     return pdfFile;
 }
