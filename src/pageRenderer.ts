@@ -14,6 +14,8 @@ function isNodeCanvasFactory(factory: unknown): factory is NodeCanvasFactory {
  * `width`/`height` must be floored to match the rendered PNG. Viewport lengths are always
  * non-negative, so `Math.floor` is equivalent to that truncation. Flooring here keeps the
  * render path and the `returnMetadataOnly` path reporting identical, image-accurate pixel sizes.
+ *
+ * @internal Exported for unit testing only; not part of the public API (`src/index.ts`).
  */
 export function toPixelDimension(viewportLength: number): number {
     return Math.floor(viewportLength);

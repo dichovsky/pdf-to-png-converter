@@ -8,6 +8,8 @@ test('toPixelDimension floors fractional viewport lengths to match canvas trunca
     expect(toPixelDimension(892.5)).toBe(892);
     expect(toPixelDimension(1263)).toBe(1263);
     expect(toPixelDimension(612)).toBe(612);
+    // A sub-pixel viewport floors to 0; the render path then throws an AssertionError in
+    // NodeCanvasFactory.create (width/height must be > 0) before any canvas is allocated.
     expect(toPixelDimension(0.9)).toBe(0);
 });
 
