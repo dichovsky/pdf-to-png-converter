@@ -4,7 +4,7 @@
 
 `pdf-to-png-converter` is a CJS-only Node.js library and CLI for converting PDF pages into PNG images or page metadata.
 
-The codebase is organized around one public library entrypoint (`pdfToPng`) plus a thin CLI adapter. The library normalizes options first, loads the PDF through `pdfjs-dist`, processes pages sequentially or through a sliding-window scheduler, and routes rendered PNG buffers either to disk or an in-memory/null sink.
+The codebase is organized around one public library entrypoint (`pdfToPng`) plus a thin CLI adapter. The library normalizes options first, loads the PDF through `pdfjs-dist`, processes pages sequentially or through a sliding-window scheduler, and routes rendered PNG buffers either to disk or an in-memory/null sink. The CLI is intentionally narrower than the API: it either writes image files to `--output-folder` or prints metadata JSON to stdout with `--return-metadata-only`.
 
 ## Public surfaces
 
@@ -99,7 +99,9 @@ Residual risk remains for directory-component swaps between checks; the library 
 
 1. `safeParseArgs()` parses argv.
 2. `buildPdfToPngOptions()` converts CLI values into a normalized `PdfToPngOptions` object.
-3. `executeConversion()` delegates to `pdfToPng()`.
+3. `buildPdfToPngOptions()` rejects CLI-only dead-end modes before any PDF work starts:
+    - image conversion without `--output-folder`
+    - `--return-page-content` (library API only)
 4. `run()` handles process exit codes and output formatting.
 5. `getVersion()` treats missing/malformed `package.json` as a packaging defect and exits with an error.
 

@@ -10,7 +10,7 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
     "name": "pdf-to-png-converter",
     "version": "4.1.0"
   },
-  "sourceHash": "6633e0eee386f025cbaea12c3b62fa83ebf486892554f5fa6836c3f480065fa1",
+  "sourceHash": "50696f5b245f75d53229bb72eb45df02745a1fc84fdffeb4b9871fba15a56c54",
   "entrypoints": [
     "src/index.ts"
   ],
@@ -61,103 +61,103 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
           "kind": "variable",
           "line": 14,
           "exported": true,
-          "signature": "export const HELP_TEXT = `Usage: pdf-to-png-converter <pdf-file-path> [options]\n\nOptions:\n  --output-folder <dir>             Folder path where PNG files will be written\n  --viewport-scale <number>   …"
+          "signature": "export const HELP_TEXT = `Usage: pdf-to-png-converter <pdf-file-path> [options]\n\nOptions:\n  --output-folder <dir>             Folder path where PNG files will be written (required unless --return-meta…"
         },
         {
           "name": "CLI_OPTIONS",
           "kind": "variable",
-          "line": 38,
+          "line": 37,
           "exported": false,
           "signature": "const CLI_OPTIONS = { 'output-folder': { type: 'string' }, 'viewport-scale': { type: 'string' }, 'use-system-fonts': { type: 'boolean' }, 'disable-font-face': { type: 'string' }, 'enable-xfa': { type:…"
         },
         {
           "name": "ParsedValues",
           "kind": "type",
-          "line": 56,
+          "line": 55,
           "exported": false,
           "signature": "type ParsedValues = { 'output-folder'?: string; 'viewport-scale'?: string; 'use-system-fonts'?: boolean; 'disable-font-face'?: string; 'enable-xfa'?: string; 'pdf-file-password'?: string; 'pages-to-pr…"
         },
         {
           "name": "CliParseResult",
           "kind": "type",
-          "line": 74,
+          "line": 73,
           "exported": false,
           "signature": "type CliParseResult = { values: ParsedValues; positionals: string[] };"
         },
         {
           "name": "parseBoolean",
           "kind": "function",
-          "line": 85,
+          "line": 84,
           "exported": true,
           "signature": "export function parseBoolean(val: string | undefined): boolean | undefined"
         },
         {
           "name": "parseNumberList",
           "kind": "function",
-          "line": 99,
+          "line": 98,
           "exported": true,
           "signature": "export function parseNumberList(val: string | undefined): number[] | undefined"
         },
         {
           "name": "parseNumericOption",
           "kind": "function",
-          "line": 110,
+          "line": 109,
           "exported": false,
           "signature": "function parseNumericOption(value: string | undefined, errorMessage: string): number | undefined"
         },
         {
           "name": "parseIntegerOption",
           "kind": "function",
-          "line": 123,
+          "line": 122,
           "exported": false,
           "signature": "function parseIntegerOption(value: string | undefined, errorMessage: string): number | undefined"
         },
         {
           "name": "safeParseArgs",
           "kind": "function",
-          "line": 136,
+          "line": 135,
           "exported": false,
           "signature": "function safeParseArgs(): CliParseResult | null"
         },
         {
           "name": "buildPdfToPngOptions",
           "kind": "function",
-          "line": 153,
+          "line": 156,
           "exported": true,
           "signature": "export function buildPdfToPngOptions( values: ParsedValues, positionals: string[], ): { pdfFilePath: string; options: NormalizedPdfToPngOptions }"
         },
         {
           "name": "executeConversion",
           "kind": "function",
-          "line": 183,
+          "line": 195,
           "exported": true,
-          "signature": "export async function executeConversion( pdfFilePath: string, options: NormalizedPdfToPngOptions, log: (...msgs: unknown[]) => void, ): Promise<void>"
+          "signature": "export async function executeConversion( pdfFilePath: string, options: NormalizedPdfToPngOptions, logInfo: (...msgs: unknown[]) => void, writeOutput: (...msgs: unknown[]) => void = console.log, ): Pro…"
         },
         {
           "name": "createLogger",
           "kind": "function",
-          "line": 204,
+          "line": 216,
           "exported": false,
           "signature": "function createLogger(silent: boolean | undefined): (...msgs: unknown[]) => void"
         },
         {
           "name": "handleRunError",
           "kind": "function",
-          "line": 210,
+          "line": 222,
           "exported": false,
           "signature": "function handleRunError(err: unknown): void"
         },
         {
           "name": "getVersion",
           "kind": "function",
-          "line": 229,
+          "line": 241,
           "exported": true,
           "signature": "export function getVersion(): string"
         },
         {
           "name": "run",
           "kind": "function",
-          "line": 249,
+          "line": 261,
           "exported": true,
           "signature": "export async function run(): Promise<void>"
         }

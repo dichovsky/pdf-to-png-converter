@@ -107,7 +107,7 @@ npx pdf-to-png-converter my-document.pdf --output-folder ./output
 
 **Options:**
 
-- `--output-folder <dir>`: Directory to save PNG files. Existing files are not overwritten; duplicate output filenames throw `EEXIST`.
+- `--output-folder <dir>`: Directory to save PNG files. Required for image conversion. Existing files are not overwritten; duplicate output filenames throw `EEXIST`.
 - `--viewport-scale <number>`: Scale factor applied to each page viewport.
 - `--use-system-fonts`: Attempt to use fonts installed on the host system.
 - `--disable-font-face <true|false>`: Do not load embedded fonts.
@@ -115,13 +115,19 @@ npx pdf-to-png-converter my-document.pdf --output-folder ./output
 - `--pdf-file-password <pwd>`: Password for encrypted PDFs.
 - `--pages-to-process <n,m,...>`: Comma-separated list of 1-based page numbers.
 - `--verbosity-level <number>`: pdfjs verbosity level (0=errors, 1=warnings, 5=infos).
-- `--return-metadata-only`: Return page metadata without rendering images.
-- `--return-page-content`: Include rendered PNG buffers in the returned results. By default the CLI discards in-memory buffers after writing to disk (or when no output folder is set) to avoid unnecessary memory usage. Pass this flag to retain them.
+- `--return-metadata-only`: Return page metadata without rendering images. This prints JSON to stdout and does not require `--output-folder`.
 - `--process-pages-in-parallel`: Process pages concurrently.
 - `--concurrency-limit <number>`: Maximum number of pages rendered simultaneously.
 - `--silent`: Suppress normal output messages unless there is an error.
 - `--version`: Show package version.
 - `--help`: Show help text.
+
+The CLI has two output modes:
+
+- image conversion: writes PNG files to `--output-folder`
+- metadata inspection: prints JSON metadata to stdout with `--return-metadata-only`
+
+If you need in-memory PNG buffers, use the library API (`returnPageContent`) rather than the CLI.
 
 ---
 

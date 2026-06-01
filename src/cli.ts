@@ -14,7 +14,7 @@ import { normalizePdfToPngOptions, type NormalizedPdfToPngOptions } from './norm
 export const HELP_TEXT = `Usage: pdf-to-png-converter <pdf-file-path> [options]
 
 Options:
-  --output-folder <dir>             Folder path where PNG files will be written
+  --output-folder <dir>             Folder path where PNG files will be written (required unless --return-metadata-only)
   --viewport-scale <number>         Scale factor applied to each page viewport
   --use-system-fonts                Attempt to use fonts installed on the host system
   --disable-font-face <true|false>  Do not load embedded fonts (true/false)
@@ -23,7 +23,6 @@ Options:
   --pages-to-process <n,m,...>      Comma-separated list of 1-based page numbers
   --verbosity-level <number>        pdfjs verbosity level (0=errors, 1=warnings, 5=infos)
   --return-metadata-only            Return page metadata without rendering images
-  --return-page-content             Retain rendered PNG buffers in results (default: false)
   --process-pages-in-parallel       Process pages concurrently
   --concurrency-limit <number>      Maximum number of pages rendered simultaneously
   --silent                          Suppress output unless there is an error
@@ -149,6 +148,10 @@ function safeParseArgs(): CliParseResult | null {
  * Parses raw CLI flags into a validated `NormalizedPdfToPngOptions` plus the positional
  * `pdfFilePath`. Single source of normalization — downstream {@link executeConversion}
  * passes the result straight to {@link pdfToPngCore} so the library does NOT re-normalize.
+ *
+ * The CLI only supports stdout-friendly metadata mode (`--return-metadata-only`) or
+ * file-writing image conversion (`--output-folder`). In-memory PNG buffers remain a
+ * library-only capability because the CLI does not serialize page results.
  */
 export function buildPdfToPngOptions(
     values: ParsedValues,
@@ -174,26 +177,35 @@ export function buildPdfToPngOptions(
         concurrencyLimit: parseIntegerOption(values['concurrency-limit'], '--concurrency-limit must be a valid integer.'),
     };
 
-    return {
-        pdfFilePath,
-        options: normalizePdfToPngOptions(rawOptions),
-    };
+    const options = normalizePdfToPngOptions(rawOptions);
+
+    if (values['return-page-content']) {
+        throw new Error('--return-page-content is not supported by the CLI. Use the library API if you need in-memory PNG buffers.');
+    }
+
+    if (!options.returnMetadataOnly && options.outputFolder === undefined) {
+        throw new Error(
+            'The CLI requires --output-folder for image conversion. Use --return-metadata-only for stdout-friendly page metadata.',
+        );
+    }
+
+    return { pdfFilePath, options };
 }
 
 export async function executeConversion(
     pdfFilePath: string,
     options: NormalizedPdfToPngOptions,
-    log: (...msgs: unknown[]) => void,
+    logInfo: (...msgs: unknown[]) => void,
+    writeOutput: (...msgs: unknown[]) => void = console.log,
 ): Promise<void> {
     try {
         const results = await pdfToPngCore(pdfFilePath, options);
         if (options.returnMetadataOnly) {
-            log('Metadata extraction complete:');
-            log(JSON.stringify(results, null, 2));
+            writeOutput(JSON.stringify(results, null, 2));
             return;
         }
 
-        log(`Successfully processed ${results.length} page(s).`);
+        logInfo(`Successfully processed ${results.length} page(s).`);
     } catch (err: unknown) {
         throw new Error(err instanceof Error ? err.message : String(err), {
             cause: err,
@@ -271,12 +283,14 @@ export async function run(): Promise<void> {
 
     try {
         const { pdfFilePath, options } = buildPdfToPngOptions(values, positionals);
-        const log = createLogger(values.silent);
-        log(`Processing PDF: ${pdfFilePath}`);
-        if (options.outputFolder) {
-            log(`Output folder: ${options.outputFolder}`);
+        const logInfo = createLogger(values.silent);
+        if (!options.returnMetadataOnly) {
+            logInfo(`Processing PDF: ${pdfFilePath}`);
+            if (options.outputFolder) {
+                logInfo(`Output folder: ${options.outputFolder}`);
+            }
         }
-        await executeConversion(pdfFilePath, options, log);
+        await executeConversion(pdfFilePath, options, logInfo);
     } catch (err: unknown) {
         handleRunError(err);
     }
