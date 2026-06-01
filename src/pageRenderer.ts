@@ -21,6 +21,22 @@ export function toPixelDimension(viewportLength: number): number {
     return Math.floor(viewportLength);
 }
 
+/**
+ * Builds the error thrown when floored page dimensions collapse to a non-renderable size.
+ *
+ * A very small `viewportScale` (e.g. `0.001` on a 612 pt page) floors to `0` px. A 0-wide or
+ * 0-tall bitmap cannot be rendered, so both the render and `returnMetadataOnly` paths reject it
+ * with this identical, actionable message instead of either returning a phantom `0×0` metadata
+ * result or surfacing an opaque canvas-factory `AssertionError`.
+ *
+ * @internal
+ */
+export function nonRenderableDimensionsError(width: number, height: number): Error {
+    return new Error(
+        `Page dimensions floor to ${width}×${height} px at this viewportScale, which cannot produce a valid image. Increase viewportScale.`,
+    );
+}
+
 export function normalizeRotation(raw: number): PageRotation {
     const normalized = ((raw % 360) + 360) % 360;
     switch (normalized) {
@@ -47,14 +63,19 @@ export async function getPageMetadata(
     const viewport = page.getViewport({ scale: pageViewportScale });
 
     try {
+        const width = toPixelDimension(viewport.width);
+        const height = toPixelDimension(viewport.height);
+        if (width <= 0 || height <= 0) {
+            throw nonRenderableDimensionsError(width, height);
+        }
         return {
             kind: 'metadata',
             pageNumber,
             name: pageName,
             content: undefined,
             path: '',
-            width: toPixelDimension(viewport.width),
-            height: toPixelDimension(viewport.height),
+            width,
+            height,
             rotation: normalizeRotation(page.rotate),
         };
     } finally {
@@ -81,6 +102,11 @@ export async function renderPdfPage(
 
     const canvasWidth = toPixelDimension(viewport.width);
     const canvasHeight = toPixelDimension(viewport.height);
+    if (canvasWidth <= 0 || canvasHeight <= 0) {
+        page.cleanup();
+        throw nonRenderableDimensionsError(canvasWidth, canvasHeight);
+    }
+
     const canvasFactory = isNodeCanvasFactory(pdf.canvasFactory) ? pdf.canvasFactory : new NodeCanvasFactory();
     const { canvas, context } = canvasFactory.create(canvasWidth, canvasHeight);
 

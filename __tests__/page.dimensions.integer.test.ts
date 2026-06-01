@@ -8,9 +8,27 @@ test('toPixelDimension floors fractional viewport lengths to match canvas trunca
     expect(toPixelDimension(892.5)).toBe(892);
     expect(toPixelDimension(1263)).toBe(1263);
     expect(toPixelDimension(612)).toBe(612);
-    // A sub-pixel viewport floors to 0; the render path then throws an AssertionError in
-    // NodeCanvasFactory.create (width/height must be > 0) before any canvas is allocated.
+    // A sub-pixel viewport floors to 0; both the render and metadata paths reject this with a
+    // clear "Increase viewportScale" error (see the non-renderable-dimensions tests below).
     expect(toPixelDimension(0.9)).toBe(0);
+});
+
+// A 612 pt US-Letter page at scale 0.001 floors to 0×0 px. Both code paths must surface the same
+// actionable error instead of a phantom 0×0 metadata result or an opaque canvas AssertionError.
+const SUB_PIXEL_SCALE = 0.001;
+
+test('render path rejects a viewportScale that floors page dimensions to zero', async () => {
+    const pdfFilePath: string = resolve('./test-data/sample.pdf');
+    await expect(pdfToPng(pdfFilePath, { viewportScale: SUB_PIXEL_SCALE, pagesToProcess: [1] })).rejects.toThrow(
+        /cannot produce a valid image\. Increase viewportScale\./,
+    );
+});
+
+test('returnMetadataOnly rejects a viewportScale that floors page dimensions to zero', async () => {
+    const pdfFilePath: string = resolve('./test-data/sample.pdf');
+    await expect(pdfToPng(pdfFilePath, { viewportScale: SUB_PIXEL_SCALE, pagesToProcess: [1], returnMetadataOnly: true })).rejects.toThrow(
+        /cannot produce a valid image\. Increase viewportScale\./,
+    );
 });
 
 /**
