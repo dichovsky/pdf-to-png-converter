@@ -310,7 +310,7 @@ The `pdfToPng` function returns an array of discriminated page objects. Branch o
 | `content`  | Rendering without `outputFolder` | `''`      | PNG `Buffer`, unless `returnPageContent: false` |
 | `file`     | Rendering with `outputFolder`    | File path | PNG `Buffer`, unless `returnPageContent: false` |
 
-All output objects also include `pageNumber`, `name`, `width`, `height`, and `rotation`. `width` and `height` are integer pixel dimensions of the rendered image: a fractional viewport (for example a 595×842 pt A4 page at `viewportScale: 1.5`, i.e. 892.5×1263) is floored to match the bitmap the canvas allocates (892×1263). `returnMetadataOnly` reports the same floored dimensions a render would produce.
+All output objects also include `pageNumber`, `name`, `width`, `height`, and `rotation`. `width` and `height` are integer pixel dimensions of the rendered image: a fractional viewport (for example a 595×842 pt A4 page at `viewportScale: 1.5`, i.e. 892.5×1263) is floored to match the bitmap the canvas allocates (892×1263). `returnMetadataOnly` reports the same floored dimensions a render would produce — and, for the same reason, rejects the same unrenderable pages a render would: a `viewportScale` that floors a page to `0` px, or one whose viewport area exceeds the internal canvas pixel limit, throws the identical error on both paths rather than returning dimensions for a page that cannot be rendered.
 
 ```javascript
 [
