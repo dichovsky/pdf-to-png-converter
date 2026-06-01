@@ -110,6 +110,9 @@ function parseNumericOption(value: string | undefined, errorMessage: string): nu
     if (value === undefined) {
         return undefined;
     }
+    if (value.trim() === '') {
+        throw new Error(errorMessage);
+    }
 
     const parsed = Number(value);
     if (!Number.isFinite(parsed)) {
@@ -122,6 +125,9 @@ function parseNumericOption(value: string | undefined, errorMessage: string): nu
 function parseIntegerOption(value: string | undefined, errorMessage: string): number | undefined {
     if (value === undefined) {
         return undefined;
+    }
+    if (value.trim() === '') {
+        throw new Error(errorMessage);
     }
 
     const parsed = Number(value);
