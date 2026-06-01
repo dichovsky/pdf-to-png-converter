@@ -1,4 +1,4 @@
-import { expect, test, vi } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import * as pageRenderer from '../src/pageRenderer.js';
 import * as pdfjsLoader from '../src/pdfjsLoader.js';
@@ -12,6 +12,10 @@ function createDeferred(): { promise: Promise<void>; resolve: () => void } {
 
     return { promise, resolve };
 }
+
+afterEach(() => {
+    vi.restoreAllMocks();
+});
 
 test('should start the next page as soon as a parallel slot frees up', async () => {
     const destroy = vi.fn().mockResolvedValue(undefined);
@@ -69,5 +73,24 @@ test('should start the next page as soon as a parallel slot frees up', async () 
     const results = await conversionPromise;
 
     expect(results.map((page) => page.pageNumber)).toEqual([1, 2, 3, 4, 5]);
+    expect(destroy).toHaveBeenCalled();
+});
+
+test('should reject when a parallel page rejects with undefined', async () => {
+    const destroy = vi.fn().mockResolvedValue(undefined);
+    const mockDocument = { numPages: 1, loadingTask: { destroy } } as unknown as PDFDocumentProxy;
+    vi.spyOn(pdfjsLoader, 'getPdfDocument').mockResolvedValue(mockDocument);
+    vi.spyOn(pageRenderer, 'renderPdfPage').mockRejectedValue(undefined);
+
+    const outcome = await pdfToPng(new Uint8Array([1]), {
+        processPagesInParallel: true,
+        concurrencyLimit: 1,
+        pagesToProcess: [1],
+    }).then(
+        (value) => ({ status: 'fulfilled' as const, value }),
+        (reason: unknown) => ({ status: 'rejected' as const, reason }),
+    );
+
+    expect(outcome).toEqual({ status: 'rejected', reason: undefined });
     expect(destroy).toHaveBeenCalled();
 });
