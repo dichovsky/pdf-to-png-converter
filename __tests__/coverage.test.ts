@@ -156,6 +156,95 @@ describe('pdfToPng', () => {
         expect(mockDocument.loadingTask.destroy).toHaveBeenCalled();
     });
 
+    it('should throw a clear error when pdf.js provides a malformed canvas factory', async () => {
+        const mockPage = {
+            getViewport: vi.fn().mockReturnValue({ width: 10, height: 10 }),
+            rotate: 0,
+            cleanup: vi.fn(),
+        };
+        const mockDocument = {
+            numPages: 1,
+            getPage: vi.fn().mockResolvedValue(mockPage),
+            cleanup: vi.fn(),
+            loadingTask: { destroy: vi.fn().mockResolvedValue(undefined) },
+            // create is not a function and destroy is absent → fails the structural guard.
+            canvasFactory: { create: 'nope' },
+        };
+
+        (fsPromises.readFile as Mock).mockResolvedValueOnce(new ArrayBuffer(8));
+        (getDocument as Mock).mockReturnValueOnce({
+            promise: Promise.resolve(mockDocument),
+        });
+
+        await expect(pdfToPng('test.pdf')).rejects.toThrow('did not provide a usable canvas factory');
+        expect(mockPage.cleanup).toHaveBeenCalled();
+        expect(mockDocument.loadingTask.destroy).toHaveBeenCalled();
+    });
+
+    it('should throw when the canvas factory returns a null canvas or context (and not call destroy)', async () => {
+        const mockCanvasFactory = {
+            create: vi.fn().mockReturnValue({ canvas: null, context: null }),
+            destroy: vi.fn(),
+        };
+        const mockPage = {
+            getViewport: vi.fn().mockReturnValue({ width: 10, height: 10 }),
+            render: vi.fn().mockReturnValue({ promise: Promise.resolve() }),
+            rotate: 0,
+            cleanup: vi.fn(),
+        };
+        const mockDocument = {
+            numPages: 1,
+            getPage: vi.fn().mockResolvedValue(mockPage),
+            cleanup: vi.fn(),
+            loadingTask: { destroy: vi.fn().mockResolvedValue(undefined) },
+            canvasFactory: mockCanvasFactory,
+        };
+
+        (fsPromises.readFile as Mock).mockResolvedValueOnce(new ArrayBuffer(8));
+        (getDocument as Mock).mockReturnValueOnce({
+            promise: Promise.resolve(mockDocument),
+        });
+
+        await expect(pdfToPng('test.pdf')).rejects.toThrow('returned a null canvas or context');
+        expect(mockPage.cleanup).toHaveBeenCalled();
+        // pdf.js's destroy() asserts a non-null canvas; we must skip it when create() yielded none.
+        expect(mockCanvasFactory.destroy).not.toHaveBeenCalled();
+    });
+
+    it('passes the exact object returned by create() into destroy() so pdf.js-internal fields survive', async () => {
+        const created = {
+            canvas: { toBuffer: vi.fn().mockReturnValue(Buffer.alloc(1)) },
+            context: {},
+            // A field pdf.js may attach for its own cleanup; it must survive the round-trip.
+            _pdfjsInternal: Symbol('internal'),
+        };
+        const mockCanvasFactory = {
+            create: vi.fn().mockReturnValue(created),
+            destroy: vi.fn(),
+        };
+        const mockPage = {
+            getViewport: vi.fn().mockReturnValue({ width: 10, height: 10 }),
+            render: vi.fn().mockReturnValue({ promise: Promise.resolve() }),
+            rotate: 0,
+            cleanup: vi.fn(),
+        };
+        const mockDocument = {
+            numPages: 1,
+            getPage: vi.fn().mockResolvedValue(mockPage),
+            cleanup: vi.fn(),
+            loadingTask: { destroy: vi.fn().mockResolvedValue(undefined) },
+            canvasFactory: mockCanvasFactory,
+        };
+
+        (fsPromises.readFile as Mock).mockResolvedValueOnce(new ArrayBuffer(8));
+        (getDocument as Mock).mockReturnValueOnce({
+            promise: Promise.resolve(mockDocument),
+        });
+
+        await pdfToPng('test.pdf');
+        expect(mockCanvasFactory.destroy).toHaveBeenCalledWith(created);
+    });
+
     it('should throw when outputFolder directory resolves outside outputFolder via symlink (symlink escape on dirname)', async () => {
         // Simulates a symlink swap: the filename is safe-looking but realpath(dirname(file))
         // resolves to a path outside realOutputFolder — L458 in savePNGfile.

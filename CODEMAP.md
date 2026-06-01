@@ -10,7 +10,7 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
     "name": "pdf-to-png-converter",
     "version": "4.1.0"
   },
-  "sourceHash": "c1620e8f80a3ed7e2024af8f0051b2ae32de6822cfe12f6338740741ca697114",
+  "sourceHash": "6633e0eee386f025cbaea12c3b62fa83ebf486892554f5fa6836c3f480065fa1",
   "entrypoints": [
     "src/index.ts"
   ],
@@ -488,56 +488,6 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
       "reExports": []
     },
     {
-      "path": "src/node.canvas.factory.ts",
-      "symbols": [
-        {
-          "name": "NodeCanvasFactory",
-          "kind": "class",
-          "line": 15,
-          "exported": true,
-          "signature": "export class NodeCanvasFactory {",
-          "members": [
-            {
-              "name": "create",
-              "kind": "method",
-              "line": 24
-            },
-            {
-              "name": "reset",
-              "kind": "method",
-              "line": 46
-            },
-            {
-              "name": "destroy",
-              "kind": "method",
-              "line": 64
-            }
-          ]
-        }
-      ],
-      "imports": [
-        {
-          "from": "./interfaces",
-          "names": [
-            "CanvasAndContext"
-          ]
-        },
-        {
-          "from": "@napi-rs/canvas",
-          "names": [
-            "Canvas"
-          ]
-        },
-        {
-          "from": "node:assert",
-          "names": [
-            "assert"
-          ]
-        }
-      ],
-      "reExports": []
-    },
-    {
       "path": "src/normalizePath.ts",
       "symbols": [
         {
@@ -761,44 +711,51 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
       "path": "src/pageRenderer.ts",
       "symbols": [
         {
-          "name": "isNodeCanvasFactory",
-          "kind": "function",
-          "line": 6,
+          "name": "CanvasFactory",
+          "kind": "interface",
+          "line": 14,
           "exported": false,
-          "signature": "function isNodeCanvasFactory(factory: unknown): factory is NodeCanvasFactory"
+          "signature": "interface CanvasFactory { create(width: number, height: number): CanvasAndContext; destroy(canvasAndContext: CanvasAndContext): void; }"
+        },
+        {
+          "name": "isCanvasFactory",
+          "kind": "function",
+          "line": 25,
+          "exported": false,
+          "signature": "function isCanvasFactory(factory: unknown): factory is CanvasFactory"
         },
         {
           "name": "toPixelDimension",
           "kind": "function",
-          "line": 20,
+          "line": 46,
           "exported": true,
           "signature": "export function toPixelDimension(viewportLength: number): number"
         },
         {
           "name": "nonRenderableDimensionsError",
           "kind": "function",
-          "line": 34,
+          "line": 60,
           "exported": true,
           "signature": "export function nonRenderableDimensionsError(width: number, height: number): Error"
         },
         {
           "name": "normalizeRotation",
           "kind": "function",
-          "line": 40,
+          "line": 66,
           "exported": true,
           "signature": "export function normalizeRotation(raw: number): PageRotation"
         },
         {
           "name": "getPageMetadata",
           "kind": "function",
-          "line": 56,
+          "line": 82,
           "exported": true,
           "signature": "export async function getPageMetadata( pdf: PDFDocumentProxy, pageName: string, pageNumber: number, pageViewportScale: number, ): Promise<MetadataPngPageOutput>"
         },
         {
           "name": "renderPdfPage",
           "kind": "function",
-          "line": 86,
+          "line": 112,
           "exported": true,
           "signature": "export async function renderPdfPage( pdf: PDFDocumentProxy, pageName: string, pageNumber: number, pageViewportScale: number, returnPageContent: boolean, ): Promise<InMemoryPngPageOutput>"
         }
@@ -813,15 +770,10 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
         {
           "from": "./interfaces/index.js",
           "names": [
+            "CanvasAndContext",
             "InMemoryPngPageOutput",
             "MetadataPngPageOutput",
             "PageRotation"
-          ]
-        },
-        {
-          "from": "./node.canvas.factory.js",
-          "names": [
-            "NodeCanvasFactory"
           ]
         },
         {
