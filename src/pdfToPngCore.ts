@@ -56,12 +56,8 @@ async function processPagesWithSlidingWindow<T>(
 function findDuplicateOutputName(names: string[], pageNumbers: number[]): { name: string; pages: number[] } | undefined {
     const pagesByName = new Map<string, number[]>();
     for (let index = 0; index < names.length; index += 1) {
-        const existing = pagesByName.get(names[index]);
-        if (existing === undefined) {
-            pagesByName.set(names[index], [pageNumbers[index]]);
-        } else {
-            existing.push(pageNumbers[index]);
-        }
+        const existing = pagesByName.get(names[index]) ?? [];
+        pagesByName.set(names[index], [...existing, pageNumbers[index]]);
     }
     for (const [name, pages] of pagesByName) {
         if (pages.length > 1) {
@@ -118,9 +114,6 @@ export async function pdfToPngCore(
                         `Each processed page must resolve to a unique filename.`,
                 );
             }
-        }
-
-        if (resolvedOutputFolder !== undefined) {
             await fsPromises.mkdir(resolvedOutputFolder, { recursive: true });
         }
         const realOutputFolder: string | undefined =
