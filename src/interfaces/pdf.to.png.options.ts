@@ -99,6 +99,10 @@ export interface PdfToPngOptions {
      * `outputFolder` is set.
      * This is significantly faster than full rendering and useful for inspecting page dimensions
      * and rotation without generating images.
+     * To stay consistent with a real render, this path still rejects pages that could not be
+     * rendered at the requested `viewportScale` — both those that floor to `0` px and those whose
+     * viewport area exceeds the internal canvas pixel limit — rather than reporting dimensions for
+     * a page that would throw on render.
      * Default: `false`.
      * @since 3.14.0
      */

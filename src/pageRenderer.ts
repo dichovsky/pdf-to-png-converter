@@ -63,6 +63,25 @@ export function nonRenderableDimensionsError(width: number, height: number): Err
     );
 }
 
+/**
+ * Builds the error thrown when a page's viewport area exceeds `MAX_CANVAS_PIXELS`.
+ *
+ * A page this large cannot be rendered: `renderPdfPage` rejects it before allocating a canvas to
+ * avoid OOM. The `returnMetadataOnly` path shares this guard so it reports the same outcome a render
+ * would — rejecting an unrenderable page rather than returning phantom dimensions for it. Mirrors
+ * {@link nonRenderableDimensionsError}, which keeps the two paths symmetric on the lower bound.
+ *
+ * @internal
+ */
+export function canvasPixelLimitError(viewportWidth: number, viewportHeight: number): Error {
+    // Pin the locale so the thousands separator is stable across runtimes (an unqualified
+    // toLocaleString() varies — comma, space, or narrow no-break space — yielding inconsistent
+    // user-facing output and brittle assertions).
+    return new Error(
+        `Canvas ${Math.round(viewportWidth)}×${Math.round(viewportHeight)} px exceeds the ${MAX_CANVAS_PIXELS.toLocaleString('en-US')} pixel limit. Reduce viewportScale.`,
+    );
+}
+
 export function normalizeRotation(raw: number): PageRotation {
     const normalized = ((raw % 360) + 360) % 360;
     switch (normalized) {
@@ -89,6 +108,9 @@ export async function getPageMetadata(
     const viewport = page.getViewport({ scale: pageViewportScale });
 
     try {
+        if (viewport.width * viewport.height > MAX_CANVAS_PIXELS) {
+            throw canvasPixelLimitError(viewport.width, viewport.height);
+        }
         const width = toPixelDimension(viewport.width);
         const height = toPixelDimension(viewport.height);
         if (width <= 0 || height <= 0) {
@@ -121,9 +143,7 @@ export async function renderPdfPage(
 
     if (viewport.width * viewport.height > MAX_CANVAS_PIXELS) {
         page.cleanup();
-        throw new Error(
-            `Canvas ${Math.round(viewport.width)}×${Math.round(viewport.height)} px exceeds the ${MAX_CANVAS_PIXELS.toLocaleString()} pixel limit. Reduce viewportScale.`,
-        );
+        throw canvasPixelLimitError(viewport.width, viewport.height);
     }
 
     const canvasWidth = toPixelDimension(viewport.width);

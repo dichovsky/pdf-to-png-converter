@@ -31,6 +31,41 @@ test('returnMetadataOnly rejects a viewportScale that floors page dimensions to 
     );
 });
 
+// A 612×792 pt US-Letter page at scale 20 yields a 12240×15840 = ~1.94e8 px viewport, above the
+// 1e8 MAX_CANVAS_PIXELS cap. Both paths must reject it identically: an oversized page is as
+// unrenderable as a floor-to-zero one, so returnMetadataOnly must not hand back phantom dimensions
+// for a page a render would refuse. Mirrors the floor-to-zero symmetry tests above.
+const OVERSIZED_SCALE = 20;
+// Anchors the "Canvas W×H px exceeds the N pixel limit" shape. The count uses a separator-tolerant
+// class as defense-in-depth (the source pins toLocaleString('en-US'), so the separator is a comma).
+const PIXEL_LIMIT_MESSAGE = /Canvas \d+×\d+ px exceeds the [\d,\s\u00a0\u202f]+ pixel limit\. Reduce viewportScale\./;
+
+test('render path rejects a viewportScale whose viewport exceeds the pixel limit', async () => {
+    const pdfFilePath: string = resolve('./test-data/sample.pdf');
+    await expect(pdfToPng(pdfFilePath, { viewportScale: OVERSIZED_SCALE, pagesToProcess: [1] })).rejects.toThrow(PIXEL_LIMIT_MESSAGE);
+});
+
+test('returnMetadataOnly rejects a viewportScale whose viewport exceeds the pixel limit', async () => {
+    const pdfFilePath: string = resolve('./test-data/sample.pdf');
+    await expect(pdfToPng(pdfFilePath, { viewportScale: OVERSIZED_SCALE, pagesToProcess: [1], returnMetadataOnly: true })).rejects.toThrow(
+        PIXEL_LIMIT_MESSAGE,
+    );
+});
+
+test('render and returnMetadataOnly reject an oversized page with the identical message', async () => {
+    const pdfFilePath: string = resolve('./test-data/sample.pdf');
+    const renderErr = await pdfToPng(pdfFilePath, { viewportScale: OVERSIZED_SCALE, pagesToProcess: [1] }).catch((e: unknown) => e);
+    const metadataErr = await pdfToPng(pdfFilePath, {
+        viewportScale: OVERSIZED_SCALE,
+        pagesToProcess: [1],
+        returnMetadataOnly: true,
+    }).catch((e: unknown) => e);
+
+    expect(renderErr).toBeInstanceOf(Error);
+    expect(metadataErr).toBeInstanceOf(Error);
+    expect((metadataErr as Error).message).toBe((renderErr as Error).message);
+});
+
 /**
  * Reads the width/height (pixels) from a PNG buffer's IHDR chunk.
  * Width is a 4-byte big-endian integer at byte offset 16, height at offset 20.
