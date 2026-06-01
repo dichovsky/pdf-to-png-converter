@@ -37,6 +37,12 @@
 - [x] 🟢 ♻️ ARCH-015 Core: remove speculative isNodeCanvasFactory guard in pageRenderer
     - **Impl:** deleted `src/node.canvas.factory.ts` + its test; `renderPdfPage` now uses `pdf.canvasFactory` directly (typed via a local `CanvasFactory` interface since pdf.js types the getter as `Object`); `@napi-rs/canvas` kept as a direct dependency (still type-imported in `CanvasAndContext` and required at runtime by pdf.js's Node renderer)
     - **Rat:** the `isNodeCanvasFactory()` duck-type guard always matched pdf.js's own built-in `NodeCanvasFactory` (it has a `create` method), so the project's class and its `new NodeCanvasFactory()` fallback were unreachable on the render path — runtime-verified. Deleting the dead seam removes a misleading abstraction and a contract-violating doc claim; rendered PNG output is unchanged (visual suites pass)
+- [x] 🟡 ♻️ ARCH-009 Core: per-page PageMode replaces 4-flag boolean web
+    - **Impl:** new `src/pageMode.ts` — discriminated union `PageMode = metadata | content | file` (mirrors `PngPageOutput['kind']`) + pure `optionsToPageMode(opts, sink)`; `processAndSavePage` takes one `PageMode` (8 args → 5) and switches on `kind`; the `resolvedPath === ''` sentinel is deleted; new `__tests__/pageMode.test.ts` table test over all 5 option combos
+    - **Rat:** the mode was implicit in a web of 4 co-dependent booleans (`shouldReturnContent`/`returnMetadataOnly`/`outputSink` presence/`returnPageContent`) threaded through the orchestrator and disambiguated by a `path === ''` sentinel; making it one explicit, pure, table-testable mapping removes the sentinel and the option puzzle
+- [x] 🟡 ♻️ ARCH-010 Core: evolve OutputSink to drop sentinel + NullSink (with ARCH-009)
+    - **Impl:** deleted `src/nullSink.ts`; the in-memory case is now `PageMode.kind === 'content'` with no sink at all, so a sink exists only in `file` mode and always writes — `OutputSink.write` stays `Promise<string>` (no interface change), `FilesystemSink` kept as the sole adapter
+    - **Rat:** `NullSink` existed only to return the `''` sentinel for the no-write path; once the mode is explicit (ARCH-009) that path carries no sink, so the stub adapter is dead. Deliberately did NOT adopt the backlog's literal `write() → Promise<string | undefined>` — that would re-introduce a sentinel-shaped "nothing written" signal and undercut ARCH-009; `Promise<string>` honors the intent (1 real adapter, sentinel gone)
 
 ## 🧱 TYPE / Public API
 

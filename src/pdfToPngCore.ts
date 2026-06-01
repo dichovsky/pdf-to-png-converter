@@ -6,7 +6,7 @@ import { FilesystemSink } from './filesystemSink.js';
 import type { PngPageOutput } from './interfaces/index.js';
 import type { OutputSink } from './interfaces/output.sink.js';
 import type { NormalizedPdfToPngOptions } from './normalizePdfToPngOptions.js';
-import { NullSink } from './nullSink.js';
+import { optionsToPageMode } from './pageMode.js';
 import { processAndSavePage, resolvePageName } from './pageOrchestrator.js';
 import { getPdfFileBuffer } from './pdfInput.js';
 import { getPdfDocument } from './pdfjsLoader.js';
@@ -120,28 +120,13 @@ export async function pdfToPngCore(
             resolvedOutputFolder !== undefined ? await fsPromises.realpath(resolvedOutputFolder) : undefined;
         const pngPageOutputs: PngPageOutput[] = [];
 
-        const shouldReturnContent: boolean = returnMetadataOnly
-            ? false
-            : normalizedProps.outputFolder
-              ? true
-              : normalizedProps.returnPageContent;
         const outputSink: OutputSink | undefined =
             resolvedOutputFolder !== undefined && realOutputFolder !== undefined
                 ? new FilesystemSink(resolvedOutputFolder, realOutputFolder)
-                : shouldReturnContent
-                  ? new NullSink()
-                  : undefined;
+                : undefined;
+        const pageMode = optionsToPageMode(normalizedProps, outputSink);
         const processPage = async (pageNumber: number, index: number): Promise<PngPageOutput> =>
-            await processAndSavePage(
-                pdfDocument,
-                resolvedNames[index],
-                pageNumber,
-                pageViewportScale,
-                shouldReturnContent,
-                returnMetadataOnly,
-                outputSink,
-                normalizedProps.returnPageContent,
-            );
+            await processAndSavePage(pdfDocument, resolvedNames[index], pageNumber, pageViewportScale, pageMode);
 
         if (normalizedProps.processPagesInParallel === true) {
             pngPageOutputs.push(
