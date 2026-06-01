@@ -4,6 +4,7 @@ import { afterAll, beforeEach, describe, expect, test } from 'vitest';
 import { pdfToPng } from '../src/pdfToPng';
 
 const pdfFilePath: string = resolve('./test-data/sample.pdf');
+const multiPagePdfFilePath: string = resolve('./test-data/large_pdf.pdf');
 const baseOutputFolder: string = resolve('./test-results/duplicate-filename');
 
 async function pngFilesIn(folder: string): Promise<string[]> {
@@ -105,5 +106,22 @@ describe('VAL-001: duplicate output filename pre-flight check', () => {
         expect(pages).toHaveLength(2);
         expect(pages.every((page) => page.name === 'same.png')).toBe(true);
         expect(pages.every((page) => page.path === '')).toBe(true);
+    });
+
+    test('(g) non-adjacent colliding pages are reported with the correct page list', async () => {
+        const outputFolder = join(baseOutputFolder, 'non-adjacent');
+        await fsPromises.mkdir(outputFolder, { recursive: true });
+
+        // Pages 1 and 3 collide on "collide.png"; page 2 is distinct. The reported page list
+        // must list the non-adjacent colliding pages (1, 3), not the distinct page 2.
+        await expect(
+            pdfToPng(multiPagePdfFilePath, {
+                outputFolder,
+                outputFileMaskFunc: (pageNumber: number) => (pageNumber === 2 ? 'unique_2.png' : 'collide.png'),
+                pagesToProcess: [1, 2, 3],
+            }),
+        ).rejects.toThrow(/Duplicate output filename "collide\.png" for pages 1, 3\./);
+
+        expect(await pngFilesIn(outputFolder)).toHaveLength(0);
     });
 });
