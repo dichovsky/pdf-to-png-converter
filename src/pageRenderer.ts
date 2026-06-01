@@ -74,8 +74,11 @@ export function nonRenderableDimensionsError(width: number, height: number): Err
  * @internal
  */
 export function canvasPixelLimitError(viewportWidth: number, viewportHeight: number): Error {
+    // Pin the locale so the thousands separator is stable across runtimes (an unqualified
+    // toLocaleString() varies — comma, space, or narrow no-break space — yielding inconsistent
+    // user-facing output and brittle assertions).
     return new Error(
-        `Canvas ${Math.round(viewportWidth)}×${Math.round(viewportHeight)} px exceeds the ${MAX_CANVAS_PIXELS.toLocaleString()} pixel limit. Reduce viewportScale.`,
+        `Canvas ${Math.round(viewportWidth)}×${Math.round(viewportHeight)} px exceeds the ${MAX_CANVAS_PIXELS.toLocaleString('en-US')} pixel limit. Reduce viewportScale.`,
     );
 }
 

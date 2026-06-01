@@ -10,7 +10,7 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
     "name": "pdf-to-png-converter",
     "version": "4.1.0"
   },
-  "sourceHash": "da2cbda13e1106f2e018822dddc828f6391c4cae8a1e47d22a29e1a4f609a467",
+  "sourceHash": "73fa04f1b7509178a35851d11eab6cac5a607b1e071d2a5721e59f35ebe40b0d",
   "entrypoints": [
     "src/index.ts"
   ],
@@ -748,21 +748,21 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
         {
           "name": "normalizeRotation",
           "kind": "function",
-          "line": 82,
+          "line": 85,
           "exported": true,
           "signature": "export function normalizeRotation(raw: number): PageRotation"
         },
         {
           "name": "getPageMetadata",
           "kind": "function",
-          "line": 98,
+          "line": 101,
           "exported": true,
           "signature": "export async function getPageMetadata( pdf: PDFDocumentProxy, pageName: string, pageNumber: number, pageViewportScale: number, ): Promise<MetadataPngPageOutput>"
         },
         {
           "name": "renderPdfPage",
           "kind": "function",
-          "line": 131,
+          "line": 134,
           "exported": true,
           "signature": "export async function renderPdfPage( pdf: PDFDocumentProxy, pageName: string, pageNumber: number, pageViewportScale: number, returnPageContent: boolean, ): Promise<InMemoryPngPageOutput>"
         }

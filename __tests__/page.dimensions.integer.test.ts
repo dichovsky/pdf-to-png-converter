@@ -36,9 +36,8 @@ test('returnMetadataOnly rejects a viewportScale that floors page dimensions to 
 // unrenderable as a floor-to-zero one, so returnMetadataOnly must not hand back phantom dimensions
 // for a page a render would refuse. Mirrors the floor-to-zero symmetry tests above.
 const OVERSIZED_SCALE = 20;
-// Anchors the "Canvas W×H px exceeds the N pixel limit" shape. MAX_CANVAS_PIXELS is rendered with
-// toLocaleString(), whose thousands separator is locale-dependent (comma, space, or narrow no-break
-// space), so the count is matched with a separator-tolerant class rather than a literal string.
+// Anchors the "Canvas W×H px exceeds the N pixel limit" shape. The count uses a separator-tolerant
+// class as defense-in-depth (the source pins toLocaleString('en-US'), so the separator is a comma).
 const PIXEL_LIMIT_MESSAGE = /Canvas \d+×\d+ px exceeds the [\d,\s\u00a0\u202f]+ pixel limit\. Reduce viewportScale\./;
 
 test('render path rejects a viewportScale whose viewport exceeds the pixel limit', async () => {
