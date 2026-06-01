@@ -23,6 +23,16 @@ test(`should throw if outputFileMaskFunc returns an empty string`, async () => {
     ).rejects.toThrow('outputFileMaskFunc returned an empty filename for page 1');
 });
 
+test(`should throw if outputFileMaskFunc returns a non-string value`, async () => {
+    await expect(
+        pdfToPng(pdfFilePath, {
+            outputFileMaskFunc: (() => 42) as unknown as (pageNumber: number) => string,
+            pagesToProcess: [1],
+            returnMetadataOnly: true,
+        }),
+    ).rejects.toThrow('outputFileMaskFunc returned a non-string filename for page 1');
+});
+
 test(`should apply default buffer name if outputFileMaskFunc is not defined for pdf buffer`, async () => {
     const pngPages: PngPageOutput[] = await pdfToPng(pdfFilePath);
 
