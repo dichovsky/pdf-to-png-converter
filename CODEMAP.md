@@ -10,7 +10,7 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
     "name": "pdf-to-png-converter",
     "version": "4.1.0"
   },
-  "sourceHash": "73fa04f1b7509178a35851d11eab6cac5a607b1e071d2a5721e59f35ebe40b0d",
+  "sourceHash": "716f4ac8f9cdf9f3974283c4d408b51a07d76fe52ea320288633891e64453749",
   "entrypoints": [
     "src/index.ts"
   ],
@@ -108,56 +108,56 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
         {
           "name": "parseIntegerOption",
           "kind": "function",
-          "line": 122,
+          "line": 125,
           "exported": false,
           "signature": "function parseIntegerOption(value: string | undefined, errorMessage: string): number | undefined"
         },
         {
           "name": "safeParseArgs",
           "kind": "function",
-          "line": 135,
+          "line": 141,
           "exported": false,
           "signature": "function safeParseArgs(): CliParseResult | null"
         },
         {
           "name": "buildPdfToPngOptions",
           "kind": "function",
-          "line": 156,
+          "line": 162,
           "exported": true,
           "signature": "export function buildPdfToPngOptions( values: ParsedValues, positionals: string[], ): { pdfFilePath: string; options: NormalizedPdfToPngOptions }"
         },
         {
           "name": "executeConversion",
           "kind": "function",
-          "line": 195,
+          "line": 201,
           "exported": true,
           "signature": "export async function executeConversion( pdfFilePath: string, options: NormalizedPdfToPngOptions, logInfo: (...msgs: unknown[]) => void, writeOutput: (...msgs: unknown[]) => void = console.log, ): Pro…"
         },
         {
           "name": "createLogger",
           "kind": "function",
-          "line": 216,
+          "line": 222,
           "exported": false,
           "signature": "function createLogger(silent: boolean | undefined): (...msgs: unknown[]) => void"
         },
         {
           "name": "handleRunError",
           "kind": "function",
-          "line": 222,
+          "line": 228,
           "exported": false,
           "signature": "function handleRunError(err: unknown): void"
         },
         {
           "name": "getVersion",
           "kind": "function",
-          "line": 241,
+          "line": 247,
           "exported": true,
           "signature": "export function getVersion(): string"
         },
         {
           "name": "run",
           "kind": "function",
-          "line": 261,
+          "line": 267,
           "exported": true,
           "signature": "export async function run(): Promise<void>"
         }

@@ -126,6 +126,18 @@ describe('buildPdfToPngOptions', () => {
             '--return-page-content is not supported by the CLI. Use the library API if you need in-memory PNG buffers.',
         );
     });
+
+    it('throws when --verbosity-level is provided as an empty string', () => {
+        expect(() => buildPdfToPngOptions({ 'verbosity-level': '', 'return-metadata-only': true }, ['test.pdf'])).toThrow(
+            '--verbosity-level must be a valid integer.',
+        );
+    });
+
+    it('throws when --viewport-scale is provided as an empty string', () => {
+        expect(() => buildPdfToPngOptions({ 'viewport-scale': '', 'return-metadata-only': true }, ['test.pdf'])).toThrow(
+            '--viewport-scale must be a valid number.',
+        );
+    });
 });
 
 describe('executeConversion', () => {
