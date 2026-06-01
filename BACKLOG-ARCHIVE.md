@@ -34,6 +34,9 @@
 - [x] 🟢 ♻️ ARCH-013 Core: collapse propsToPdfDocInitParams defaulting into normalizer
     - **Impl:** `propsToPdfDocInitParams(opts: NormalizedPdfToPngOptions)` and `getPdfDocument(buffer, opts: NormalizedPdfToPngOptions)` — non-optional normalized params; all `?? PDF_TO_PNG_OPTIONS_DEFAULTS.X` and `?? VerbosityLevel.ERRORS` mappers removed; pure field-rename body; `props.to.pdf.doc.init.params.test.ts` now normalizes raw props first before asserting
     - **Rat:** defaults lived in two places (the normalizer AND the pdfjs params mapper); structurally making `NormalizedPdfToPngOptions` the single validation boundary required removing every downstream fallback so divergence is impossible
+- [x] 🟢 ♻️ ARCH-015 Core: remove speculative isNodeCanvasFactory guard in pageRenderer
+    - **Impl:** deleted `src/node.canvas.factory.ts` + its test; `renderPdfPage` now uses `pdf.canvasFactory` directly (typed via a local `CanvasFactory` interface since pdf.js types the getter as `Object`); `@napi-rs/canvas` kept as a direct dependency (still type-imported in `CanvasAndContext` and required at runtime by pdf.js's Node renderer)
+    - **Rat:** the `isNodeCanvasFactory()` duck-type guard always matched pdf.js's own built-in `NodeCanvasFactory` (it has a `create` method), so the project's class and its `new NodeCanvasFactory()` fallback were unreachable on the render path — runtime-verified. Deleting the dead seam removes a misleading abstraction and a contract-violating doc claim; rendered PNG output is unchanged (visual suites pass)
 
 ## 🧱 TYPE / Public API
 

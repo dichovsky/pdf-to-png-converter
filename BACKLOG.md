@@ -16,8 +16,6 @@
 - [ ] 🟢 ♻️ ARCH-014 Core: close `Uint8Array | ArrayBufferLike` union at getPdfFileBuffer
     - getPdfFileBuffer always returns Uint8Array; remove the `instanceof Uint8Array ? ... : new Uint8Array(...)` in getPdfDocument
     - narrows interfaces at both seams; one place owns "what shape we hand pdfjs"
-- [ ] 🟢 ♻️ ARCH-015 Core: remove speculative isNodeCanvasFactory guard in pageRenderer
-    - always `new NodeCanvasFactory()`; delete the predicate and dead branch (library never installs the factory into pdfjs)
 - [ ] 🟢 ♻️ ARCH-016 Core: de-duplicate flat-filename rule (with ARCH-012)
     - extract assertFlatFilename into outputWriter.ts (or shared util); pageOrchestrator + outputWriter both call it
     - one place owns the SEC-001/002/003-load-bearing predicate
