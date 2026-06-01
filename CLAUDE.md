@@ -25,7 +25,7 @@ Published to npm as `pdf-to-png-converter`. Entry: `out/index.js`, types: `out/i
 4. `getPdfDocument()` in `src/pdfjsLoader.ts` — dynamically imports `pdfjs-dist/legacy/build/pdf.mjs`, calls `getDocument()` with params from `propsToPdfDocInitParams(NormalizedPdfToPngOptions)`
 5. Invalid page numbers (< 1 or > numPages) in `pagesToProcess` are silently filtered before the render loop
 6. `renderPdfPage()` / `getPageMetadata()` in `src/pageRenderer.ts` — when `returnMetadataOnly` is true returns dimensions and rotation immediately; otherwise creates a canvas via pdf.js's built-in Node canvas factory (`pdf.canvasFactory`, backed by `@napi-rs/canvas`), renders via `page.render()`, encodes to PNG, cleans up in `finally`
-7. `processAndSavePage()` in `src/pageOrchestrator.ts` — composes the render → write step against an `OutputSink` (`FilesystemSink` or `NullSink`)
+7. `processAndSavePage()` in `src/pageOrchestrator.ts` — switches on the per-page `PageMode` (`src/pageMode.ts`, derived once per conversion by `optionsToPageMode()`): `metadata` returns dimensions only; `content` renders in memory; `file` renders and writes through the `OutputSink` (`FilesystemSink`)
 8. `savePNGfile()` in `src/outputWriter.ts` — joins `outputFolder` + `name`, validates `content !== undefined`, writes with `fsPromises.writeFile` (with realpath-based path-traversal guard from SEC-001/002/003)
 9. Returns `PngPageOutput[]` — one entry per processed page
 
@@ -37,7 +37,7 @@ Published to npm as `pdf-to-png-converter`. Entry: `out/index.js`, types: `out/i
 
 - When `returnMetadataOnly: true`, no rendering occurs, no output folder is created, no files are written, `content` is always `undefined`
 - When `outputFolder` is set, content is always retrieved internally (even if `returnPageContent: false`) so it can be written to disk; after writing, if `returnPageContent === false`, `content` is set to `undefined` to free memory
-- `shouldReturnContent` resolves as: `returnMetadataOnly ? false : outputFolder ? true : (returnPageContent ?? true)`
+- The effective mode is `optionsToPageMode()`: `returnMetadataOnly` → `metadata`; else `outputFolder` set → `file` (always renders content to write, keeps it only when `returnPageContent`); else → `content` (renders content only when `returnPageContent`)
 
 ## Source Structure
 
@@ -53,9 +53,10 @@ Key modules (current sizes are typical, not authoritative):
 - `src/pdfjsLoader.ts` — dynamic pdfjs import + `getPdfDocument(buffer, NormalizedPdfToPngOptions)`.
 - `src/propsToPdfDocInitParams.ts` — pure field-rename mapper from `NormalizedPdfToPngOptions` to pdfjs `DocumentInitParameters`. No `??` defaulting.
 - `src/pageRenderer.ts` — `renderPdfPage` / `getPageMetadata`.
-- `src/pageOrchestrator.ts` — composes render → write through an `OutputSink`.
+- `src/pageMode.ts` — `PageMode` discriminated union (`metadata` | `content` | `file`) + pure `optionsToPageMode()`; the single source of the per-page render/output decision.
+- `src/pageOrchestrator.ts` — switches on a `PageMode` to compose render → write through an `OutputSink`.
 - `src/outputWriter.ts` — `savePNGfile` with realpath-based path-traversal guard.
-- `src/filesystemSink.ts`, `src/nullSink.ts` — `OutputSink` implementations.
+- `src/filesystemSink.ts` — the sole `OutputSink` implementation (disk writes); in-memory pages use no sink.
 - `src/const.ts` — runtime constants (limits + defaults); test-only asset lists are in `__tests__/test-data-constants.ts`.
 - `src/interfaces/` — PdfToPngOptions, PngPageOutput, OutputSink, CanvasAndContext.
 - `src/types/verbosity.level.ts` — VerbosityLevel enum (ERRORS=0, WARNINGS=1, INFOS=5).

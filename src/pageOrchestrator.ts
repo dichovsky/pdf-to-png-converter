@@ -51,9 +51,11 @@ export async function processAndSavePage(
         return await getPageMetadata(pdfDocument, pageName, pageNumber, pageViewportScale);
     }
 
-    // `file` mode always renders content so it can be written; `content` mode renders it only when asked.
-    const shouldRenderContent = mode.kind === 'file' ? true : mode.returnContent;
-    const pageOutput = await renderPdfPage(pdfDocument, pageName, pageNumber, pageViewportScale, shouldRenderContent);
+    // The page is always rendered (the canvas is needed for dimensions); this flag only controls
+    // whether the PNG Buffer is materialized. `file` mode always materializes it so the page can be
+    // written; `content` mode materializes it only when the caller asked to keep it.
+    const shouldReturnContent = mode.kind === 'file' ? true : mode.returnContent;
+    const pageOutput = await renderPdfPage(pdfDocument, pageName, pageNumber, pageViewportScale, shouldReturnContent);
 
     if (mode.kind === 'content') {
         return pageOutput;
