@@ -14,7 +14,7 @@ import { getPdfDocument } from './pdfjsLoader.js';
 async function processPagesWithSlidingWindow<T>(
     pageNumbers: number[],
     concurrencyLimit: number,
-    processPage: (pageNumber: number) => Promise<T>,
+    processPage: (pageNumber: number, index: number) => Promise<T>,
 ): Promise<T[]> {
     const results = new Array<T>(pageNumbers.length);
     let nextIndex = 0;
@@ -25,7 +25,7 @@ async function processPagesWithSlidingWindow<T>(
             const currentIndex = nextIndex;
             nextIndex += 1;
             try {
-                results[currentIndex] = await processPage(pageNumbers[currentIndex]);
+                results[currentIndex] = await processPage(pageNumbers[currentIndex], currentIndex);
             } catch (error: unknown) {
                 firstError ??= error;
             }
@@ -40,6 +40,35 @@ async function processPagesWithSlidingWindow<T>(
     }
 
     return results;
+}
+
+/**
+ * Finds the first output filename that more than one processed page resolves to.
+ *
+ * Page names are resolved up front (before any output I/O) so a non-injective `outputFileMaskFunc`
+ * or a duplicated `pagesToProcess` entry surfaces as a clear, deterministic error instead of a raw
+ * `EEXIST` from the exclusive-create (`'wx'`) write — which previously also left the first colliding
+ * file on disk and leaked the absolute output path. See VAL-001.
+ *
+ * Iterates in first-seen order, so the reported duplicate is deterministic regardless of whether
+ * pages are later rendered sequentially or in parallel.
+ */
+function findDuplicateOutputName(names: string[], pageNumbers: number[]): { name: string; pages: number[] } | undefined {
+    const pagesByName = new Map<string, number[]>();
+    for (let index = 0; index < names.length; index += 1) {
+        const existing = pagesByName.get(names[index]);
+        if (existing === undefined) {
+            pagesByName.set(names[index], [pageNumbers[index]]);
+        } else {
+            existing.push(pageNumbers[index]);
+        }
+    }
+    for (const [name, pages] of pagesByName) {
+        if (pages.length > 1) {
+            return { name, pages };
+        }
+    }
+    return undefined;
 }
 
 /**
@@ -69,6 +98,28 @@ export async function pdfToPngCore(
         const returnMetadataOnly = normalizedProps.returnMetadataOnly;
         const resolvedOutputFolder: string | undefined =
             normalizedProps.outputFolder !== undefined && !returnMetadataOnly ? resolve(normalizedProps.outputFolder) : undefined;
+
+        const defaultMask: string = typeof pdfFile === 'string' ? parse(pdfFile).name : PDF_TO_PNG_OPTIONS_DEFAULTS.outputFileMask;
+
+        // Resolve every page name up front. resolvePageName also enforces the non-empty and
+        // flat-filename rules, so that validation continues to fire for in-memory conversions too.
+        const resolvedNames: string[] = validPagesToProcess.map((pageNumber) =>
+            resolvePageName(pageNumber, defaultMask, normalizedProps.outputFileMaskFunc),
+        );
+
+        // Collisions only corrupt output when pages are written to disk; in-memory / metadata-only
+        // conversions may legitimately repeat a name. Reject duplicates before any output I/O
+        // (before mkdir/realpath/write) so nothing is created and no partial output is left behind.
+        if (resolvedOutputFolder !== undefined) {
+            const duplicate = findDuplicateOutputName(resolvedNames, validPagesToProcess);
+            if (duplicate !== undefined) {
+                throw new Error(
+                    `Duplicate output filename "${duplicate.name}" for pages ${duplicate.pages.join(', ')}. ` +
+                        `Each processed page must resolve to a unique filename.`,
+                );
+            }
+        }
+
         if (resolvedOutputFolder !== undefined) {
             await fsPromises.mkdir(resolvedOutputFolder, { recursive: true });
         }
@@ -76,7 +127,6 @@ export async function pdfToPngCore(
             resolvedOutputFolder !== undefined ? await fsPromises.realpath(resolvedOutputFolder) : undefined;
         const pngPageOutputs: PngPageOutput[] = [];
 
-        const defaultMask: string = typeof pdfFile === 'string' ? parse(pdfFile).name : PDF_TO_PNG_OPTIONS_DEFAULTS.outputFileMask;
         const shouldReturnContent: boolean = returnMetadataOnly
             ? false
             : normalizedProps.outputFolder
@@ -88,10 +138,10 @@ export async function pdfToPngCore(
                 : shouldReturnContent
                   ? new NullSink()
                   : undefined;
-        const processPage = async (pageNumber: number): Promise<PngPageOutput> =>
+        const processPage = async (pageNumber: number, index: number): Promise<PngPageOutput> =>
             await processAndSavePage(
                 pdfDocument,
-                resolvePageName(pageNumber, defaultMask, normalizedProps.outputFileMaskFunc),
+                resolvedNames[index],
                 pageNumber,
                 pageViewportScale,
                 shouldReturnContent,
@@ -105,8 +155,8 @@ export async function pdfToPngCore(
                 ...(await processPagesWithSlidingWindow(validPagesToProcess, normalizedProps.concurrencyLimit, processPage)),
             );
         } else {
-            for (const pageNumber of validPagesToProcess) {
-                pngPageOutputs.push(await processPage(pageNumber));
+            for (const [index, pageNumber] of validPagesToProcess.entries()) {
+                pngPageOutputs.push(await processPage(pageNumber, index));
             }
         }
 

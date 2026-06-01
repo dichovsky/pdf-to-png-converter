@@ -10,7 +10,7 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
     "name": "pdf-to-png-converter",
     "version": "4.1.0"
   },
-  "sourceHash": "716f4ac8f9cdf9f3974283c4d408b51a07d76fe52ea320288633891e64453749",
+  "sourceHash": "a9d1866fd2dd1a1e5a4f77b3c9c8208145a085d8a04f38140bfbdf751e90f645",
   "entrypoints": [
     "src/index.ts"
   ],
@@ -862,12 +862,19 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
           "kind": "function",
           "line": 14,
           "exported": false,
-          "signature": "async function processPagesWithSlidingWindow<T>( pageNumbers: number[], concurrencyLimit: number, processPage: (pageNumber: number) => Promise<T>, ): Promise<T[]>"
+          "signature": "async function processPagesWithSlidingWindow<T>( pageNumbers: number[], concurrencyLimit: number, processPage: (pageNumber: number, index: number) => Promise<T>, ): Promise<T[]>"
+        },
+        {
+          "name": "findDuplicateOutputName",
+          "kind": "function",
+          "line": 56,
+          "exported": false,
+          "signature": "function findDuplicateOutputName(names: string[], pageNumbers: number[]): { name: string; pages: number[] } | undefined"
         },
         {
           "name": "pdfToPngCore",
           "kind": "function",
-          "line": 55,
+          "line": 84,
           "exported": true,
           "signature": "export async function pdfToPngCore( pdfFile: string | ArrayBufferLike | Uint8Array, normalizedProps: NormalizedPdfToPngOptions, ): Promise<PngPageOutput[]>"
         }

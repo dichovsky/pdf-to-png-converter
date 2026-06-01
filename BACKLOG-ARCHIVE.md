@@ -82,3 +82,6 @@
 - [x] 🟡 🐛 SEC-003 Sec: cap concurrencyLimit upper bound
     - **Impl:** MAX_CONCURRENCY_LIMIT=16 enforced in normalizePdfToPngOptions when processPagesInParallel
     - **Rat:** N workers × 400MB canvas cap = attacker-driven memory blowup; default 4 unaffected
+- [x] 🔴 🐛 VAL-001 Core: output filename collisions abort conversion with cryptic EEXIST + partial writes
+    - **Impl:** resolve all page names up front in pdfToPngCore; findDuplicateOutputName pre-flight check throws a clear plain Error (flat filename + conflicting pages, no absolute path) before any output I/O when outputFolder is set; resolved names threaded by index into sequential + sliding-window loops
+    - **Rat:** non-injective outputFileMaskFunc / duplicate pagesToProcess hit exclusive-create 'wx' mid-run → raw EEXIST, nondeterministic in parallel, leaked absolute path, and left the first colliding file on disk; pre-flight check makes it fail-fast and atomic. Gated on disk-writes only — in-memory/metadata conversions may legitimately repeat names
