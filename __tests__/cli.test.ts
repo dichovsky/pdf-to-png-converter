@@ -114,6 +114,18 @@ describe('buildPdfToPngOptions', () => {
     it('throws when no pdf path is provided', () => {
         expect(() => buildPdfToPngOptions({}, [])).toThrow('<pdf-file-path> is required.');
     });
+
+    it('throws when image conversion is requested without --output-folder', () => {
+        expect(() => buildPdfToPngOptions({}, ['test.pdf'])).toThrow(
+            'The CLI requires --output-folder for image conversion. Use --return-metadata-only for stdout-friendly page metadata.',
+        );
+    });
+
+    it('throws when --return-page-content is used in the CLI', () => {
+        expect(() => buildPdfToPngOptions({ 'output-folder': '/out', 'return-page-content': true }, ['test.pdf'])).toThrow(
+            '--return-page-content is not supported by the CLI. Use the library API if you need in-memory PNG buffers.',
+        );
+    });
 });
 
 describe('executeConversion', () => {
@@ -123,6 +135,19 @@ describe('executeConversion', () => {
         await executeConversion('test.pdf', normalizePdfToPngOptions({ outputFolder: '/out' }), log);
 
         expect(log).toHaveBeenCalledWith('Successfully processed 0 page(s).');
+    });
+
+    it('writes metadata JSON without an informational banner', async () => {
+        vi.mocked(pdfToPngCore).mockResolvedValueOnce([
+            { kind: 'metadata', pageNumber: 1, name: 'page_1.png', width: 595, height: 842, rotation: 0, content: undefined, path: '' },
+        ]);
+        const logInfo = vi.fn();
+        const writeOutput = vi.fn();
+
+        await executeConversion('test.pdf', normalizePdfToPngOptions({ returnMetadataOnly: true }), logInfo, writeOutput);
+
+        expect(logInfo).not.toHaveBeenCalled();
+        expect(writeOutput).toHaveBeenCalledWith(expect.stringContaining('"pageNumber": 1'));
     });
 });
 
@@ -384,19 +409,24 @@ describe('CLI run()', () => {
         );
     });
 
-    it('passes --return-page-content flag through to pdfToPngCore', async () => {
+    it('rejects --return-page-content because the CLI has no observable buffer output mode', async () => {
         setArgv('test.pdf', '--output-folder', '/out', '--return-page-content');
         await run();
-        expect(pdfToPngCore).toHaveBeenCalledWith('test.pdf', expect.objectContaining({ returnPageContent: true }));
-        expect(exitSpy).not.toHaveBeenCalled();
+        expect(errorSpy).toHaveBeenCalledWith(
+            'Error: --return-page-content is not supported by the CLI. Use the library API if you need in-memory PNG buffers.',
+        );
+        expect(pdfToPngCore).not.toHaveBeenCalled();
+        expect(exitSpy).toHaveBeenCalledWith(1);
     });
 
-    it('calls pdfToPngCore without --output-folder (buffer / in-memory mode)', async () => {
+    it('rejects image conversion without --output-folder', async () => {
         setArgv('test.pdf');
         await run();
-        expect(pdfToPngCore).toHaveBeenCalledTimes(1);
-        expect(pdfToPngCore).toHaveBeenCalledWith('test.pdf', expect.objectContaining({ outputFolder: undefined }));
-        expect(exitSpy).not.toHaveBeenCalled();
+        expect(errorSpy).toHaveBeenCalledWith(
+            'Error: The CLI requires --output-folder for image conversion. Use --return-metadata-only for stdout-friendly page metadata.',
+        );
+        expect(pdfToPngCore).not.toHaveBeenCalled();
+        expect(exitSpy).toHaveBeenCalledWith(1);
     });
 
     it('does not log processing info in --silent mode', async () => {
@@ -421,16 +451,34 @@ describe('CLI run()', () => {
             'test.pdf',
             expect.objectContaining({ returnMetadataOnly: true, outputFolder: undefined }),
         );
-        expect(logSpy).toHaveBeenCalledWith('Metadata extraction complete:');
+        expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('"pageNumber": 1'));
+        expect(logSpy).not.toHaveBeenCalledWith('Processing PDF: test.pdf');
+        expect(exitSpy).not.toHaveBeenCalled();
+    });
+
+    it('prints metadata JSON in --silent --return-metadata-only mode', async () => {
+        vi.mocked(pdfToPngCore).mockResolvedValueOnce([
+            { kind: 'metadata', pageNumber: 1, name: 'page_1.png', width: 595, height: 842, rotation: 0, content: undefined, path: '' },
+        ]);
+
+        setArgv('test.pdf', '--return-metadata-only', '--silent');
+        await run();
+        expect(pdfToPngCore).toHaveBeenCalledTimes(1);
         expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('"pageNumber": 1'));
         expect(exitSpy).not.toHaveBeenCalled();
     });
 
-    it('suppresses metadata output in --silent --return-metadata-only mode', async () => {
-        setArgv('test.pdf', '--return-metadata-only', '--silent');
+    it('does not log output-folder chatter in metadata-only mode because no files are written', async () => {
+        vi.mocked(pdfToPngCore).mockResolvedValueOnce([
+            { kind: 'metadata', pageNumber: 1, name: 'page_1.png', width: 595, height: 842, rotation: 0, content: undefined, path: '' },
+        ]);
+
+        setArgv('test.pdf', '--return-metadata-only', '--output-folder', '/out');
         await run();
-        expect(pdfToPngCore).toHaveBeenCalledTimes(1);
-        expect(logSpy).not.toHaveBeenCalled();
+
+        expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('"pageNumber": 1'));
+        expect(logSpy).not.toHaveBeenCalledWith('Processing PDF: test.pdf');
+        expect(logSpy).not.toHaveBeenCalledWith('Output folder: /out');
         expect(exitSpy).not.toHaveBeenCalled();
     });
 
