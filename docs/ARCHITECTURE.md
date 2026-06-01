@@ -4,7 +4,7 @@
 
 `pdf-to-png-converter` is a CJS-only Node.js library and CLI for converting PDF pages into PNG images or page metadata.
 
-The codebase is organized around one public library entrypoint (`pdfToPng`) plus a thin CLI adapter. The library normalizes options first, loads the PDF through `pdfjs-dist`, processes pages sequentially or through a sliding-window scheduler, and routes rendered PNG buffers either to disk or an in-memory/null sink. The CLI is intentionally narrower than the API: it either writes image files to `--output-folder` or prints metadata JSON to stdout with `--return-metadata-only`.
+The codebase is organized around one public library entrypoint (`pdfToPng`) plus a thin CLI adapter. The library normalizes options first, loads the PDF through `pdfjs-dist`, processes pages sequentially or through a sliding-window scheduler, and routes each page according to its `PageMode` — written to disk through a filesystem sink, returned in memory, or reported as metadata only. The CLI is intentionally narrower than the API: it either writes image files to `--output-folder` or prints metadata JSON to stdout with `--return-metadata-only`.
 
 ## Public surfaces
 
@@ -19,34 +19,32 @@ The codebase is organized around one public library entrypoint (`pdfToPng`) plus
 1. `pdfToPng(pdfFile, props?)` in `src/pdfToPng.ts` calls `normalizePdfToPngOptions()`.
 2. `getPdfFileBuffer()` in `src/pdfInput.ts` loads a file path via `fs.promises.readFile()` or accepts `ArrayBufferLike` / `Uint8Array` input directly.
 3. `getPdfDocument()` in `src/pdfjsLoader.ts` dynamically imports `pdfjs-dist/legacy/build/pdf.mjs`, creates the loading task, and destroys that task on load failure.
-4. `pdfToPng()` resolves `pagesToProcess`, filters page numbers above `pdfDocument.numPages`, prepares the default filename mask, and creates the output sink:
-    - `FilesystemSink` when `outputFolder` is set
-    - `NullSink` when content is retained in memory but nothing is written
-    - no sink when the caller requested neither files nor page content
-5. `processAndSavePage()` in `src/pageOrchestrator.ts` coordinates one page:
-    - metadata-only path: `getPageMetadata()`
-    - render path: `renderPdfPage()`
-    - optional sink write
-    - final conversion to the discriminated output shape
+4. `pdfToPng()` resolves `pagesToProcess`, filters page numbers above `pdfDocument.numPages`, prepares the default filename mask, constructs the output sink, and derives the per-page mode:
+    - `FilesystemSink` when `outputFolder` is set; otherwise no sink
+    - `optionsToPageMode()` (`src/pageMode.ts`) maps the normalized options + sink to a `PageMode` (`metadata` | `content` | `file`)
+5. `processAndSavePage()` in `src/pageOrchestrator.ts` switches on the page's `PageMode`:
+    - `metadata`: `getPageMetadata()` (dimensions only)
+    - `content`: `renderPdfPage()`, returned in memory
+    - `file`: `renderPdfPage()` then a sink write, returned as the discriminated `file` output shape
 6. `pageRenderer.ts` obtains the page, computes the viewport, normalizes `rotation`, renders through pdf.js's built-in Node canvas factory (`pdf.canvasFactory`, backed by `@napi-rs/canvas`), and returns an in-memory page result.
 7. `outputWriter.ts` validates filename containment, checks realpaths, writes via `fs.promises.open(..., 'wx')`, and returns the absolute file path.
 8. `pdfToPng()` always calls `pdfDocument.destroy()` in `finally`.
 
 ## Module map
 
-| Module                            | Responsibility                                               | Key exports                                                      |
-| --------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------- |
-| `src/pdfToPng.ts`                 | Top-level orchestration, sink selection, page scheduling     | `pdfToPng`                                                       |
-| `src/normalizePdfToPngOptions.ts` | Option validation and defaulting                             | `normalizePdfToPngOptions`                                       |
-| `src/pdfInput.ts`                 | Input loading and buffer normalization                       | `getPdfFileBuffer`                                               |
-| `src/pdfjsLoader.ts`              | Dynamic `pdfjs-dist` loading and document lifecycle          | `getPdfDocument`                                                 |
-| `src/pageOrchestrator.ts`         | Per-page naming, render/metadata branching, sink integration | `resolvePageName`, `processAndSavePage`                          |
-| `src/pageRenderer.ts`             | Page metadata extraction, rendering, rotation normalization  | `normalizeRotation`, `getPageMetadata`, `renderPdfPage`          |
-| `src/outputWriter.ts`             | Path-containment enforcement and secure file writes          | `savePNGfile`                                                    |
-| `src/filesystemSink.ts`           | Disk-backed sink using `savePNGfile()`                       | `FilesystemSink`                                                 |
-| `src/nullSink.ts`                 | No-op sink for in-memory workflows                           | `NullSink`                                                       |
-| `src/propsToPdfDocInitParams.ts`  | Maps library options to `pdfjs-dist` init params             | `propsToPdfDocInitParams`                                        |
-| `src/cli.ts`                      | CLI adapter and reusable CLI helpers                         | `run`, `buildPdfToPngOptions`, `executeConversion`, `getVersion` |
+| Module                            | Responsibility                                              | Key exports                                                      |
+| --------------------------------- | ----------------------------------------------------------- | ---------------------------------------------------------------- |
+| `src/pdfToPng.ts`                 | Top-level orchestration, sink selection, page scheduling    | `pdfToPng`                                                       |
+| `src/normalizePdfToPngOptions.ts` | Option validation and defaulting                            | `normalizePdfToPngOptions`                                       |
+| `src/pdfInput.ts`                 | Input loading and buffer normalization                      | `getPdfFileBuffer`                                               |
+| `src/pdfjsLoader.ts`              | Dynamic `pdfjs-dist` loading and document lifecycle         | `getPdfDocument`                                                 |
+| `src/pageOrchestrator.ts`         | Per-page naming, `PageMode` branching, sink integration     | `resolvePageName`, `processAndSavePage`                          |
+| `src/pageMode.ts`                 | Per-page render/output mode union + pure mapping            | `PageMode`, `optionsToPageMode`                                  |
+| `src/pageRenderer.ts`             | Page metadata extraction, rendering, rotation normalization | `normalizeRotation`, `getPageMetadata`, `renderPdfPage`          |
+| `src/outputWriter.ts`             | Path-containment enforcement and secure file writes         | `savePNGfile`                                                    |
+| `src/filesystemSink.ts`           | Disk-backed sink using `savePNGfile()` (sole `OutputSink`)  | `FilesystemSink`                                                 |
+| `src/propsToPdfDocInitParams.ts`  | Maps library options to `pdfjs-dist` init params            | `propsToPdfDocInitParams`                                        |
+| `src/cli.ts`                      | CLI adapter and reusable CLI helpers                        | `run`, `buildPdfToPngOptions`, `executeConversion`, `getVersion` |
 
 ## Output model
 

@@ -1,7 +1,7 @@
 import { sep } from 'node:path';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import type { FilePngPageOutput, PngPageOutput } from './interfaces/index.js';
-import type { OutputSink } from './interfaces/output.sink.js';
+import type { PageMode } from './pageMode.js';
 import { getPageMetadata, renderPdfPage } from './pageRenderer.js';
 
 // Reject only characters the host OS treats as path separators. On Windows both "\" and "/"
@@ -45,33 +45,31 @@ export async function processAndSavePage(
     pageName: string,
     pageNumber: number,
     pageViewportScale: number,
-    shouldReturnContent: boolean,
-    returnMetadataOnly: boolean,
-    outputSink: OutputSink | undefined,
-    returnPageContent: boolean | undefined,
+    mode: PageMode,
 ): Promise<PngPageOutput> {
-    if (returnMetadataOnly) {
+    if (mode.kind === 'metadata') {
         return await getPageMetadata(pdfDocument, pageName, pageNumber, pageViewportScale);
     }
 
+    // The page is always rendered (the canvas is needed for dimensions); this flag only controls
+    // whether the PNG Buffer is materialized. `file` mode always materializes it so the page can be
+    // written; `content` mode materializes it only when the caller asked to keep it.
+    const shouldReturnContent = mode.kind === 'file' ? true : mode.returnContent;
     const pageOutput = await renderPdfPage(pdfDocument, pageName, pageNumber, pageViewportScale, shouldReturnContent);
 
-    if (outputSink !== undefined) {
-        if (pageOutput.content === undefined) {
-            throw new Error(`Cannot write PNG file "${pageOutput.name}" because content is undefined.`);
-        }
-        const resolvedPath = await outputSink.write(pageOutput.name, pageOutput.content);
-        if (resolvedPath === '') {
-            return pageOutput;
-        }
-        const filePageOutput: FilePngPageOutput = {
-            ...pageOutput,
-            kind: 'file',
-            path: resolvedPath,
-            content: returnPageContent === false ? undefined : pageOutput.content,
-        };
-        return filePageOutput;
+    if (mode.kind === 'content') {
+        return pageOutput;
     }
 
-    return pageOutput;
+    if (pageOutput.content === undefined) {
+        throw new Error(`Cannot write PNG file "${pageOutput.name}" because content is undefined.`);
+    }
+    const resolvedPath = await mode.sink.write(pageOutput.name, pageOutput.content);
+    const filePageOutput: FilePngPageOutput = {
+        ...pageOutput,
+        kind: 'file',
+        path: resolvedPath,
+        content: mode.returnContent ? pageOutput.content : undefined,
+    };
+    return filePageOutput;
 }

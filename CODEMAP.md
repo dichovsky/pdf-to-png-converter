@@ -10,7 +10,7 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
     "name": "pdf-to-png-converter",
     "version": "4.1.0"
   },
-  "sourceHash": "51155f3baa94c5b7019cc3ed1b1b983f46e9ec50cd151c2becc9fd24a83ccfe9",
+  "sourceHash": "a8008940180814bc6208210b6da9e8ad51b98e6b93e4fafc0286e0acc4d704b7",
   "entrypoints": [
     "src/index.ts"
   ],
@@ -553,34 +553,6 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
       "reExports": []
     },
     {
-      "path": "src/nullSink.ts",
-      "symbols": [
-        {
-          "name": "NullSink",
-          "kind": "class",
-          "line": 3,
-          "exported": true,
-          "signature": "export class NullSink implements OutputSink {",
-          "members": [
-            {
-              "name": "write",
-              "kind": "method",
-              "line": 4
-            }
-          ]
-        }
-      ],
-      "imports": [
-        {
-          "from": "./interfaces/output.sink.js",
-          "names": [
-            "OutputSink"
-          ]
-        }
-      ],
-      "reExports": []
-    },
-    {
       "path": "src/outputWriter.ts",
       "symbols": [
         {
@@ -633,6 +605,40 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
       "reExports": []
     },
     {
+      "path": "src/pageMode.ts",
+      "symbols": [
+        {
+          "name": "PageMode",
+          "kind": "type",
+          "line": 16,
+          "exported": true,
+          "signature": "export type PageMode = | { readonly kind: 'metadata' } | { readonly kind: 'content'; readonly returnContent: boolean } | { readonly kind: 'file'; readonly sink: OutputSink; readonly returnContent: boo…"
+        },
+        {
+          "name": "optionsToPageMode",
+          "kind": "function",
+          "line": 27,
+          "exported": true,
+          "signature": "export function optionsToPageMode(opts: NormalizedPdfToPngOptions, sink: OutputSink | undefined): PageMode"
+        }
+      ],
+      "imports": [
+        {
+          "from": "./interfaces/output.sink.js",
+          "names": [
+            "OutputSink"
+          ]
+        },
+        {
+          "from": "./normalizePdfToPngOptions.js",
+          "names": [
+            "NormalizedPdfToPngOptions"
+          ]
+        }
+      ],
+      "reExports": []
+    },
+    {
       "path": "src/pageOrchestrator.ts",
       "symbols": [
         {
@@ -668,7 +674,7 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
           "kind": "function",
           "line": 43,
           "exported": true,
-          "signature": "export async function processAndSavePage( pdfDocument: PDFDocumentProxy, pageName: string, pageNumber: number, pageViewportScale: number, shouldReturnContent: boolean, returnMetadataOnly: boolean, out…"
+          "signature": "export async function processAndSavePage( pdfDocument: PDFDocumentProxy, pageName: string, pageNumber: number, pageViewportScale: number, mode: PageMode, ): Promise<PngPageOutput>"
         }
       ],
       "imports": [
@@ -680,9 +686,9 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
           ]
         },
         {
-          "from": "./interfaces/output.sink.js",
+          "from": "./pageMode.js",
           "names": [
-            "OutputSink"
+            "PageMode"
           ]
         },
         {
@@ -911,9 +917,9 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
           ]
         },
         {
-          "from": "./nullSink.js",
+          "from": "./pageMode.js",
           "names": [
-            "NullSink"
+            "optionsToPageMode"
           ]
         },
         {
