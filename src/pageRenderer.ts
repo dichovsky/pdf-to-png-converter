@@ -16,6 +16,23 @@ interface CanvasFactory {
     destroy(canvasAndContext: CanvasAndContext): void;
 }
 
+/**
+ * Runtime structural check that pdf.js's `canvasFactory` exposes the `create` / `destroy` slice
+ * we rely on. pdf.js types the property as `Object`, so the value is validated at runtime rather
+ * than force-cast — a missing or malformed factory then fails fast with a clear message instead of
+ * surfacing a `TypeError` deep inside the render path.
+ */
+function isCanvasFactory(factory: unknown): factory is CanvasFactory {
+    return (
+        typeof factory === 'object' &&
+        factory !== null &&
+        'create' in factory &&
+        typeof factory.create === 'function' &&
+        'destroy' in factory &&
+        typeof factory.destroy === 'function'
+    );
+}
+
 export function normalizeRotation(raw: number): PageRotation {
     const normalized = ((raw % 360) + 360) % 360;
     switch (normalized) {
@@ -74,12 +91,18 @@ export async function renderPdfPage(
         );
     }
 
-    const canvasFactory = pdf.canvasFactory as unknown as CanvasFactory;
-    const { canvas, context } = canvasFactory.create(viewport.width, viewport.height);
+    const canvasFactory = pdf.canvasFactory;
+    if (!isCanvasFactory(canvasFactory)) {
+        page.cleanup();
+        throw new Error('pdf.js did not provide a usable canvas factory (missing create/destroy).');
+    }
+
+    const canvasAndContext = canvasFactory.create(viewport.width, viewport.height);
+    const { canvas, context } = canvasAndContext;
 
     try {
-        if (!canvas) {
-            throw new Error('pdf.js canvas factory returned a null canvas');
+        if (!canvas || !context) {
+            throw new Error('pdf.js canvas factory returned a null canvas or context.');
         }
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore — upstream pdfjs-dist@~6.0.x expects DOM CanvasRenderingContext2D, but @napi-rs/canvas exposes SKRSContext2D here. @ts-ignore (not @ts-expect-error) is required because build:test runs with skipLibCheck:true, which hides this error and would make @ts-expect-error report as unused.
@@ -96,8 +119,11 @@ export async function renderPdfPage(
         };
     } finally {
         page.cleanup();
-        if (canvas) {
-            canvasFactory.destroy({ canvas, context });
+        // Pass the original object pdf.js handed back so any internal fields it needs for cleanup
+        // survive. Guard on canvas: pdf.js's destroy() asserts a non-null canvas, so skip it when
+        // create() yielded none (the try block has already thrown for that case).
+        if (canvasAndContext.canvas) {
+            canvasFactory.destroy(canvasAndContext);
         }
     }
 }

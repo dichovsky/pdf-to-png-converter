@@ -10,7 +10,7 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
     "name": "pdf-to-png-converter",
     "version": "4.1.0"
   },
-  "sourceHash": "63c3b04a10f0fc4beab3c9fada014ef71d1653e953f61d27ec2c8428a47e8843",
+  "sourceHash": "59d649ae72ebdce05e1b53ddae865a3d76af0b9d2c8ac9f4029fac0d97534358",
   "entrypoints": [
     "src/index.ts"
   ],
@@ -718,23 +718,30 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
           "signature": "interface CanvasFactory { create(width: number, height: number): CanvasAndContext; destroy(canvasAndContext: CanvasAndContext): void; }"
         },
         {
+          "name": "isCanvasFactory",
+          "kind": "function",
+          "line": 25,
+          "exported": false,
+          "signature": "function isCanvasFactory(factory: unknown): factory is CanvasFactory"
+        },
+        {
           "name": "normalizeRotation",
           "kind": "function",
-          "line": 19,
+          "line": 36,
           "exported": true,
           "signature": "export function normalizeRotation(raw: number): PageRotation"
         },
         {
           "name": "getPageMetadata",
           "kind": "function",
-          "line": 35,
+          "line": 52,
           "exported": true,
           "signature": "export async function getPageMetadata( pdf: PDFDocumentProxy, pageName: string, pageNumber: number, pageViewportScale: number, ): Promise<MetadataPngPageOutput>"
         },
         {
           "name": "renderPdfPage",
           "kind": "function",
-          "line": 60,
+          "line": 77,
           "exported": true,
           "signature": "export async function renderPdfPage( pdf: PDFDocumentProxy, pageName: string, pageNumber: number, pageViewportScale: number, returnPageContent: boolean, ): Promise<InMemoryPngPageOutput>"
         }
