@@ -98,10 +98,10 @@ Residual risk remains for directory-component swaps between checks; the library 
 `src/cli.ts` is intentionally thin:
 
 1. `safeParseArgs()` parses argv.
-2. `buildPdfToPngOptions()` converts CLI values into a normalized `PdfToPngOptions` object.
-3. `buildPdfToPngOptions()` rejects CLI-only dead-end modes before any PDF work starts:
+2. `buildPdfToPngOptions()` converts CLI values into a normalized `PdfToPngOptions` object and rejects CLI-only dead-end modes before any PDF work starts:
     - image conversion without `--output-folder`
     - `--return-page-content` (library API only)
+3. `executeConversion()` delegates to `pdfToPngCore()` and writes either PNG-conversion progress or metadata JSON.
 4. `run()` handles process exit codes and output formatting.
 5. `getVersion()` treats missing/malformed `package.json` as a packaging defect and exits with an error.
 
