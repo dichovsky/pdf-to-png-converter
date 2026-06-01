@@ -304,7 +304,7 @@ The `pdfToPng` function returns an array of discriminated page objects. Branch o
 | `content`  | Rendering without `outputFolder` | `''`      | PNG `Buffer`, unless `returnPageContent: false` |
 | `file`     | Rendering with `outputFolder`    | File path | PNG `Buffer`, unless `returnPageContent: false` |
 
-All output objects also include `pageNumber`, `name`, `width`, `height`, and `rotation`.
+All output objects also include `pageNumber`, `name`, `width`, `height`, and `rotation`. `width` and `height` are integer pixel dimensions of the rendered image: a fractional viewport (for example a 595×842 pt A4 page at `viewportScale: 1.5`, i.e. 892.5×1263) is floored to match the bitmap the canvas allocates (892×1263). `returnMetadataOnly` reports the same floored dimensions a render would produce.
 
 ```javascript
 [
@@ -315,8 +315,8 @@ All output objects also include `pageNumber`, `name`, `width`, `height`, and `ro
         content: Buffer<...>,               // PNG image data
                                             //   undefined if returnPageContent=false
         path: '',                           // Empty string for in-memory and metadata results
-        width: 612,                         // Image width in pixels
-        height: 792,                        // Image height in pixels
+        width: 612,                         // Image width in pixels (integer; floored from viewportScale)
+        height: 792,                        // Image height in pixels (integer; floored from viewportScale)
         rotation: 0                         // Page rotation in degrees: 0, 90, 180, or 270
     },
     // ... more pages

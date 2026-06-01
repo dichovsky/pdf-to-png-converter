@@ -10,7 +10,7 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
     "name": "pdf-to-png-converter",
     "version": "4.1.0"
   },
-  "sourceHash": "59d649ae72ebdce05e1b53ddae865a3d76af0b9d2c8ac9f4029fac0d97534358",
+  "sourceHash": "6633e0eee386f025cbaea12c3b62fa83ebf486892554f5fa6836c3f480065fa1",
   "entrypoints": [
     "src/index.ts"
   ],
@@ -28,7 +28,7 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
       "name": "PngPageOutput",
       "kind": "type",
       "file": "src/interfaces/png.page.output.ts",
-      "line": 29,
+      "line": 31,
       "signature": "export type PngPageOutput = MetadataPngPageOutput | InMemoryPngPageOutput | FilePngPageOutput;",
       "jsdoc": "",
       "typeOnly": true
@@ -458,28 +458,28 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
         {
           "name": "MetadataPngPageOutput",
           "kind": "interface",
-          "line": 11,
+          "line": 13,
           "exported": true,
           "signature": "export interface MetadataPngPageOutput extends BasePngPageOutput { kind: 'metadata'; content: undefined; path: ''; }"
         },
         {
           "name": "InMemoryPngPageOutput",
           "kind": "interface",
-          "line": 17,
+          "line": 19,
           "exported": true,
           "signature": "export interface InMemoryPngPageOutput extends BasePngPageOutput { kind: 'content'; content: Buffer | undefined; path: ''; }"
         },
         {
           "name": "FilePngPageOutput",
           "kind": "interface",
-          "line": 23,
+          "line": 25,
           "exported": true,
           "signature": "export interface FilePngPageOutput extends BasePngPageOutput { kind: 'file'; content: Buffer | undefined; path: string; }"
         },
         {
           "name": "PngPageOutput",
           "kind": "type",
-          "line": 29,
+          "line": 31,
           "exported": true,
           "signature": "export type PngPageOutput = MetadataPngPageOutput | InMemoryPngPageOutput | FilePngPageOutput;"
         }
@@ -725,23 +725,37 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
           "signature": "function isCanvasFactory(factory: unknown): factory is CanvasFactory"
         },
         {
+          "name": "toPixelDimension",
+          "kind": "function",
+          "line": 46,
+          "exported": true,
+          "signature": "export function toPixelDimension(viewportLength: number): number"
+        },
+        {
+          "name": "nonRenderableDimensionsError",
+          "kind": "function",
+          "line": 60,
+          "exported": true,
+          "signature": "export function nonRenderableDimensionsError(width: number, height: number): Error"
+        },
+        {
           "name": "normalizeRotation",
           "kind": "function",
-          "line": 36,
+          "line": 66,
           "exported": true,
           "signature": "export function normalizeRotation(raw: number): PageRotation"
         },
         {
           "name": "getPageMetadata",
           "kind": "function",
-          "line": 52,
+          "line": 82,
           "exported": true,
           "signature": "export async function getPageMetadata( pdf: PDFDocumentProxy, pageName: string, pageNumber: number, pageViewportScale: number, ): Promise<MetadataPngPageOutput>"
         },
         {
           "name": "renderPdfPage",
           "kind": "function",
-          "line": 77,
+          "line": 112,
           "exported": true,
           "signature": "export async function renderPdfPage( pdf: PDFDocumentProxy, pageName: string, pageNumber: number, pageViewportScale: number, returnPageContent: boolean, ): Promise<InMemoryPngPageOutput>"
         }

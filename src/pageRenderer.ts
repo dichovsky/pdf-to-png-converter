@@ -33,6 +33,36 @@ function isCanvasFactory(factory: unknown): factory is CanvasFactory {
     );
 }
 
+/**
+ * Converts a (possibly fractional) viewport length into the integer pixel count the canvas
+ * will actually allocate. `@napi-rs/canvas` truncates fractional dimensions toward zero when a
+ * canvas is constructed (e.g. a 892.5-wide viewport yields an 892 px bitmap), so the reported
+ * `width`/`height` must be floored to match the rendered PNG. Viewport lengths are always
+ * non-negative, so `Math.floor` is equivalent to that truncation. Flooring here keeps the
+ * render path and the `returnMetadataOnly` path reporting identical, image-accurate pixel sizes.
+ *
+ * @internal Exported for unit testing only; not part of the public API (`src/index.ts`).
+ */
+export function toPixelDimension(viewportLength: number): number {
+    return Math.floor(viewportLength);
+}
+
+/**
+ * Builds the error thrown when floored page dimensions collapse to a non-renderable size.
+ *
+ * A very small `viewportScale` (e.g. `0.001` on a 612 pt page) floors to `0` px. A 0-wide or
+ * 0-tall bitmap cannot be rendered, so both the render and `returnMetadataOnly` paths reject it
+ * with this identical, actionable message instead of either returning a phantom `0×0` metadata
+ * result or surfacing an opaque canvas-factory `AssertionError`.
+ *
+ * @internal
+ */
+export function nonRenderableDimensionsError(width: number, height: number): Error {
+    return new Error(
+        `Page dimensions floor to ${width}×${height} px at this viewportScale, which cannot produce a valid image. Increase viewportScale.`,
+    );
+}
+
 export function normalizeRotation(raw: number): PageRotation {
     const normalized = ((raw % 360) + 360) % 360;
     switch (normalized) {
@@ -59,14 +89,19 @@ export async function getPageMetadata(
     const viewport = page.getViewport({ scale: pageViewportScale });
 
     try {
+        const width = toPixelDimension(viewport.width);
+        const height = toPixelDimension(viewport.height);
+        if (width <= 0 || height <= 0) {
+            throw nonRenderableDimensionsError(width, height);
+        }
         return {
             kind: 'metadata',
             pageNumber,
             name: pageName,
             content: undefined,
             path: '',
-            width: viewport.width,
-            height: viewport.height,
+            width,
+            height,
             rotation: normalizeRotation(page.rotate),
         };
     } finally {
@@ -91,13 +126,20 @@ export async function renderPdfPage(
         );
     }
 
+    const canvasWidth = toPixelDimension(viewport.width);
+    const canvasHeight = toPixelDimension(viewport.height);
+    if (canvasWidth <= 0 || canvasHeight <= 0) {
+        page.cleanup();
+        throw nonRenderableDimensionsError(canvasWidth, canvasHeight);
+    }
+
     const canvasFactory = pdf.canvasFactory;
     if (!isCanvasFactory(canvasFactory)) {
         page.cleanup();
         throw new Error('pdf.js did not provide a usable canvas factory (missing create/destroy).');
     }
 
-    const canvasAndContext = canvasFactory.create(viewport.width, viewport.height);
+    const canvasAndContext = canvasFactory.create(canvasWidth, canvasHeight);
     const { canvas, context } = canvasAndContext;
 
     try {
@@ -113,8 +155,8 @@ export async function renderPdfPage(
             name: pageName,
             content: returnPageContent ? canvas.toBuffer('image/png') : undefined,
             path: '',
-            width: viewport.width,
-            height: viewport.height,
+            width: canvasWidth,
+            height: canvasHeight,
             rotation: normalizeRotation(page.rotate),
         };
     } finally {
