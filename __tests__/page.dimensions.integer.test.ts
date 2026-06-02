@@ -184,3 +184,21 @@ test('returnMetadataOnly reports the same in-limit dimensions a render produces 
     expect(metadata[0].height).toBe(rendered[0].height);
     expect(metadata[0].width * metadata[0].height).toBeLessThanOrEqual(MAX_CANVAS_PIXELS);
 });
+
+test('pixel-limit error reports the floored canvas dimensions, not the rounded viewport', async () => {
+    const pdfFilePath: string = resolve(PIXEL_LIMIT_PDF);
+    const [meta1] = await pdfToPng(pdfFilePath, { pagesToProcess: [1], returnMetadataOnly: true });
+    // A fractional, oversized scale: the floored bitmap exceeds the cap, and at least one viewport
+    // length has a fractional part ≥ 0.5 so `Math.round` would report a different (larger) size than
+    // `Math.floor`. The thrown message must use the floored dimensions actually allocated.
+    const scale = 14.501;
+    const flooredWidth = Math.floor(meta1.width * scale);
+    const flooredHeight = Math.floor(meta1.height * scale);
+    // Guard the asset assumptions: genuinely oversized, and round ≠ floor on at least one axis.
+    expect(flooredWidth * flooredHeight).toBeGreaterThan(MAX_CANVAS_PIXELS);
+    expect(Math.round(meta1.width * scale) !== flooredWidth || Math.round(meta1.height * scale) !== flooredHeight).toBe(true);
+
+    const error = await pdfToPng(pdfFilePath, { viewportScale: scale, pagesToProcess: [1] }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toContain(`Canvas ${flooredWidth}×${flooredHeight} px`);
+});

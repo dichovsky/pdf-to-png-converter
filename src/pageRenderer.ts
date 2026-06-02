@@ -76,12 +76,13 @@ export function nonRenderableDimensionsError(width: number, height: number): Err
  *
  * @internal
  */
-export function canvasPixelLimitError(viewportWidth: number, viewportHeight: number): Error {
-    // Pin the locale so the thousands separator is stable across runtimes (an unqualified
-    // toLocaleString() varies — comma, space, or narrow no-break space — yielding inconsistent
-    // user-facing output and brittle assertions).
+export function canvasPixelLimitError(canvasWidth: number, canvasHeight: number): Error {
+    // Callers pass the already-floored bitmap dimensions, so the reported "Canvas W×H" matches the
+    // canvas the guard actually enforces against. Pin the locale so the thousands separator is
+    // stable across runtimes (an unqualified toLocaleString() varies — comma, space, or narrow
+    // no-break space — yielding inconsistent user-facing output and brittle assertions).
     return new Error(
-        `Canvas ${Math.round(viewportWidth)}×${Math.round(viewportHeight)} px exceeds the ${MAX_CANVAS_PIXELS.toLocaleString('en-US')} pixel limit. Reduce viewportScale.`,
+        `Canvas ${canvasWidth}×${canvasHeight} px exceeds the ${MAX_CANVAS_PIXELS.toLocaleString('en-US')} pixel limit. Reduce viewportScale.`,
     );
 }
 
@@ -116,7 +117,7 @@ export async function getPageMetadata(
         const width = toPixelDimension(viewport.width);
         const height = toPixelDimension(viewport.height);
         if (width * height > MAX_CANVAS_PIXELS) {
-            throw canvasPixelLimitError(viewport.width, viewport.height);
+            throw canvasPixelLimitError(width, height);
         }
         if (width <= 0 || height <= 0) {
             throw nonRenderableDimensionsError(width, height);
@@ -152,7 +153,7 @@ export async function renderPdfPage(
     const canvasHeight = toPixelDimension(viewport.height);
     if (canvasWidth * canvasHeight > MAX_CANVAS_PIXELS) {
         page.cleanup();
-        throw canvasPixelLimitError(viewport.width, viewport.height);
+        throw canvasPixelLimitError(canvasWidth, canvasHeight);
     }
     if (canvasWidth <= 0 || canvasHeight <= 0) {
         page.cleanup();
