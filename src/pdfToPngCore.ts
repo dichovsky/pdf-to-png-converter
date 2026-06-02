@@ -54,16 +54,28 @@ async function processPagesWithSlidingWindow<T>(
  * `EEXIST` from the exclusive-create (`'wx'`) write — which previously also left the first colliding
  * file on disk and leaked the absolute output path. See VAL-001.
  *
+ * Collision is detected case-insensitively (keys are lower-cased): on case-insensitive,
+ * case-preserving filesystems (macOS APFS, Windows NTFS — the default developer environments)
+ * names such as `Page.png` and `page.png` are the SAME file, so writing both would otherwise slip
+ * past an exact-string check and fail with the very raw `EEXIST` (partial output + leaked absolute
+ * path) this pre-flight exists to prevent. Keying case-insensitively makes the "unique filename"
+ * guarantee hold portably across every platform. The reported `name` is the first-seen original
+ * (case preserved) for an actionable message.
+ *
  * Iterates in first-seen order, so the reported duplicate is deterministic regardless of whether
  * pages are later rendered sequentially or in parallel.
  */
 function findDuplicateOutputName(names: string[], pageNumbers: number[]): { name: string; pages: number[] } | undefined {
-    const pagesByName = new Map<string, number[]>();
+    const pagesByKey = new Map<string, { name: string; pages: number[] }>();
     for (let index = 0; index < names.length; index += 1) {
-        const existing = pagesByName.get(names[index]) ?? [];
-        pagesByName.set(names[index], [...existing, pageNumbers[index]]);
+        const key = names[index].toLowerCase();
+        const existing = pagesByKey.get(key);
+        pagesByKey.set(key, {
+            name: existing?.name ?? names[index],
+            pages: [...(existing?.pages ?? []), pageNumbers[index]],
+        });
     }
-    for (const [name, pages] of pagesByName) {
+    for (const { name, pages } of pagesByKey.values()) {
         if (pages.length > 1) {
             return { name, pages };
         }
