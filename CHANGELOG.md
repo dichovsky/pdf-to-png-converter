@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.1.0] — 2026-06-02
+
 ### Removed
 
 - Removed the bespoke `NodeCanvasFactory` (`src/node.canvas.factory.ts`) and its tests. Rendering now uses pdf.js's built-in Node canvas factory (`PDFDocumentProxy.canvasFactory`, backed by `@napi-rs/canvas`) directly. The previous code selected this factory at runtime anyway — the `isNodeCanvasFactory()` duck-type guard always matched pdf.js's own factory, so the project's class and its `new NodeCanvasFactory()` fallback were never exercised on the render path. The `@napi-rs/canvas` dependency is unchanged (kept as a direct dependency so pdf.js's renderer is always able to load it). Rendered PNG output is unchanged — the visual-comparison suites pass. Resolves backlog item ARCH-015. pdf.js's `canvasFactory` is validated at runtime (it must expose callable `create`/`destroy`) rather than force-cast, the render path now asserts both the returned `canvas` and `context` are non-null before use, and `destroy()` receives the exact `CanvasAndContext` object pdf.js returned (preserving any internal fields it needs for cleanup).
@@ -21,8 +23,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A `viewportScale` small enough to floor a page to `0` px in either dimension now throws an actionable `"…cannot produce a valid image. Increase viewportScale."` error from both `renderPdfPage` and `getPageMetadata`, instead of returning a phantom `0×0` metadata result or surfacing an opaque canvas-factory `AssertionError`. The page is released before the render path throws.
 - `returnMetadataOnly` (`getPageMetadata`) now enforces the `MAX_CANVAS_PIXELS` limit, matching `renderPdfPage`. Previously the oversized-page guard lived only on the render path, so a `viewportScale` whose viewport area exceeded the limit threw `"Canvas …×… px exceeds the … pixel limit. Reduce viewportScale."` on a real render but silently returned those (unrenderable) dimensions in metadata-only mode — a phantom result for a page that cannot be rendered, the same failure mode the floor-to-zero guard already prevents on both paths. The two paths now reject oversized pages with the identical message via the shared `canvasPixelLimitError` builder (mirroring `nonRenderableDimensionsError`).
 - The `MAX_CANVAS_PIXELS` canvas-area guard now bounds the **rendered (floored) canvas** — `floor(viewportWidth) × floor(viewportHeight)` — instead of the unrounded fractional viewport area. Because the canvas is allocated with floored dimensions (via the shared `toPixelDimension` helper), a page whose un-floored viewport area slightly exceeded the limit while its actually-allocated bitmap fit within it was wrongly rejected with `"Canvas …×… px exceeds the … pixel limit. Reduce viewportScale."`. This affects a narrow `viewportScale` band — e.g. a 612×792 pt US-Letter page at `viewportScale ≈ 14.3636` produces an un-floored area of `100,000,739` px (over the `100,000,000` cap) but a real `8790×11375 = 99,986,250` px bitmap (under it), so the page is renderable yet was refused. Both `renderPdfPage` and the `returnMetadataOnly` path (`getPageMetadata`) now floor viewport lengths _before_ the area check, so the guard matches the bitmap actually allocated and the two paths stay symmetric. Pages that genuinely exceed the limit still throw the identical message on both paths, and peak canvas memory remains bounded at `MAX_CANVAS_PIXELS × 4 bytes ≈ 400 MB`.
-
-## [4.1.0] — 2026-05-31
 
 ### Security
 
