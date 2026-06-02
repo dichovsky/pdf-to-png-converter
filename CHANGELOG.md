@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The duplicate-output-filename pre-flight check (VAL-001) now detects collisions **case-insensitively**. Previously it compared resolved page filenames with exact string equality, so two names differing only in case (e.g. an `outputFileMaskFunc` returning `Page.png` for one page and `page.png` for another) passed the check. On case-insensitive, case-preserving filesystems — the default on macOS (APFS) and Windows (NTFS) — those names are the **same file**, so the second exclusive-create (`'wx'`) write failed with a raw `EEXIST` that left the first file on disk and **leaked the absolute output path** in the error message — exactly the partial-output + path-leak failure mode VAL-001 was introduced to prevent. The pre-flight now lower-cases names when keying, so the clean `Duplicate output filename "…" for pages …` error is thrown before any I/O on every platform; the reported name preserves the first-seen original casing. In-memory / metadata-only conversions (no `outputFolder`) still allow repeated names. This makes the "each processed page must resolve to a unique filename" guarantee hold portably regardless of the host filesystem.
+
 ### Changed
 
 - The published npm tarball no longer ships `out/.tsbuildinfo`. `incremental` is disabled in `tsconfig.prod.json` (and the unused `tsBuildInfoFile` setting removed) — the `prebuild` step runs `clean`, which wipes `out/` before every build, so incremental compilation never had any effect here. Removing the file drops the tarball from 48 to 47 files (~45 kB → ~30 kB packed). No runtime, type, or API change.

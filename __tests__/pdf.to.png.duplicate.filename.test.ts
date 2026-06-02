@@ -124,4 +124,54 @@ describe('VAL-001: duplicate output filename pre-flight check', () => {
 
         expect(await pngFilesIn(outputFolder)).toHaveLength(0);
     });
+
+    test('(h) names differing only in case collide on case-insensitive filesystems and are rejected before any write', async () => {
+        const outputFolder = join(baseOutputFolder, 'case-collision');
+        await fsPromises.mkdir(outputFolder, { recursive: true });
+
+        // "Page.png" and "page.png" are distinct strings but the SAME file on case-insensitive,
+        // case-preserving filesystems (macOS APFS, Windows NTFS — the default dev environments).
+        // The pre-flight check must reject them with the clean VAL-001 error on every platform,
+        // not let the second exclusive-create ('wx') write fail with a raw EEXIST that leaks the
+        // absolute output path and leaves the first file behind.
+        await expect(
+            pdfToPng(multiPagePdfFilePath, {
+                outputFolder,
+                outputFileMaskFunc: (pageNumber: number) => (pageNumber === 1 ? 'Page.png' : 'page.png'),
+                pagesToProcess: [1, 2],
+            }),
+        ).rejects.toThrow(/Duplicate output filename "Page\.png" for pages 1, 2\./);
+
+        expect(await pngFilesIn(outputFolder)).toHaveLength(0);
+    });
+
+    test('(i) case-collision error does not leak the absolute output path', async () => {
+        const outputFolder = join(baseOutputFolder, 'case-no-leak');
+
+        let message = '';
+        try {
+            await pdfToPng(multiPagePdfFilePath, {
+                outputFolder,
+                outputFileMaskFunc: (pageNumber: number) => (pageNumber === 1 ? 'Page.png' : 'page.png'),
+                pagesToProcess: [1, 2],
+            });
+        } catch (error: unknown) {
+            message = error instanceof Error ? error.message : String(error);
+        }
+
+        expect(message).toMatch(/Duplicate output filename/);
+        expect(message).not.toContain(outputFolder);
+        expect(message).not.toContain(process.cwd());
+    });
+
+    test('(j) gating: case-only-differing names with no outputFolder (in-memory) do not throw', async () => {
+        const pages = await pdfToPng(pdfFilePath, {
+            outputFileMaskFunc: (pageNumber: number) => (pageNumber === 1 ? 'Page.png' : 'page.png'),
+            pagesToProcess: [1, 2],
+        });
+
+        expect(pages).toHaveLength(2);
+        expect(pages.map((page) => page.name)).toEqual(['Page.png', 'page.png']);
+        expect(pages.every((page) => page.path === '')).toBe(true);
+    });
 });

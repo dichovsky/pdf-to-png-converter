@@ -10,7 +10,7 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
     "name": "pdf-to-png-converter",
     "version": "4.1.0"
   },
-  "sourceHash": "a64d89b73f09c871f556ab107ed2838684a62d4a27f93f2693d41c13c8cf6574",
+  "sourceHash": "047db4c7966a202208d29a815ffed04cce3227f3f477853bed1011c2796d03bf",
   "entrypoints": [
     "src/index.ts"
   ],
@@ -873,14 +873,14 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
         {
           "name": "findDuplicateOutputName",
           "kind": "function",
-          "line": 60,
+          "line": 68,
           "exported": false,
           "signature": "function findDuplicateOutputName(names: string[], pageNumbers: number[]): { name: string; pages: number[] } | undefined"
         },
         {
           "name": "pdfToPngCore",
           "kind": "function",
-          "line": 84,
+          "line": 96,
           "exported": true,
           "signature": "export async function pdfToPngCore( pdfFile: string | ArrayBufferLike | Uint8Array, normalizedProps: NormalizedPdfToPngOptions, ): Promise<PngPageOutput[]>"
         }
