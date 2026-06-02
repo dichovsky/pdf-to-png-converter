@@ -9,7 +9,9 @@ export const MAX_VIEWPORT_SCALE = 100;
 
 /**
  * Maximum canvas area in pixels. At 4 bytes per pixel, 100 MP ≈ 400 MB of raw bitmap memory.
- * Any page whose viewport exceeds this limit will be rejected before canvas allocation.
+ * Any page whose rendered (floored) canvas area exceeds this limit is rejected before canvas
+ * allocation. The guard floors the viewport dimensions first so it bounds the bitmap actually
+ * allocated rather than the slightly larger fractional viewport area.
  */
 export const MAX_CANVAS_PIXELS = 100_000_000;
 

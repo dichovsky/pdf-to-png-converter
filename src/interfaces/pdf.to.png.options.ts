@@ -101,8 +101,8 @@ export interface PdfToPngOptions {
      * and rotation without generating images.
      * To stay consistent with a real render, this path still rejects pages that could not be
      * rendered at the requested `viewportScale` — both those that floor to `0` px and those whose
-     * viewport area exceeds the internal canvas pixel limit — rather than reporting dimensions for
-     * a page that would throw on render.
+     * rendered (floored) canvas area exceeds the internal canvas pixel limit — rather than reporting
+     * dimensions for a page that would throw on render.
      * Default: `false`.
      * @since 3.14.0
      */

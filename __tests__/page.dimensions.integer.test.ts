@@ -3,6 +3,7 @@ import { expect, test } from 'vitest';
 import type { PngPageOutput } from '../src';
 import { pdfToPng } from '../src';
 import { toPixelDimension } from '../src/pageRenderer.js';
+import { MAX_CANVAS_PIXELS } from '../src/const.js';
 
 test('toPixelDimension floors fractional viewport lengths to match canvas truncation', () => {
     expect(toPixelDimension(892.5)).toBe(892);
@@ -117,4 +118,87 @@ test('returnMetadataOnly reports the same integer dimensions a render would prod
     expect(Number.isInteger(metadata[0].height)).toBe(true);
     expect(metadata[0].width).toBe(rendered[0].width);
     expect(metadata[0].height).toBe(rendered[0].height);
+});
+
+// Regression: the pixel-limit guard must bound the ACTUALLY-ALLOCATED canvas (floored
+// dimensions), not the fractional viewport area. There is a narrow scale band where the
+// un-floored viewport area `w*s × h*s` exceeds MAX_CANVAS_PIXELS while the floored bitmap that
+// @napi-rs/canvas actually allocates — `floor(w*s) × floor(h*s)` — stays within it. Such a page
+// is renderable and must NOT be rejected. (Before the fix the guard compared the un-floored area
+// and threw "exceeds the pixel limit" for it.) Mirrors PR #154's "floored dims are the bitmap".
+const PIXEL_LIMIT_PDF = './test-data/sample.pdf';
+
+/** Smallest scale whose un-floored viewport area exceeds the cap while the floored canvas fits within it. */
+function findFlooredStraddleScale(widthPt: number, heightPt: number): number {
+    let scale = Math.sqrt(MAX_CANVAS_PIXELS / (widthPt * heightPt));
+    for (let i = 0; i < 200_000; i += 1) {
+        const unfloored = widthPt * scale * (heightPt * scale);
+        const floored = Math.floor(widthPt * scale) * Math.floor(heightPt * scale);
+        if (unfloored > MAX_CANVAS_PIXELS && floored <= MAX_CANVAS_PIXELS) {
+            return scale;
+        }
+        scale += 0.0001;
+    }
+    throw new Error('No straddle scale found for the pixel-limit regression test.');
+}
+
+test('renders a page whose floored canvas fits the limit even though its viewport area exceeds it', async () => {
+    const pdfFilePath: string = resolve(PIXEL_LIMIT_PDF);
+    // Page-1 dimensions at scale 1 are integer points (US-Letter 612×792), so they are the page's
+    // true point dimensions — derive the straddle scale from them instead of hard-coding.
+    const [meta1] = await pdfToPng(pdfFilePath, { pagesToProcess: [1], returnMetadataOnly: true });
+    const scale = findFlooredStraddleScale(meta1.width, meta1.height);
+
+    const expectedWidth = Math.floor(meta1.width * scale);
+    const expectedHeight = Math.floor(meta1.height * scale);
+    // The chosen scale really does straddle the cap: un-floored area over, floored canvas within.
+    expect(meta1.width * scale * (meta1.height * scale)).toBeGreaterThan(MAX_CANVAS_PIXELS);
+    expect(expectedWidth * expectedHeight).toBeLessThanOrEqual(MAX_CANVAS_PIXELS);
+
+    const pages: PngPageOutput[] = await pdfToPng(pdfFilePath, {
+        viewportScale: scale,
+        pagesToProcess: [1],
+        returnPageContent: true,
+    });
+
+    const page = pages[0];
+    expect(page.width).toBe(expectedWidth);
+    expect(page.height).toBe(expectedHeight);
+    expect(page.width * page.height).toBeLessThanOrEqual(MAX_CANVAS_PIXELS);
+    const png = readPngDimensions(page.content as Buffer);
+    expect(png.width).toBe(expectedWidth);
+    expect(png.height).toBe(expectedHeight);
+});
+
+test('returnMetadataOnly reports the same in-limit dimensions a render produces at the floored straddle scale', async () => {
+    const pdfFilePath: string = resolve(PIXEL_LIMIT_PDF);
+    const [meta1] = await pdfToPng(pdfFilePath, { pagesToProcess: [1], returnMetadataOnly: true });
+    const scale = findFlooredStraddleScale(meta1.width, meta1.height);
+
+    const [rendered, metadata] = await Promise.all([
+        pdfToPng(pdfFilePath, { viewportScale: scale, pagesToProcess: [1], returnPageContent: true }),
+        pdfToPng(pdfFilePath, { viewportScale: scale, pagesToProcess: [1], returnMetadataOnly: true }),
+    ]);
+
+    expect(metadata[0].width).toBe(rendered[0].width);
+    expect(metadata[0].height).toBe(rendered[0].height);
+    expect(metadata[0].width * metadata[0].height).toBeLessThanOrEqual(MAX_CANVAS_PIXELS);
+});
+
+test('pixel-limit error reports the floored canvas dimensions, not the rounded viewport', async () => {
+    const pdfFilePath: string = resolve(PIXEL_LIMIT_PDF);
+    const [meta1] = await pdfToPng(pdfFilePath, { pagesToProcess: [1], returnMetadataOnly: true });
+    // A fractional, oversized scale: the floored bitmap exceeds the cap, and at least one viewport
+    // length has a fractional part ≥ 0.5 so `Math.round` would report a different (larger) size than
+    // `Math.floor`. The thrown message must use the floored dimensions actually allocated.
+    const scale = 14.501;
+    const flooredWidth = Math.floor(meta1.width * scale);
+    const flooredHeight = Math.floor(meta1.height * scale);
+    // Guard the asset assumptions: genuinely oversized, and round ≠ floor on at least one axis.
+    expect(flooredWidth * flooredHeight).toBeGreaterThan(MAX_CANVAS_PIXELS);
+    expect(Math.round(meta1.width * scale) !== flooredWidth || Math.round(meta1.height * scale) !== flooredHeight).toBe(true);
+
+    const error = await pdfToPng(pdfFilePath, { viewportScale: scale, pagesToProcess: [1] }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toContain(`Canvas ${flooredWidth}×${flooredHeight} px`);
 });
