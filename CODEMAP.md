@@ -10,7 +10,7 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
     "name": "pdf-to-png-converter",
     "version": "4.1.0"
   },
-  "sourceHash": "91bd3c96d0303157ee7a2aa2a94d5e2a639e3ed9ddae6b98af5ff8e3b9d2267f",
+  "sourceHash": "a64d89b73f09c871f556ab107ed2838684a62d4a27f93f2693d41c13c8cf6574",
   "entrypoints": [
     "src/index.ts"
   ],
@@ -672,7 +672,7 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
         {
           "name": "processAndSavePage",
           "kind": "function",
-          "line": 43,
+          "line": 48,
           "exported": true,
           "signature": "export async function processAndSavePage( pdfDocument: PDFDocumentProxy, pageName: string, pageNumber: number, pageViewportScale: number, mode: PageMode, ): Promise<PngPageOutput>"
         }

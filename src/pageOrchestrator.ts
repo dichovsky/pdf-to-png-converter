@@ -28,7 +28,12 @@ export function resolvePageName(
         return `${defaultMask}_page_${pageNumber}.png`;
     }
 
-    const name: string = outputFileMaskFunc(pageNumber);
+    const name: unknown = outputFileMaskFunc(pageNumber);
+    if (typeof name !== 'string') {
+        throw new Error(
+            `outputFileMaskFunc returned a non-string filename for page ${pageNumber}. Provide a string including the .png extension.`,
+        );
+    }
     if (!name) {
         throw new Error(
             `outputFileMaskFunc returned an empty filename for page ${pageNumber}. Provide a non-empty string including the .png extension.`,
