@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The published npm tarball no longer ships `out/.tsbuildinfo`. `incremental` is disabled in `tsconfig.prod.json` (and the unused `tsBuildInfoFile` setting removed) — the `prebuild` step runs `clean`, which wipes `out/` before every build, so incremental compilation never had any effect here. Removing the file drops the tarball from 48 to 47 files (~45 kB → ~30 kB packed). No runtime, type, or API change.
+
 ## [4.1.0] — 2026-06-02
 
 ### Removed

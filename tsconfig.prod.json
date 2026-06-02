@@ -5,8 +5,7 @@
         "outDir": "./out",
         "noEmit": false,
         "declaration": true,
-        "incremental": true,
-        "tsBuildInfoFile": "./out/.tsbuildinfo"
+        "incremental": false
     },
     "include": ["./src/**/*"]
 }
