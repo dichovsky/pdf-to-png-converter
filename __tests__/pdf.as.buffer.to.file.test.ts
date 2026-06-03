@@ -8,7 +8,7 @@ import { comparePNG } from './comparePNG';
 test(`should generate png from pdf buffer`, async () => {
     const pdfFilePath: string = resolve('./test-data/sample.pdf');
     const pdfBuffer = readFileSync(pdfFilePath);
-    const outputFolder = resolve('./test-results/sample/actual');
+    const outputFolder = resolve('./test-results/sample-buffer/actual');
     await fsPromises.rm(outputFolder, { recursive: true, force: true });
     const pngPages: PngPageOutput[] = await pdfToPng(pdfBuffer, {
         outputFolder,
