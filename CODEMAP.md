@@ -10,7 +10,7 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
     "name": "pdf-to-png-converter",
     "version": "4.1.0"
   },
-  "sourceHash": "047db4c7966a202208d29a815ffed04cce3227f3f477853bed1011c2796d03bf",
+  "sourceHash": "c8317449422ca227167c1d4897278760d26e3ab93375f326129adc837b6b43f4",
   "entrypoints": [
     "src/index.ts"
   ],
@@ -493,7 +493,7 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
         {
           "name": "normalizePath",
           "kind": "function",
-          "line": 21,
+          "line": 26,
           "exported": true,
           "signature": "export function normalizePath(path: string): string"
         }
