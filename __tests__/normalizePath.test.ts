@@ -5,7 +5,7 @@ test('should normalize path ending with slash', () => {
     const path = '/path/to/folder/';
     const normalizedPath: string = normalizePath(path);
     if (process.platform === 'win32') {
-        expect(normalizedPath).toBe(`${__dirname[0]}:\\path\\to\\folder\\`);
+        expect(normalizedPath).toBe(`${__dirname[0]}:/path/to/folder/`);
     } else {
         expect(normalizedPath).toBe('/path/to/folder/');
     }
@@ -15,7 +15,7 @@ test('should normalize path without ending slash', () => {
     const path = '/path/to/folder';
     const normalizedPath: string = normalizePath(path);
     if (process.platform === 'win32') {
-        expect(normalizedPath).toBe(`${__dirname[0]}:\\path\\to\\folder\\`);
+        expect(normalizedPath).toBe(`${__dirname[0]}:/path/to/folder/`);
     } else {
         expect(normalizedPath).toBe('/path/to/folder/');
     }
@@ -31,17 +31,17 @@ test('should normalize root path', () => {
     const normalizedPath: string = normalizePath(path);
 
     if (process.platform === 'win32') {
-        expect(normalizedPath).toBe(`${__dirname[0]}:\\`);
+        expect(normalizedPath).toBe(`${__dirname[0]}:/`);
     } else {
         expect(normalizedPath).toBe('/');
     }
 });
 
 if (process.platform === 'win32') {
-    test('should append trailing backslash if path ends with backslash on Windows systems', () => {
+    test('should convert Windows separators to forward slashes with a trailing slash', () => {
         const path = `${__dirname[0]}:\\Windows\\`;
         const normalizedPath = normalizePath(path);
-        expect(normalizedPath).toBe(`${__dirname[0]}:\\Windows\\`);
+        expect(normalizedPath).toBe(`${__dirname[0]}:/Windows/`);
     });
 }
 
@@ -49,7 +49,7 @@ test('should normalize path containing spaces', () => {
     const path = '/path/to/my folder/with spaces';
     const normalizedPath: string = normalizePath(path);
     if (process.platform === 'win32') {
-        expect(normalizedPath).toMatch(/my folder\\with spaces\\/);
+        expect(normalizedPath).toMatch(/my folder\/with spaces\//);
     } else {
         expect(normalizedPath).toBe('/path/to/my folder/with spaces/');
     }
@@ -59,7 +59,7 @@ test('should normalize path containing parentheses and special characters', () =
     const path = '/path/to/folder (1)/output';
     const normalizedPath: string = normalizePath(path);
     if (process.platform === 'win32') {
-        expect(normalizedPath).toMatch(/folder \(1\)\\output\\/);
+        expect(normalizedPath).toMatch(/folder \(1\)\/output\//);
     } else {
         expect(normalizedPath).toBe('/path/to/folder (1)/output/');
     }
@@ -69,7 +69,7 @@ test('should preserve spaces in path and ensure trailing separator', () => {
     const path = '/my documents/pdf output';
     const normalizedPath: string = normalizePath(path);
     if (process.platform === 'win32') {
-        expect(normalizedPath.endsWith('\\')).toBe(true);
+        expect(normalizedPath.endsWith('/')).toBe(true);
     } else {
         expect(normalizedPath).toBe('/my documents/pdf output/');
         expect(normalizedPath.endsWith('/')).toBe(true);
