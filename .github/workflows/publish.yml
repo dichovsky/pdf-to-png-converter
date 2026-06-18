@@ -23,9 +23,16 @@ jobs:
                   node-version-file: .nvmrc
                   cache: 'npm'
                   registry-url: 'https://registry.npmjs.org'
+            # Trusted Publishing (OIDC) needs npm >= 11.5.1; pin to the packageManager version.
+            - run: npm install -g npm@11.13.0
             - run: npm ci
             - run: npm audit --audit-level=high
             - run: npm run build
-            - run: npm publish
+            - name: Pre-release checks
+              run: npm run release:precheck
               env:
-                  NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+                  RELEASE_TAG: ${{ github.event.release.tag_name }}
+            # No NODE_AUTH_TOKEN: npm authenticates via OIDC trusted publishing and attaches provenance.
+            - run: npm publish --provenance
+            - name: Post-release checks
+              run: npm run release:postcheck

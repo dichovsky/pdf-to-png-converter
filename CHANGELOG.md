@@ -9,8 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.1.1] — 2026-06-19
+
 ### Fixed
 
+- pdf.js CMap and standard-font factory URLs (`cMapUrl` / `standardFontDataUrl`) are now always emitted with forward slashes and a guaranteed trailing `/`, fixing every conversion on Windows. `normalizePath()` previously appended the OS path separator, so on Windows it produced a `\`-terminated, backslash-separated value; pdf.js validates these factory URLs with `getFactoryUrlProp`, which throws `Invalid factory url … must include trailing slash.` for any non-`/` terminator, breaking all rendering on Windows. POSIX output is byte-identical to before (the separator was already `/`). Resolves issue #173.
 - The duplicate-output-filename pre-flight check (VAL-001) now detects collisions **case-insensitively**. Previously it compared resolved page filenames with exact string equality, so two names differing only in case (e.g. an `outputFileMaskFunc` returning `Page.png` for one page and `page.png` for another) passed the check. On case-insensitive, case-preserving filesystems — the default on macOS (APFS) and Windows (NTFS) — those names are the **same file**, so the second exclusive-create (`'wx'`) write failed with a raw `EEXIST` that left the first file on disk and **leaked the absolute output path** in the error message — exactly the partial-output + path-leak failure mode VAL-001 was introduced to prevent. The pre-flight now lower-cases names when keying, so the clean `Duplicate output filename "…" for pages …` error is thrown before any I/O on every platform; the reported name preserves the first-seen original casing. In-memory / metadata-only conversions (no `outputFolder`) still allow repeated names. This makes the "each processed page must resolve to a unique filename" guarantee hold portably regardless of the host filesystem.
 
 ### Changed

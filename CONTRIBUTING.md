@@ -69,6 +69,20 @@ Types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`, `ci`
 - [ ] New behaviour is covered by tests (coverage thresholds: lines 90%, functions 90%, branches 85%)
 - [ ] `CHANGELOG.md` updated under `## [Unreleased]` (or moved into the release section when cutting a release)
 
+## Releasing
+
+Releases are published to npm by `.github/workflows/publish.yml` when a GitHub Release is **published**. Publishing uses npm **Trusted Publishing (OIDC)** — there is no long-lived `NPM_TOKEN`; the workflow mints a short-lived token and attaches build [provenance](https://docs.npmjs.com/generating-provenance-statements) automatically.
+
+**One-time setup (maintainer):** on npmjs.com, configure the package's _Trusted Publisher_ to GitHub Actions for `dichovsky/pdf-to-png-converter`, workflow `publish.yml` (leave _Environment_ blank).
+
+**Cutting a release:**
+
+1. On a release branch, bump the version with `npm version <x.y.z> --no-git-tag-version` (updates `package.json` + `package-lock.json`).
+2. Move the `## [Unreleased]` entries in `CHANGELOG.md` into a new `## [x.y.z] — <date>` section.
+3. Run `npm run release:precheck` locally (after `npm run build`) to validate the version is unpublished, the CHANGELOG entry exists, and the tarball ships only `out/`.
+4. Merge the branch, then create a GitHub Release tagged `vx.y.z`.
+5. The workflow runs `release:precheck` → `npm publish --provenance` → `release:postcheck` (verifies the published version, the `latest` dist-tag, the provenance attestation, and a clean-install smoke test).
+
 ## Reporting Bugs / Security Issues
 
 - **Bugs:** open a [GitHub issue](https://github.com/dichovsky/pdf-to-png-converter/issues)
