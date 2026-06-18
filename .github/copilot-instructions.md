@@ -325,10 +325,11 @@ for (const testData of testDataArray) {
 - Ubuntu only, Node 24
 - Steps: `npm ci` → `npm run build:test && npm run lint` → `npm test`
 
-**`publish.yml`** — runs on GitHub release creation:
+**`publish.yml`** — runs when a GitHub release is published:
 
 - Ubuntu, Node 24.x
-- Steps: `npm ci` → `npm run build` → `npm publish` (uses `NPM_TOKEN` secret)
+- Auth via npm **Trusted Publishing (OIDC)** — no `NPM_TOKEN`; `id-token: write` mints a short-lived token and attaches provenance
+- Steps: pin `npm@11.13.0` → `npm ci` → `npm audit` → `npm run build` → `release:precheck` → `npm publish --provenance` → `release:postcheck`
 
 ## Dependencies
 
