@@ -77,25 +77,25 @@
         ]
     },
     "dependencies": {
-        "@napi-rs/canvas": "~1.0.0",
-        "pdfjs-dist": "~6.0.227"
+        "@napi-rs/canvas": "~1.0.2",
+        "pdfjs-dist": "~6.1.200"
     },
     "devDependencies": {
         "@eslint/js": "^10.0.1",
-        "@types/node": "^26.0.0",
-        "@typescript-eslint/eslint-plugin": "^8.60.0",
-        "@typescript-eslint/parser": "^8.60.0",
-        "@vitest/coverage-v8": "^4.1.7",
-        "eslint": "^10.4.1",
+        "@types/node": "^26.0.1",
+        "@typescript-eslint/eslint-plugin": "^8.62.1",
+        "@typescript-eslint/parser": "^8.62.1",
+        "@vitest/coverage-v8": "^4.1.9",
+        "eslint": "^10.6.0",
         "husky": "^9.1.7",
         "license-checker": "^25.0.1",
-        "lint-staged": "^17.0.7",
-        "png-visual-compare": "^6.1.0",
-        "prettier": "^3.8.3",
+        "lint-staged": "^17.0.8",
+        "png-visual-compare": "^6.2.0",
+        "prettier": "^3.9.4",
         "rimraf": "^6.1.3",
         "ts-node": "^10.9.2",
         "typescript": "^6.0.3",
-        "vitest": "^4.1.7"
+        "vitest": "^4.1.9"
     },
     "packageManager": "npm@11.13.0",
     "engines": {
