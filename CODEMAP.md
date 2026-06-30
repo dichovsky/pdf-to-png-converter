@@ -10,7 +10,7 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
     "name": "pdf-to-png-converter",
     "version": "4.1.1"
   },
-  "sourceHash": "c8317449422ca227167c1d4897278760d26e3ab93375f326129adc837b6b43f4",
+  "sourceHash": "a2c56ce791ede7f2f33264dcba9e4244e5c37627c4df033c43d9db85fec362d2",
   "entrypoints": [
     "src/index.ts"
   ],

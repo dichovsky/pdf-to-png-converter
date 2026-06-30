@@ -174,7 +174,7 @@ export async function renderPdfPage(
             throw new Error('pdf.js canvas factory returned a null canvas or context.');
         }
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore — upstream pdfjs-dist@~6.0.x expects DOM CanvasRenderingContext2D, but @napi-rs/canvas exposes SKRSContext2D here. @ts-ignore (not @ts-expect-error) is required because build:test runs with skipLibCheck:true, which hides this error and would make @ts-expect-error report as unused.
+        // @ts-ignore — upstream pdfjs-dist@~6.1.x expects DOM CanvasRenderingContext2D, but @napi-rs/canvas exposes SKRSContext2D here. @ts-ignore (not @ts-expect-error) is required because build:test runs with skipLibCheck:true, which hides this error and would make @ts-expect-error report as unused.
         await page.render({ canvasContext: context, viewport, canvas }).promise;
         return {
             kind: 'content',
