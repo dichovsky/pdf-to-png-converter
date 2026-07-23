@@ -97,6 +97,9 @@
         "typescript": "^6.0.3",
         "vitest": "^4.1.9"
     },
+    "overrides": {
+        "brace-expansion": "^1.1.16"
+    },
     "packageManager": "npm@11.13.0",
     "engines": {
         "node": ">=22.13.0 || >=24"
