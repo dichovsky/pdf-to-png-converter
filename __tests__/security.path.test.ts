@@ -1,6 +1,6 @@
 import { promises as fsPromises } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join, relative, resolve } from 'node:path';
 import { expect, test } from 'vitest';
 import type { PdfToPngOptions } from '../src/interfaces/pdf.to.png.options.js';
 import { resolvePageName } from '../src/pageOrchestrator.js';
@@ -9,7 +9,10 @@ import { pdfToPng } from '../src';
 const SAMPLE_PDF = resolve('./test-data/sample.pdf');
 
 test('should allow outputFolder paths outside cwd when the filename stays contained', async () => {
-    const outputFolder = '../escape';
+    const baseDir = await fsPromises.mkdtemp(join(tmpdir(), 'pdf-to-png-security-'));
+    // A relative path is built (rather than hardcoding '../escape') so the resolved target is always
+    // the freshly-created, guaranteed-writable mkdtemp dir instead of an arbitrary ancestor of cwd.
+    const outputFolder = relative(process.cwd(), join(baseDir, 'escape'));
     const resolvedOutputFolder = resolve(outputFolder);
 
     try {
@@ -23,7 +26,7 @@ test('should allow outputFolder paths outside cwd when the filename stays contai
         expect(pages).toHaveLength(1);
         expect(pages[0].path).toBe(resolve(resolvedOutputFolder, 'allowed.png'));
     } finally {
-        await fsPromises.rm(resolvedOutputFolder, { recursive: true, force: true });
+        await fsPromises.rm(baseDir, { recursive: true, force: true });
     }
 });
 
