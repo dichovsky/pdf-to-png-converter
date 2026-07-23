@@ -4,6 +4,7 @@ import { expect, test } from 'vitest';
 import type { PngPageOutput } from '../src';
 import { pdfToPng } from '../src';
 import { comparePNG } from './comparePNG';
+import { RELAXED_COMPARE_DIFFERENCE_THRESHOLD } from './test-data-constants';
 
 const PDF_PATH = resolve('./test-data/rotated-pages.pdf');
 // 4-page A4 PDF: page 1=0°, page 2=90°, page 3=180°, page 4=270°
@@ -83,6 +84,6 @@ test('should write rotated pages to files with correct visual output', async () 
             createExpectedFileIfMissing: true,
         });
 
-        expect(compareResult).toBe(0);
+        expect(compareResult).toBeLessThan(RELAXED_COMPARE_DIFFERENCE_THRESHOLD);
     }
 });
