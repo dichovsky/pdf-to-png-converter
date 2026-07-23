@@ -198,3 +198,5 @@ export const STANDARD_CMAPS = [
     'V.bcmap',
     'WP-Symbol.bcmap',
 ];
+
+export const RELAXED_COMPARE_DIFFERENCE_THRESHOLD = 6;

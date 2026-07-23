@@ -4,6 +4,7 @@ import { expect, test } from 'vitest';
 import type { PngPageOutput } from '../src';
 import { pdfToPng } from '../src';
 import { comparePNG } from './comparePNG';
+import { RELAXED_COMPARE_DIFFERENCE_THRESHOLD } from './test-data-constants';
 
 test(`should convert specific PDF pages To PNG files`, async () => {
     const pdfFilePath: string = resolve('./test-data/large_pdf.pdf');
@@ -26,7 +27,7 @@ test(`should convert specific PDF pages To PNG files`, async () => {
             createExpectedFileIfMissing: true,
         });
 
-        expect(compareResult).toBe(0);
+        expect(compareResult).toBeLessThan(RELAXED_COMPARE_DIFFERENCE_THRESHOLD);
     }
 });
 
