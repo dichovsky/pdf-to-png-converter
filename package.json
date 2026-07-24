@@ -47,6 +47,7 @@
         "prebuild": "npm run clean",
         "build": "tsc --pretty --project tsconfig.prod.json",
         "build:strict": "tsc --project tsconfig.strict.json",
+        "bench": "npm run build && ts-node scripts/benchmark.ts",
         "build:test": "tsc --pretty --noEmit --project tsconfig.json",
         "clean": "rimraf ./out ./test-results",
         "codemap": "ts-node scripts/generate-codemap.ts",

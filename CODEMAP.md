@@ -10,7 +10,7 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
     "name": "pdf-to-png-converter",
     "version": "4.1.1"
   },
-  "sourceHash": "a2c56ce791ede7f2f33264dcba9e4244e5c37627c4df033c43d9db85fec362d2",
+  "sourceHash": "c08a02effbdea3abf2652edbd2f60447106d1c982a09ae07c2bad46b8bbcf486",
   "entrypoints": [
     "src/index.ts"
   ],
@@ -235,30 +235,37 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
           "signature": "export const MAX_CONCURRENCY_LIMIT = 16"
         },
         {
+          "name": "SEQUENTIAL_PIPELINE_WINDOW",
+          "kind": "variable",
+          "line": 41,
+          "exported": true,
+          "signature": "export const SEQUENTIAL_PIPELINE_WINDOW = 2"
+        },
+        {
           "name": "PDF_TO_PNG_OPTIONS_DEFAULTS",
           "kind": "variable",
-          "line": 39,
+          "line": 47,
           "exported": true,
           "signature": "export const PDF_TO_PNG_OPTIONS_DEFAULTS = { viewportScale: 1, disableFontFace: true, useSystemFonts: false, enableXfa: true, outputFileMask: 'buffer', pdfFilePassword: undefined, concurrencyLimit: 4,…"
         },
         {
           "name": "CMAP_RELATIVE_URL",
           "kind": "variable",
-          "line": 58,
+          "line": 66,
           "exported": true,
           "signature": "export const CMAP_RELATIVE_URL = './node_modules/pdfjs-dist/cmaps/'"
         },
         {
           "name": "STANDARD_FONTS_RELATIVE_URL",
           "kind": "variable",
-          "line": 59,
+          "line": 67,
           "exported": true,
           "signature": "export const STANDARD_FONTS_RELATIVE_URL = './node_modules/pdfjs-dist/standard_fonts/'"
         },
         {
           "name": "DOCUMENT_INIT_PARAMS_DEFAULTS",
           "kind": "variable",
-          "line": 71,
+          "line": 79,
           "exported": true,
           "signature": "export const DOCUMENT_INIT_PARAMS_DEFAULTS: DocumentInitParameters = { cMapUrl: CMAP_RELATIVE_URL, cMapPacked: true, standardFontDataUrl: STANDARD_FONTS_RELATIVE_URL, }"
         }
@@ -719,56 +726,56 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
         {
           "name": "CanvasFactory",
           "kind": "interface",
-          "line": 14,
+          "line": 15,
           "exported": false,
           "signature": "interface CanvasFactory { create(width: number, height: number): CanvasAndContext; destroy(canvasAndContext: CanvasAndContext): void; }"
         },
         {
           "name": "isCanvasFactory",
           "kind": "function",
-          "line": 25,
+          "line": 26,
           "exported": false,
           "signature": "function isCanvasFactory(factory: unknown): factory is CanvasFactory"
         },
         {
           "name": "toPixelDimension",
           "kind": "function",
-          "line": 46,
+          "line": 47,
           "exported": true,
           "signature": "export function toPixelDimension(viewportLength: number): number"
         },
         {
           "name": "nonRenderableDimensionsError",
           "kind": "function",
-          "line": 60,
+          "line": 61,
           "exported": true,
           "signature": "export function nonRenderableDimensionsError(width: number, height: number): Error"
         },
         {
           "name": "canvasPixelLimitError",
           "kind": "function",
-          "line": 79,
+          "line": 80,
           "exported": true,
           "signature": "export function canvasPixelLimitError(canvasWidth: number, canvasHeight: number): Error"
         },
         {
           "name": "normalizeRotation",
           "kind": "function",
-          "line": 89,
+          "line": 90,
           "exported": true,
           "signature": "export function normalizeRotation(raw: number): PageRotation"
         },
         {
           "name": "getPageMetadata",
           "kind": "function",
-          "line": 105,
+          "line": 106,
           "exported": true,
           "signature": "export async function getPageMetadata( pdf: PDFDocumentProxy, pageName: string, pageNumber: number, pageViewportScale: number, ): Promise<MetadataPngPageOutput>"
         },
         {
           "name": "renderPdfPage",
           "kind": "function",
-          "line": 140,
+          "line": 141,
           "exported": true,
           "signature": "export async function renderPdfPage( pdf: PDFDocumentProxy, pageName: string, pageNumber: number, pageViewportScale: number, returnPageContent: boolean, ): Promise<InMemoryPngPageOutput>"
         }
@@ -889,7 +896,8 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
         {
           "from": "./const.js",
           "names": [
-            "PDF_TO_PNG_OPTIONS_DEFAULTS"
+            "PDF_TO_PNG_OPTIONS_DEFAULTS",
+            "SEQUENTIAL_PIPELINE_WINDOW"
           ]
         },
         {

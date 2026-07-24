@@ -33,6 +33,14 @@ export const MAX_INPUT_BYTES = 256 * 1024 * 1024;
 export const MAX_CONCURRENCY_LIMIT = 16;
 
 /**
+ * Sliding-window size used for sequential (non-parallel) conversions. A window of 2 lets the
+ * off-thread PNG encode and disk write of page N overlap the main-thread render of page N+1,
+ * while keeping at most one extra canvas alive. Result order is preserved by the window helper;
+ * rendered pixels are unaffected.
+ */
+export const SEQUENTIAL_PIPELINE_WINDOW = 2;
+
+/**
  * Default values applied to `PdfToPngOptions` fields that are not explicitly set by the caller.
  * These are also used as the source of truth for documented defaults in JSDoc comments on the type.
  */

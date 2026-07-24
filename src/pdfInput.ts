@@ -26,6 +26,16 @@ export async function getPdfFileBuffer(
             return buffer;
         }
         if (Buffer.isBuffer(buffer)) {
+            // Zero-copy handoff. This Buffer was freshly allocated by readFile and is never
+            // exposed to the caller, so pdfjs may safely transfer (detach) its underlying
+            // ArrayBuffer — unlike the caller-owned branches below, no defensive copy is needed.
+            // readFile allocates non-pooled memory today; the full-span guard protects against
+            // any future pooled allocation whose ArrayBuffer is shared with unrelated data.
+            // Empty (or detached, byteLength 0) buffers take the copy path so pdfjs raises its
+            // clear "empty PDF" error instead of an opaque constructor TypeError.
+            if (buffer.byteLength > 0 && buffer.byteOffset === 0 && buffer.byteLength === buffer.buffer.byteLength) {
+                return new Uint8Array(buffer.buffer);
+            }
             return new Uint8Array(buffer);
         }
         throw new Error(`Unsupported buffer type: ${Object.prototype.toString.call(buffer)}`);

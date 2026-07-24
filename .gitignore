@@ -112,3 +112,4 @@ dist
 # IntelliJ IDEA files
 .idea
 *.iml
+bench-results

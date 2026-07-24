@@ -213,7 +213,7 @@ describe('pdfToPng', () => {
 
     it('passes the exact object returned by create() into destroy() so pdf.js-internal fields survive', async () => {
         const created = {
-            canvas: { toBuffer: vi.fn().mockReturnValue(Buffer.alloc(1)) },
+            canvas: { encode: vi.fn().mockResolvedValue(Buffer.alloc(1)) },
             context: {},
             // A field pdf.js may attach for its own cleanup; it must survive the round-trip.
             _pdfjsInternal: Symbol('internal'),
@@ -248,7 +248,7 @@ describe('pdfToPng', () => {
     it('should throw when outputFolder directory resolves outside outputFolder via symlink (symlink escape on dirname)', async () => {
         // Simulates a symlink swap: the filename is safe-looking but realpath(dirname(file))
         // resolves to a path outside realOutputFolder — L458 in savePNGfile.
-        const mockCanvas = { toBuffer: vi.fn().mockReturnValue(Buffer.alloc(0)) };
+        const mockCanvas = { encode: vi.fn().mockResolvedValue(Buffer.alloc(0)) };
         const mockCanvasFactory = {
             create: vi.fn().mockReturnValue({ canvas: mockCanvas, context: {} }),
             destroy: vi.fn(),
@@ -283,9 +283,9 @@ describe('pdfToPng', () => {
     });
 
     it('should throw when content is undefined at write time (defensive guard)', async () => {
-        // Simulates canvas.toBuffer() returning undefined (e.g. broken canvas implementation).
+        // Simulates canvas.encode() resolving to undefined (e.g. broken canvas implementation).
         // Guards L463: the savePNGfile defensive check that content must not be undefined.
-        const mockCanvas = { toBuffer: vi.fn().mockReturnValue(undefined) };
+        const mockCanvas = { encode: vi.fn().mockResolvedValue(undefined) };
         const mockCanvasFactory = {
             create: vi.fn().mockReturnValue({ canvas: mockCanvas, context: {} }),
             destroy: vi.fn(),
@@ -320,7 +320,7 @@ describe('pdfToPng', () => {
     it('should throw when output folder realpath changes between initial check and final write', async () => {
         // Simulate a TOCTOU swap: realpath returns the same value for the initial containment
         // checks (passes), then a different value for the final re-verification (triggers error).
-        const mockCanvas = { toBuffer: vi.fn().mockReturnValue(Buffer.alloc(0)) };
+        const mockCanvas = { encode: vi.fn().mockResolvedValue(Buffer.alloc(0)) };
         const mockCanvasFactory = {
             create: vi.fn().mockReturnValue({ canvas: mockCanvas, context: {} }),
             destroy: vi.fn(),
