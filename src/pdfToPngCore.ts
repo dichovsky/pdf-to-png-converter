@@ -1,7 +1,7 @@
 import { promises as fsPromises } from 'node:fs';
 import { parse, resolve } from 'node:path';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
-import { PDF_TO_PNG_OPTIONS_DEFAULTS } from './const.js';
+import { PDF_TO_PNG_OPTIONS_DEFAULTS, SEQUENTIAL_PIPELINE_WINDOW } from './const.js';
 import { FilesystemSink } from './filesystemSink.js';
 import type { PngPageOutput } from './interfaces/index.js';
 import type { OutputSink } from './interfaces/output.sink.js';
@@ -18,20 +18,20 @@ async function processPagesWithSlidingWindow<T>(
 ): Promise<T[]> {
     const results = new Array<T>(pageNumbers.length);
     let nextIndex = 0;
-    let firstError: unknown;
-    let hasError = false;
+    // Errors keyed by page index. Several in-flight pages can fail before the window drains;
+    // the error thrown afterwards is always the failing page with the LOWEST index, so the
+    // surfaced error is deterministic and matches what a strict page-order loop would report,
+    // regardless of which rejection happened to settle first.
+    const errorsByIndex = new Map<number, unknown>();
 
     async function runWorker(): Promise<void> {
-        while (!hasError && nextIndex < pageNumbers.length) {
+        while (errorsByIndex.size === 0 && nextIndex < pageNumbers.length) {
             const currentIndex = nextIndex;
             nextIndex += 1;
             try {
                 results[currentIndex] = await processPage(pageNumbers[currentIndex], currentIndex);
             } catch (error: unknown) {
-                if (!hasError) {
-                    firstError = error;
-                    hasError = true;
-                }
+                errorsByIndex.set(currentIndex, error);
             }
         }
     }
@@ -39,8 +39,8 @@ async function processPagesWithSlidingWindow<T>(
     const workerCount = Math.min(concurrencyLimit, pageNumbers.length);
     await Promise.allSettled(Array.from({ length: workerCount }, () => runWorker()));
 
-    if (hasError) {
-        throw firstError;
+    if (errorsByIndex.size > 0) {
+        throw errorsByIndex.get(Math.min(...errorsByIndex.keys()));
     }
 
     return results;
@@ -134,7 +134,6 @@ export async function pdfToPngCore(
         }
         const realOutputFolder: string | undefined =
             resolvedOutputFolder !== undefined ? await fsPromises.realpath(resolvedOutputFolder) : undefined;
-        const pngPageOutputs: PngPageOutput[] = [];
 
         const outputSink: OutputSink | undefined =
             resolvedOutputFolder !== undefined && realOutputFolder !== undefined
@@ -144,17 +143,15 @@ export async function pdfToPngCore(
         const processPage = async (pageNumber: number, index: number): Promise<PngPageOutput> =>
             await processAndSavePage(pdfDocument, resolvedNames[index], pageNumber, pageViewportScale, pageMode);
 
-        if (normalizedProps.processPagesInParallel === true) {
-            pngPageOutputs.push(
-                ...(await processPagesWithSlidingWindow(validPagesToProcess, normalizedProps.concurrencyLimit, processPage)),
-            );
-        } else {
-            for (const [index, pageNumber] of validPagesToProcess.entries()) {
-                pngPageOutputs.push(await processPage(pageNumber, index));
-            }
-        }
-
-        return pngPageOutputs;
+        // Sequential mode also runs through the sliding window, with a fixed window of 2: up to
+        // two pages are in flight, so page N's PNG encode (libuv threadpool) and disk write
+        // overlap page N+1's render on the JS thread. Result order and rendered pixels are
+        // identical to a strict one-at-a-time loop; side effects (disk writes) may complete out
+        // of page order, and at most one extra canvas is alive at a time.
+        const windowSize = normalizedProps.processPagesInParallel === true ? normalizedProps.concurrencyLimit : SEQUENTIAL_PIPELINE_WINDOW;
+        // Returned directly (not spread into push(...)) — spreading a huge result array into one
+        // call exceeds V8's argument-count cap and crashes on very large page counts.
+        return await processPagesWithSlidingWindow(validPagesToProcess, windowSize, processPage);
     } finally {
         await pdfDocument.loadingTask.destroy();
     }

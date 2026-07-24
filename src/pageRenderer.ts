@@ -9,7 +9,8 @@ import type { CanvasAndContext, InMemoryPngPageOutput, MetadataPngPageOutput, Pa
  * `create` / `destroy` slice we use. At runtime this is pdf.js's built-in Node canvas factory,
  * which is backed by `@napi-rs/canvas` (pdf.js's own optional dependency, kept as a direct
  * dependency of this package so it is always present). The produced `Canvas` therefore exposes
- * `toBuffer('image/png')`.
+ * the native Skia PNG encoders: the async `encode('png')` used by the render path and its
+ * synchronous twin `toBuffer('image/png')`.
  */
 interface CanvasFactory {
     create(width: number, height: number): CanvasAndContext;
@@ -180,7 +181,11 @@ export async function renderPdfPage(
             kind: 'content',
             pageNumber,
             name: pageName,
-            content: returnPageContent ? canvas.toBuffer('image/png') : undefined,
+            // Async encode() runs on the libuv threadpool (byte-identical to the synchronous
+            // toBuffer — same native Skia encoder) so the JS thread is free to render another
+            // page while this one compresses. The await sits inside the try block, so the
+            // finally's canvasFactory.destroy() cannot run until encoding has finished.
+            content: returnPageContent ? await canvas.encode('png') : undefined,
             path: '',
             width: canvasWidth,
             height: canvasHeight,
