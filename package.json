@@ -66,7 +66,7 @@
         "test": "vitest run --coverage",
         "test:docker": "npm run clean && npm run docker:build && npm run docker:run",
         "test:fast": "vitest run --reporter=dot --no-coverage",
-        "test:license": "license-checker --production --onlyAllow \"ISC; MIT; MIT OR X11; BSD; Apache-2.0; Unlicense\""
+        "test:license": "license-checker-rseidelsohn --production --onlyAllow \"ISC; MIT; MIT OR X11; BSD; Apache-2.0; Unlicense\""
     },
     "lint-staged": {
         "src/**/*.ts": [
@@ -89,7 +89,7 @@
         "@vitest/coverage-v8": "^4.1.10",
         "eslint": "^10.7.0",
         "husky": "^9.1.7",
-        "license-checker": "^25.0.1",
+        "license-checker-rseidelsohn": "^5.0.1",
         "lint-staged": "^17.2.0",
         "png-visual-compare": "^6.2.0",
         "prettier": "^3.9.6",
@@ -99,10 +99,7 @@
         "vitest": "^4.1.10"
     },
     "overrides": {
-        "brace-expansion": "^1.1.16"
-    },
-    "overrides": {
-        "brace-expansion": "^1.1.16"
+        "brace-expansion": "^5.0.8"
     },
     "packageManager": "npm@11.13.0",
     "engines": {
