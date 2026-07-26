@@ -41,6 +41,7 @@ A high-performance Node.js library for converting PDF files and buffers to PNG i
 - [CLI Usage](#cli-usage)
 - [API Reference](#api-reference)
 - [Examples](#examples)
+- [Performance Notes](#performance-notes)
 - [Output Format](#output-format)
 - [Migration Guide](#migration-guide)
 - [Project Links](#project-links)
@@ -297,6 +298,14 @@ pages.forEach((page) => {
 ```
 
 This is significantly faster than full rendering and useful for checking page counts, dimensions, or orientation before deciding how to process a document.
+
+---
+
+## Performance Notes
+
+- **Pipelined processing.** PNG encoding runs on the libuv threadpool and overlaps page rendering, so files may finish writing out of page order even in default (non-parallel) mode. Always consume results via the resolved, page-ordered array rather than directory-watch order.
+- **Threadpool sizing.** PNG encodes and disk writes share Node's libuv threadpool (4 threads by default). For parallel file-output workloads on many-core machines, raising it can help: `UV_THREADPOOL_SIZE=8 node app.js`.
+- **Strict serial processing.** If you need exactly one page in flight at a time (minimal memory, strict on-disk ordering), use `processPagesInParallel: true` with `concurrencyLimit: 1` — a sliding window of exactly one page.
 
 ---
 
