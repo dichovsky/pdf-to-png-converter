@@ -31,7 +31,7 @@ Published to npm as `pdf-to-png-converter`. Entry: `out/index.js`, types: `out/i
 
 **Single validation boundary:** `normalizePdfToPngOptions` produces `NormalizedPdfToPngOptions`, which is consumed by `pdfToPngCore`, `getPdfDocument`, and `propsToPdfDocInitParams`. No downstream module re-applies `??` defaults — all defaulting happens in the normalizer.
 
-**Concurrency:** all conversions run through a sliding window (`processPagesWithSlidingWindow` in `src/pdfToPngCore.ts`). Parallel mode (`processPagesInParallel: true`) uses a window of `concurrencyLimit` (default 4); sequential (default) uses a fixed window of 2 (`SEQUENTIAL_PIPELINE_WINDOW`) so the off-thread PNG encode (async `canvas.encode('png')` on the libuv threadpool) and disk write of page N overlap the render of page N+1. Output order is preserved in both modes.
+**Concurrency:** all conversions run through a sliding window (`processPagesWithSlidingWindow` in `src/pdfToPngCore.ts`). Parallel mode (`processPagesInParallel: true`) uses a window of `concurrencyLimit` (default 4); sequential (default) uses a fixed window of 3 (`SEQUENTIAL_PIPELINE_WINDOW`, sized by paired A/B measurement — encode ≈ 2× render on text docs; the bump is worth ~2–5%) so the off-thread PNG encodes (async `canvas.encode('png')` on the libuv threadpool) and disk writes of finished pages overlap the next page's render. Output order is preserved in both modes.
 
 **`outputFolder` + `returnPageContent` + `returnMetadataOnly` interaction:**
 

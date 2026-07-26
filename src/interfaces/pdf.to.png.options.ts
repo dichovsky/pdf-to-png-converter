@@ -112,11 +112,11 @@ export interface PdfToPngOptions {
      * When `true`, selected pages are rendered concurrently through a sliding-window scheduler
      * that keeps up to `concurrencyLimit` pages active. When `false`, pages are processed in
      * a lightly pipelined sequence: results are always returned in page order, but the PNG
-     * encoding and disk write of page N may overlap the rendering of page N+1 (at most two
-     * pages in flight), so files may finish writing out of page order and, when a page fails,
-     * the page already in flight still completes before the returned promise rejects.
+     * encoding and disk writes of finished pages may overlap the rendering of the next page
+     * (at most three pages in flight), so files may finish writing out of page order and, when
+     * a page fails, pages already in flight still complete before the returned promise rejects.
      * Consume output via the resolved `PngPageOutput[]` (ordered) rather than directory-watch order.
-     * Peak canvas memory in this mode is up to two live canvases; for strict one-page-at-a-time
+     * Peak canvas memory in this mode is up to three live canvases; for strict one-page-at-a-time
      * processing with a single live canvas, set `processPagesInParallel: true` with
      * `concurrencyLimit: 1` (a sliding window of exactly one page).
      * Default: `false`.

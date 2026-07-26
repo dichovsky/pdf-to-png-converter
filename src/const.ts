@@ -33,12 +33,17 @@ export const MAX_INPUT_BYTES = 256 * 1024 * 1024;
 export const MAX_CONCURRENCY_LIMIT = 16;
 
 /**
- * Sliding-window size used for sequential (non-parallel) conversions. A window of 2 lets the
- * off-thread PNG encode and disk write of page N overlap the main-thread render of page N+1,
- * while keeping at most one extra canvas alive. Result order is preserved by the window helper;
- * rendered pixels are unaffected.
+ * Sliding-window size used for sequential (non-parallel) conversions. The window lets the
+ * off-thread PNG encode and disk write of finished pages overlap the main-thread render of the
+ * next page. Result order is preserved by the window helper; rendered pixels are unaffected.
+ *
+ * Sized 3 by paired A/B measurement: on text-heavy documents PNG encode costs ~2× render, and a
+ * second in-flight encode recovers a small but consistent margin (TAMReview.pdf: −2…−5% median
+ * end-to-end vs window 2 in interleaved trials, faster in 3 of 4 pairs; larger single-run
+ * differences did not replicate under controlled re-measurement). Window 4 measured within
+ * noise of 3. Peak cost: up to three live canvases.
  */
-export const SEQUENTIAL_PIPELINE_WINDOW = 2;
+export const SEQUENTIAL_PIPELINE_WINDOW = 3;
 
 /**
  * Default values applied to `PdfToPngOptions` fields that are not explicitly set by the caller.

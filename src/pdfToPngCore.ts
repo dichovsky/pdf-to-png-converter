@@ -143,11 +143,11 @@ export async function pdfToPngCore(
         const processPage = async (pageNumber: number, index: number): Promise<PngPageOutput> =>
             await processAndSavePage(pdfDocument, resolvedNames[index], pageNumber, pageViewportScale, pageMode);
 
-        // Sequential mode also runs through the sliding window, with a fixed window of 2: up to
-        // two pages are in flight, so page N's PNG encode (libuv threadpool) and disk write
-        // overlap page N+1's render on the JS thread. Result order and rendered pixels are
-        // identical to a strict one-at-a-time loop; side effects (disk writes) may complete out
-        // of page order, and at most one extra canvas is alive at a time.
+        // Sequential mode also runs through the sliding window, with a fixed window of
+        // SEQUENTIAL_PIPELINE_WINDOW (3): the PNG encodes (libuv threadpool) and disk writes of
+        // finished pages overlap the next page's render on the JS thread. Result order and
+        // rendered pixels are identical to a strict one-at-a-time loop; side effects (disk
+        // writes) may complete out of page order, and up to three canvases are alive at a time.
         const windowSize = normalizedProps.processPagesInParallel === true ? normalizedProps.concurrencyLimit : SEQUENTIAL_PIPELINE_WINDOW;
         // Returned directly (not spread into push(...)) — spreading a huge result array into one
         // call exceeds V8's argument-count cap and crashes on very large page counts.
