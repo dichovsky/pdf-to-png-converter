@@ -10,7 +10,7 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
     "name": "pdf-to-png-converter",
     "version": "4.1.1"
   },
-  "sourceHash": "c08a02effbdea3abf2652edbd2f60447106d1c982a09ae07c2bad46b8bbcf486",
+  "sourceHash": "e1652ed20183c632529a999d894636195eb21b2ba77f476fda7275e9ad9adccf",
   "entrypoints": [
     "src/index.ts"
   ],
@@ -237,35 +237,35 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
         {
           "name": "SEQUENTIAL_PIPELINE_WINDOW",
           "kind": "variable",
-          "line": 41,
+          "line": 45,
           "exported": true,
-          "signature": "export const SEQUENTIAL_PIPELINE_WINDOW = 2"
+          "signature": "export const SEQUENTIAL_PIPELINE_WINDOW = 3"
         },
         {
           "name": "PDF_TO_PNG_OPTIONS_DEFAULTS",
           "kind": "variable",
-          "line": 47,
+          "line": 51,
           "exported": true,
           "signature": "export const PDF_TO_PNG_OPTIONS_DEFAULTS = { viewportScale: 1, disableFontFace: true, useSystemFonts: false, enableXfa: true, outputFileMask: 'buffer', pdfFilePassword: undefined, concurrencyLimit: 4,…"
         },
         {
           "name": "CMAP_RELATIVE_URL",
           "kind": "variable",
-          "line": 66,
+          "line": 70,
           "exported": true,
           "signature": "export const CMAP_RELATIVE_URL = './node_modules/pdfjs-dist/cmaps/'"
         },
         {
           "name": "STANDARD_FONTS_RELATIVE_URL",
           "kind": "variable",
-          "line": 67,
+          "line": 71,
           "exported": true,
           "signature": "export const STANDARD_FONTS_RELATIVE_URL = './node_modules/pdfjs-dist/standard_fonts/'"
         },
         {
           "name": "DOCUMENT_INIT_PARAMS_DEFAULTS",
           "kind": "variable",
-          "line": 79,
+          "line": 83,
           "exported": true,
           "signature": "export const DOCUMENT_INIT_PARAMS_DEFAULTS: DocumentInitParameters = { cMapUrl: CMAP_RELATIVE_URL, cMapPacked: true, standardFontDataUrl: STANDARD_FONTS_RELATIVE_URL, }"
         }
@@ -586,7 +586,7 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
         {
           "name": "savePNGfile",
           "kind": "function",
-          "line": 29,
+          "line": 33,
           "exported": true,
           "signature": "export async function savePNGfile(name: string, content: Buffer, resolvedOutputFolder: string, realOutputFolder: string): Promise<string>"
         }
@@ -601,7 +601,6 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
         {
           "from": "node:path",
           "names": [
-            "dirname",
             "isAbsolute",
             "join",
             "relative",

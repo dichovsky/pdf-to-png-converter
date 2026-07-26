@@ -1,5 +1,5 @@
 import { promises as fsPromises } from 'node:fs';
-import { dirname, isAbsolute, join, relative, sep } from 'node:path';
+import { isAbsolute, join, relative, sep } from 'node:path';
 
 // Reject only characters the host OS treats as path separators. On POSIX, "\" is a valid
 // filename character (e.g. PDFs named `foo\bar.pdf` produce a default mask of `foo\bar`) so
@@ -22,7 +22,11 @@ function isEscapingRelativePath(rel: string): boolean {
  * attacker with write access to the output folder could otherwise swap a sub-directory for a
  * symlink between the realpath check and the `open()` call). The `'wx'` flag additionally
  * prevents overwriting an existing target and blocks following a pre-existing symlink at the
- * target filename on POSIX systems. Callers should clear the output folder before re-running
+ * target filename on POSIX systems. Because the filename is flat, the file's directory IS the
+ * output folder itself, so a single fresh `realpath` of the output folder immediately before
+ * `open()` — compared for exact equality with the value captured at conversion start — detects
+ * any symlink swap or rename of the folder or its ancestors in one syscall (equality is strictly
+ * stronger than a containment check). Callers should clear the output folder before re-running
  * the same conversion if they expect to reuse the same output names. The input object is not
  * mutated; callers receive the resolved path from the return value.
  */
@@ -35,13 +39,16 @@ export async function savePNGfile(name: string, content: Buffer, resolvedOutputF
         throw new Error(`Output file name escapes the output folder: ${name}`);
     }
 
-    const resolvedFilePath = join(resolvedOutputFolder, name);
-    if (isEscapingRelativePath(relative(resolvedOutputFolder, resolvedFilePath))) {
-        throw new Error(`Output file name escapes the output folder: ${name}`);
+    // '.' collapses to the output folder itself under join() (bypassing the escape checks below,
+    // since relative() yields ''), and would surface as a raw EEXIST/EISDIR from open() that
+    // leaks the absolute folder path. '..' needs no twin guard: it resolves to the PARENT folder,
+    // which the escaping-relative check below already rejects cleanly.
+    if (name === '.') {
+        throw new Error(`Output file name must be a plain filename, received: ${name}`);
     }
 
-    const realFileDir = await fsPromises.realpath(dirname(resolvedFilePath));
-    if (isEscapingRelativePath(relative(realOutputFolder, realFileDir))) {
+    const resolvedFilePath = join(resolvedOutputFolder, name);
+    if (isEscapingRelativePath(relative(resolvedOutputFolder, resolvedFilePath))) {
         throw new Error(`Output file name escapes the output folder: ${name}`);
     }
 

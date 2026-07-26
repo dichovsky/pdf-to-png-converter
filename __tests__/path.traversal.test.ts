@@ -92,6 +92,12 @@ test.runIf(isWindows)('savePNGfile should reject "\\" on Windows before any I/O'
     );
 });
 
+test('savePNGfile should reject "." before any I/O (would collapse to the output folder itself)', async () => {
+    await expect(savePNGfile('.', Buffer.alloc(0), '/tmp/does-not-matter', '/tmp/does-not-matter')).rejects.toThrow(
+        'Output file name must be a plain filename',
+    );
+});
+
 test('pdfToPng should reject outputFileMaskFunc returning a subdirectory filename', async () => {
     await fsPromises.rm(resolve(outputFolder), { recursive: true, force: true });
     await expect(
