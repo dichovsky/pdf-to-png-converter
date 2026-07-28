@@ -81,7 +81,7 @@ Releases are published to npm by `.github/workflows/publish.yml` when a GitHub R
 2. Move the `## [Unreleased]` entries in `CHANGELOG.md` into a new `## [x.y.z] — <date>` section.
 3. Run `npm run release:precheck` locally (after `npm run build`) to validate the version is unpublished, the CHANGELOG entry exists, and the tarball ships only `out/`.
 4. Merge the branch, then create a GitHub Release tagged `vx.y.z`.
-5. The workflow runs `release:precheck` → `npm publish --provenance` → `release:postcheck` (verifies the published version, the `latest` dist-tag, the provenance attestation, and a clean-install smoke test).
+5. The workflow runs `release:precheck` → `npm publish --provenance` → `release:postcheck` (verifies the published version, the `latest` dist-tag, the provenance attestation, a clean-install smoke test, and a real conversion in worker-thread mode against the installed package).
 
 ## Reporting Bugs / Security Issues
 
