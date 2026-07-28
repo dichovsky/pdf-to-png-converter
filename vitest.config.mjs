@@ -6,7 +6,9 @@ export default defineConfig({
         coverage: {
             provider: 'v8',
             include: ['src/**/*.ts'],
-            exclude: ['src/types/**/*.ts'],
+            // pageRenderWorker runs inside worker threads: the integration tests exercise it,
+            // but V8 coverage only instruments the main process, so it would always read 0%.
+            exclude: ['src/types/**/*.ts', 'src/pageRenderWorker.ts'],
             reportsDirectory: './test-results/coverage',
             thresholds: {
                 lines: 90,
