@@ -10,7 +10,7 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
     "name": "pdf-to-png-converter",
     "version": "4.1.1"
   },
-  "sourceHash": "e1652ed20183c632529a999d894636195eb21b2ba77f476fda7275e9ad9adccf",
+  "sourceHash": "ee10136526ff246b62be5a622bb4ef949d9ae041481a33eb79e213e6c586aaa3",
   "entrypoints": [
     "src/index.ts"
   ],
@@ -66,98 +66,98 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
         {
           "name": "CLI_OPTIONS",
           "kind": "variable",
-          "line": 37,
+          "line": 38,
           "exported": false,
           "signature": "const CLI_OPTIONS = { 'output-folder': { type: 'string' }, 'viewport-scale': { type: 'string' }, 'use-system-fonts': { type: 'boolean' }, 'disable-font-face': { type: 'string' }, 'enable-xfa': { type:…"
         },
         {
           "name": "ParsedValues",
           "kind": "type",
-          "line": 55,
+          "line": 57,
           "exported": false,
           "signature": "type ParsedValues = { 'output-folder'?: string; 'viewport-scale'?: string; 'use-system-fonts'?: boolean; 'disable-font-face'?: string; 'enable-xfa'?: string; 'pdf-file-password'?: string; 'pages-to-pr…"
         },
         {
           "name": "CliParseResult",
           "kind": "type",
-          "line": 73,
+          "line": 76,
           "exported": false,
           "signature": "type CliParseResult = { values: ParsedValues; positionals: string[] };"
         },
         {
           "name": "parseBoolean",
           "kind": "function",
-          "line": 84,
+          "line": 87,
           "exported": true,
           "signature": "export function parseBoolean(val: string | undefined): boolean | undefined"
         },
         {
           "name": "parseNumberList",
           "kind": "function",
-          "line": 98,
+          "line": 101,
           "exported": true,
           "signature": "export function parseNumberList(val: string | undefined): number[] | undefined"
         },
         {
           "name": "parseNumericOption",
           "kind": "function",
-          "line": 109,
+          "line": 112,
           "exported": false,
           "signature": "function parseNumericOption(value: string | undefined, errorMessage: string): number | undefined"
         },
         {
           "name": "parseIntegerOption",
           "kind": "function",
-          "line": 125,
+          "line": 128,
           "exported": false,
           "signature": "function parseIntegerOption(value: string | undefined, errorMessage: string): number | undefined"
         },
         {
           "name": "safeParseArgs",
           "kind": "function",
-          "line": 141,
+          "line": 144,
           "exported": false,
           "signature": "function safeParseArgs(): CliParseResult | null"
         },
         {
           "name": "buildPdfToPngOptions",
           "kind": "function",
-          "line": 162,
+          "line": 165,
           "exported": true,
           "signature": "export function buildPdfToPngOptions( values: ParsedValues, positionals: string[], ): { pdfFilePath: string; options: NormalizedPdfToPngOptions }"
         },
         {
           "name": "executeConversion",
           "kind": "function",
-          "line": 201,
+          "line": 205,
           "exported": true,
           "signature": "export async function executeConversion( pdfFilePath: string, options: NormalizedPdfToPngOptions, logInfo: (...msgs: unknown[]) => void, writeOutput: (...msgs: unknown[]) => void = console.log, ): Pro…"
         },
         {
           "name": "createLogger",
           "kind": "function",
-          "line": 222,
+          "line": 226,
           "exported": false,
           "signature": "function createLogger(silent: boolean | undefined): (...msgs: unknown[]) => void"
         },
         {
           "name": "handleRunError",
           "kind": "function",
-          "line": 228,
+          "line": 232,
           "exported": false,
           "signature": "function handleRunError(err: unknown): void"
         },
         {
           "name": "getVersion",
           "kind": "function",
-          "line": 247,
+          "line": 251,
           "exported": true,
           "signature": "export function getVersion(): string"
         },
         {
           "name": "run",
           "kind": "function",
-          "line": 267,
+          "line": 271,
           "exported": true,
           "signature": "export async function run(): Promise<void>"
         }
@@ -237,35 +237,35 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
         {
           "name": "SEQUENTIAL_PIPELINE_WINDOW",
           "kind": "variable",
-          "line": 45,
+          "line": 46,
           "exported": true,
           "signature": "export const SEQUENTIAL_PIPELINE_WINDOW = 3"
         },
         {
           "name": "PDF_TO_PNG_OPTIONS_DEFAULTS",
           "kind": "variable",
-          "line": 51,
+          "line": 52,
           "exported": true,
           "signature": "export const PDF_TO_PNG_OPTIONS_DEFAULTS = { viewportScale: 1, disableFontFace: true, useSystemFonts: false, enableXfa: true, outputFileMask: 'buffer', pdfFilePassword: undefined, concurrencyLimit: 4,…"
         },
         {
           "name": "CMAP_RELATIVE_URL",
           "kind": "variable",
-          "line": 70,
+          "line": 71,
           "exported": true,
           "signature": "export const CMAP_RELATIVE_URL = './node_modules/pdfjs-dist/cmaps/'"
         },
         {
           "name": "STANDARD_FONTS_RELATIVE_URL",
           "kind": "variable",
-          "line": 71,
+          "line": 72,
           "exported": true,
           "signature": "export const STANDARD_FONTS_RELATIVE_URL = './node_modules/pdfjs-dist/standard_fonts/'"
         },
         {
           "name": "DOCUMENT_INIT_PARAMS_DEFAULTS",
           "kind": "variable",
-          "line": 83,
+          "line": 84,
           "exported": true,
           "signature": "export const DOCUMENT_INIT_PARAMS_DEFAULTS: DocumentInitParameters = { cMapUrl: CMAP_RELATIVE_URL, cMapPacked: true, standardFontDataUrl: STANDARD_FONTS_RELATIVE_URL, }"
         }
@@ -495,6 +495,69 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
       "reExports": []
     },
     {
+      "path": "src/interfaces/worker.protocol.ts",
+      "symbols": [
+        {
+          "name": "WorkerDocumentOptions",
+          "kind": "interface",
+          "line": 18,
+          "exported": true,
+          "signature": "export interface WorkerDocumentOptions { viewportScale?: number; disableFontFace?: boolean; useSystemFonts?: boolean; enableXfa?: boolean; pdfFilePassword?: string; verbosityLevel?: number; }"
+        },
+        {
+          "name": "WorkerInitData",
+          "kind": "interface",
+          "line": 28,
+          "exported": true,
+          "signature": "export interface WorkerInitData { pdfBuffer: Uint8Array; documentOptions: WorkerDocumentOptions; materializeContent: boolean; }"
+        },
+        {
+          "name": "RenderPageRequest",
+          "kind": "interface",
+          "line": 36,
+          "exported": true,
+          "signature": "export interface RenderPageRequest { type: 'render'; index: number; pageNumber: number; pageName: string; }"
+        },
+        {
+          "name": "RenderedPageMessage",
+          "kind": "interface",
+          "line": 45,
+          "exported": true,
+          "signature": "export interface RenderedPageMessage { type: 'result'; index: number; pageNumber: number; name: string; width: number; height: number; rotation: PageRotation; content: Uint8Array | undefined; }"
+        },
+        {
+          "name": "RenderErrorMessage",
+          "kind": "interface",
+          "line": 62,
+          "exported": true,
+          "signature": "export interface RenderErrorMessage { type: 'render-error'; index: number; error: unknown; }"
+        },
+        {
+          "name": "FatalErrorMessage",
+          "kind": "interface",
+          "line": 69,
+          "exported": true,
+          "signature": "export interface FatalErrorMessage { type: 'fatal'; error: unknown; }"
+        },
+        {
+          "name": "WorkerResponse",
+          "kind": "type",
+          "line": 74,
+          "exported": true,
+          "signature": "export type WorkerResponse = RenderedPageMessage | RenderErrorMessage | FatalErrorMessage;"
+        }
+      ],
+      "imports": [
+        {
+          "from": "./index.js",
+          "names": [
+            "PageRotation"
+          ]
+        }
+      ],
+      "reExports": []
+    },
+    {
       "path": "src/normalizePath.ts",
       "symbols": [
         {
@@ -530,7 +593,7 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
         {
           "name": "normalizePdfToPngOptions",
           "kind": "function",
-          "line": 22,
+          "line": 23,
           "exported": true,
           "signature": "export function normalizePdfToPngOptions(props: PdfToPngOptions | undefined): NormalizedPdfToPngOptions"
         }
@@ -648,37 +711,58 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
       "path": "src/pageOrchestrator.ts",
       "symbols": [
         {
+          "name": "RenderedPageMode",
+          "kind": "type",
+          "line": 8,
+          "exported": true,
+          "signature": "export type RenderedPageMode = Exclude<PageMode, { kind: 'metadata' }>;"
+        },
+        {
           "name": "PATH_SEPARATOR_PATTERN",
           "kind": "variable",
-          "line": 11,
+          "line": 14,
           "exported": false,
           "signature": "const PATH_SEPARATOR_PATTERN = sep === '\\\\' ? /[\\\\/]/ : /\\"
         },
         {
           "name": "SEPARATOR_DESCRIPTION",
           "kind": "variable",
-          "line": 12,
+          "line": 15,
           "exported": false,
           "signature": "const SEPARATOR_DESCRIPTION = sep === '\\\\' ? '\"/\" or \"\\\\\"' : '\"/\"'"
         },
         {
           "name": "assertFlatFilename",
           "kind": "function",
-          "line": 14,
+          "line": 17,
           "exported": false,
           "signature": "function assertFlatFilename(name: string, pageNumber: number): void"
         },
         {
           "name": "resolvePageName",
           "kind": "function",
-          "line": 22,
+          "line": 25,
           "exported": true,
           "signature": "export function resolvePageName( pageNumber: number, defaultMask: string, outputFileMaskFunc: ((page: number) => string) | undefined, ): string"
         },
         {
+          "name": "finalizePageOutput",
+          "kind": "function",
+          "line": 58,
+          "exported": true,
+          "signature": "export async function finalizePageOutput(pageOutput: InMemoryPngPageOutput, mode: RenderedPageMode): Promise<PngPageOutput>"
+        },
+        {
+          "name": "shouldMaterializeContent",
+          "kind": "function",
+          "line": 80,
+          "exported": true,
+          "signature": "export function shouldMaterializeContent(mode: RenderedPageMode): boolean"
+        },
+        {
           "name": "processAndSavePage",
           "kind": "function",
-          "line": 48,
+          "line": 84,
           "exported": true,
           "signature": "export async function processAndSavePage( pdfDocument: PDFDocumentProxy, pageName: string, pageNumber: number, pageViewportScale: number, mode: PageMode, ): Promise<PngPageOutput>"
         }
@@ -688,6 +772,7 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
           "from": "./interfaces/index.js",
           "names": [
             "FilePngPageOutput",
+            "InMemoryPngPageOutput",
             "PngPageOutput"
           ]
         },
@@ -708,6 +793,95 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
           "from": "node:path",
           "names": [
             "sep"
+          ]
+        },
+        {
+          "from": "pdfjs-dist",
+          "names": [
+            "PDFDocumentProxy"
+          ]
+        }
+      ],
+      "reExports": []
+    },
+    {
+      "path": "src/pageRenderWorker.ts",
+      "symbols": [
+        {
+          "name": "port",
+          "kind": "variable",
+          "line": 23,
+          "exported": false,
+          "signature": "const port = parentPort"
+        },
+        {
+          "name": "init",
+          "kind": "variable",
+          "line": 24,
+          "exported": false,
+          "signature": "const init = workerData as WorkerInitData"
+        },
+        {
+          "name": "normalizedOptions",
+          "kind": "variable",
+          "line": 28,
+          "exported": false,
+          "signature": "const normalizedOptions = normalizePdfToPngOptions(init.documentOptions)"
+        },
+        {
+          "name": "documentPromise",
+          "kind": "variable",
+          "line": 30,
+          "exported": false,
+          "signature": "let documentPromise: Promise<PDFDocumentProxy> | undefined"
+        },
+        {
+          "name": "postErrorResponse",
+          "kind": "function",
+          "line": 37,
+          "exported": false,
+          "signature": "function postErrorResponse(build: (error: unknown) => WorkerResponse, error: unknown): void"
+        },
+        {
+          "name": "handleRender",
+          "kind": "function",
+          "line": 45,
+          "exported": false,
+          "signature": "async function handleRender(request: RenderPageRequest): Promise<void>"
+        }
+      ],
+      "imports": [
+        {
+          "from": "./interfaces/worker.protocol.js",
+          "names": [
+            "RenderPageRequest",
+            "WorkerInitData",
+            "WorkerResponse"
+          ]
+        },
+        {
+          "from": "./normalizePdfToPngOptions.js",
+          "names": [
+            "normalizePdfToPngOptions"
+          ]
+        },
+        {
+          "from": "./pageRenderer.js",
+          "names": [
+            "renderPdfPage"
+          ]
+        },
+        {
+          "from": "./pdfjsLoader.js",
+          "names": [
+            "getPdfDocument"
+          ]
+        },
+        {
+          "from": "node:worker_threads",
+          "names": [
+            "parentPort",
+            "workerData"
           ]
         },
         {
@@ -872,21 +1046,21 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
         {
           "name": "processPagesWithSlidingWindow",
           "kind": "function",
-          "line": 14,
+          "line": 17,
           "exported": false,
           "signature": "async function processPagesWithSlidingWindow<T>( pageNumbers: number[], concurrencyLimit: number, processPage: (pageNumber: number, index: number) => Promise<T>, ): Promise<T[]>"
         },
         {
           "name": "findDuplicateOutputName",
           "kind": "function",
-          "line": 68,
+          "line": 71,
           "exported": false,
           "signature": "function findDuplicateOutputName(names: string[], pageNumbers: number[]): { name: string; pages: number[] } | undefined"
         },
         {
           "name": "pdfToPngCore",
           "kind": "function",
-          "line": 96,
+          "line": 99,
           "exported": true,
           "signature": "export async function pdfToPngCore( pdfFile: string | ArrayBufferLike | Uint8Array, normalizedProps: NormalizedPdfToPngOptions, ): Promise<PngPageOutput[]>"
         }
@@ -908,6 +1082,7 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
         {
           "from": "./interfaces/index.js",
           "names": [
+            "InMemoryPngPageOutput",
             "PngPageOutput"
           ]
         },
@@ -915,6 +1090,12 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
           "from": "./interfaces/output.sink.js",
           "names": [
             "OutputSink"
+          ]
+        },
+        {
+          "from": "./interfaces/worker.protocol.js",
+          "names": [
+            "WorkerDocumentOptions"
           ]
         },
         {
@@ -932,8 +1113,10 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
         {
           "from": "./pageOrchestrator.js",
           "names": [
+            "finalizePageOutput",
             "processAndSavePage",
-            "resolvePageName"
+            "resolvePageName",
+            "shouldMaterializeContent"
           ]
         },
         {
@@ -946,6 +1129,18 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
           "from": "./pdfjsLoader.js",
           "names": [
             "getPdfDocument"
+          ]
+        },
+        {
+          "from": "./workerPool.js",
+          "names": [
+            "WorkerPageTask"
+          ]
+        },
+        {
+          "from": "./workerPool.js",
+          "names": [
+            "renderPagesInWorkerPool"
           ]
         },
         {
@@ -1082,6 +1277,75 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
         }
       ],
       "imports": [],
+      "reExports": []
+    },
+    {
+      "path": "src/workerPool.ts",
+      "symbols": [
+        {
+          "name": "WorkerPageTask",
+          "kind": "interface",
+          "line": 8,
+          "exported": true,
+          "signature": "export interface WorkerPageTask { index: number; pageNumber: number; pageName: string; }"
+        },
+        {
+          "name": "WorkerRenderedPage",
+          "kind": "interface",
+          "line": 15,
+          "exported": true,
+          "signature": "export interface WorkerRenderedPage { pageNumber: number; name: string; width: number; height: number; rotation: PageRotation; content: Buffer | undefined; }"
+        },
+        {
+          "name": "resolveWorkerEntryPath",
+          "kind": "function",
+          "line": 30,
+          "exported": false,
+          "signature": "function resolveWorkerEntryPath(): string"
+        },
+        {
+          "name": "renderPagesInWorkerPool",
+          "kind": "function",
+          "line": 57,
+          "exported": true,
+          "signature": "export async function renderPagesInWorkerPool( pdfBuffer: Uint8Array, documentOptions: WorkerDocumentOptions, materializeContent: boolean, tasks: WorkerPageTask[], poolSize: number, onPageRendered: (i…"
+        }
+      ],
+      "imports": [
+        {
+          "from": "./interfaces/index.js",
+          "names": [
+            "PageRotation"
+          ]
+        },
+        {
+          "from": "./interfaces/worker.protocol.js",
+          "names": [
+            "RenderPageRequest",
+            "WorkerDocumentOptions",
+            "WorkerInitData",
+            "WorkerResponse"
+          ]
+        },
+        {
+          "from": "node:fs",
+          "names": [
+            "existsSync"
+          ]
+        },
+        {
+          "from": "node:path",
+          "names": [
+            "join"
+          ]
+        },
+        {
+          "from": "node:worker_threads",
+          "names": [
+            "Worker"
+          ]
+        }
+      ],
       "reExports": []
     }
   ]

@@ -178,8 +178,13 @@ Converts PDF pages to PNG images.
     pagesToProcess?: number[],       // 1-indexed integer pages to convert (e.g., [1, 3, 5])
                                     // Non-integer and <= 0 values throw; pages beyond the PDF length are ignored
     processPagesInParallel?: boolean, // Enable parallel processing (default: false)
-    concurrencyLimit?: number,       // Max concurrent pages when parallel: integer 1..16 (default: 4)
-                                     // The upper bound caps peak in-flight canvas memory at ~6.4 GiB.
+    concurrencyLimit?: number,       // Max concurrent pages (parallel) / worker-pool size (worker
+                                     // threads): integer 1..16 (default: 4). The upper bound caps
+                                     // peak in-flight canvas memory at ~6.4 GiB.
+    renderInWorkerThreads?: boolean, // Rasterize pages in a pool of worker threads (default: false)
+                                     // True multi-core parallelism (pool size = concurrencyLimit); each
+                                     // worker loads its own document copy. Pays off on multi-page,
+                                     // render-heavy PDFs; identical pixels, ordered results.
 
     // Output Control
     returnPageContent?: boolean,     // Include PNG buffer in output (default: true)
@@ -306,6 +311,7 @@ This is significantly faster than full rendering and useful for checking page co
 - **Pipelined processing.** PNG encoding runs on the libuv threadpool and overlaps page rendering, so files may finish writing out of page order even in default (non-parallel) mode. Always consume results via the resolved, page-ordered array rather than directory-watch order.
 - **Threadpool sizing.** PNG encodes and disk writes share Node's libuv threadpool (4 threads by default). For parallel file-output workloads on many-core machines, raising it can help: `UV_THREADPOOL_SIZE=8 node app.js`.
 - **Strict serial processing.** If you need exactly one page in flight at a time (minimal memory, strict on-disk ordering), use `processPagesInParallel: true` with `concurrencyLimit: 1` — a sliding window of exactly one page.
+- **Multi-core rendering.** `processPagesInParallel` interleaves pages on one thread — rasterization itself never runs in parallel. For CPU-bound documents (large embedded images, complex vector art), `renderInWorkerThreads: true` rasterizes pages in a pool of worker threads instead (measured ~3× end-to-end on a 12-page image-heavy document with the default pool of 4). Cost: one PDF copy + one pdf.js instance of memory per worker, plus one extra copy of the PDF retained on the main thread for the duration of the conversion, and a few hundred ms of pool startup per conversion — so prefer it for multi-page, render-heavy work rather than small documents.
 
 ---
 
