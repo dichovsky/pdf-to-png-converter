@@ -150,10 +150,14 @@ function checkUnreleasedIsEmpty(failures: string[]): void {
     const stranded = body
         .split('\n')
         .map((line) => line.trim())
-        .filter((line) => line.length > 0);
+        // Sub-headings are scaffolding, not content: an `[Unreleased]` left holding an empty
+        // "### Changed" ships nothing and must not block the release. Everything else counts —
+        // narrowing this to bullet lines would let stranded prose through, and prose under
+        // `[Unreleased]` describes shipped behaviour just as much as a bullet does.
+        .filter((line) => line.length > 0 && !line.startsWith('#'));
     if (stranded.length > 0) {
         failures.push(
-            `P5 CHANGELOG.md still has ${stranded.length} line(s) under "## [Unreleased]" — move them into the version section being released, or they ship undocumented`,
+            `P5 CHANGELOG.md still has ${stranded.length} entry line(s) under "## [Unreleased]" — move them into the version section being released, or they ship undocumented`,
         );
         return;
     }
