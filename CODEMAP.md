@@ -8,7 +8,7 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
   "schema": "codemap.v2",
   "repo": {
     "name": "pdf-to-png-converter",
-    "version": "4.1.1"
+    "version": "4.2.0"
   },
   "sourceHash": "ee10136526ff246b62be5a622bb4ef949d9ae041481a33eb79e213e6c586aaa3",
   "entrypoints": [
