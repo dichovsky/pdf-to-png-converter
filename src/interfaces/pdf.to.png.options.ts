@@ -129,12 +129,30 @@ export interface PdfToPngOptions {
      * Must be a positive integer between `1` and `16` (inclusive); values outside that range throw
      * immediately (before any I/O). The upper bound caps peak in-flight canvas memory at roughly
      * `16 × MAX_CANVAS_PIXELS × 4 bytes ≈ 6.4 GiB` so a single conversion cannot exhaust container
-     * memory. Higher values increase throughput at the cost of memory. Only applies when
-     * `processPagesInParallel` is `true`.
+     * memory. Higher values increase throughput at the cost of memory. Applies when
+     * `processPagesInParallel` or `renderInWorkerThreads` is enabled; in worker-thread mode it
+     * sets the worker-pool size.
      * Default: `4`.
      * @since 3.14.0
      */
     concurrencyLimit?: number;
+
+    /**
+     * When `true`, pages are rasterized in a pool of Node.js worker threads (pool size =
+     * `concurrencyLimit`), giving true multi-core parallelism — unlike `processPagesInParallel`,
+     * which interleaves pages on one thread. Each worker loads its own copy of the document, so
+     * expect roughly one PDF copy plus one pdf.js instance of memory per worker and a pool
+     * startup cost of a few hundred milliseconds per conversion; it pays off on multi-page,
+     * render-heavy (e.g. image-heavy) documents and can be slower for small ones.
+     * Rendered pixels are identical to single-threaded mode; results are returned in page
+     * order; disk writes still happen on the main thread through the same path-security guards.
+     * Takes precedence over `processPagesInParallel`. Ignored when `returnMetadataOnly` is `true`
+     * (metadata extraction does not render). `outputFileMaskFunc` is fully supported — names are
+     * resolved on the main thread before dispatch.
+     * Default: `false`.
+     * @since 4.2.0
+     */
+    renderInWorkerThreads?: boolean;
 
     /**
      * Maximum allowed input PDF size in bytes. Inputs larger than this throw immediately,
