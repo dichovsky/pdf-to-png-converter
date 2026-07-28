@@ -1,15 +1,46 @@
 import { promises as fsPromises } from 'node:fs';
-import { isAbsolute, join, relative, sep } from 'node:path';
-
-// Reject only characters the host OS treats as path separators. On POSIX, "\" is a valid
-// filename character (e.g. PDFs named `foo\bar.pdf` produce a default mask of `foo\bar`) so
-// rejecting it would break legitimate flat-filename conversions there. See SEC-001 in
-// CHANGELOG / BACKLOG for the threat model.
-const PATH_SEPARATOR_PATTERN = sep === '\\' ? /[\\/]/ : /\//;
-const SEPARATOR_DESCRIPTION = sep === '\\' ? '"/" or "\\"' : '"/"';
+import { isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { containsPathSeparator, SEPARATOR_DESCRIPTION } from './flatFilename.js';
 
 function isEscapingRelativePath(rel: string): boolean {
     return rel === '..' || rel.startsWith('..' + sep) || isAbsolute(rel);
+}
+
+/**
+ * The prepared output folder: its absolute path, plus the `realpath` captured at conversion
+ * start. The two are only meaningful together — every write re-reads the folder's realpath and
+ * compares it against `realOutputFolder` — so they travel as one value rather than as two
+ * strings callers must keep in sync.
+ */
+export interface OutputFolderHandle {
+    readonly resolvedOutputFolder: string;
+    readonly realOutputFolder: string;
+}
+
+/**
+ * Resolves `outputFolder` against the process CWD. Kept separate from `prepareOutputFolder` so the
+ * CWD is captured at conversion start, before any user-supplied `outputFileMaskFunc` runs: a mask
+ * callback that calls `process.chdir()` must not be able to redirect where a relative
+ * `outputFolder` lands.
+ */
+export function resolveOutputFolder(outputFolder: string): string {
+    return resolve(outputFolder);
+}
+
+/**
+ * Creates the already-resolved output folder and captures its `realpath` as the baseline every
+ * subsequent write is checked against. Colocated with `savePNGfile` so the whole SEC-001/002/003
+ * threat model — folder creation, the realpath baseline, and the per-write re-check that consumes
+ * it — lives in this one module.
+ *
+ * Callers must reject duplicate output filenames BEFORE calling this: it is the first output I/O
+ * of a conversion, and running it earlier would leave a created directory behind on a conversion
+ * that then fails validation.
+ */
+export async function prepareOutputFolder(resolvedOutputFolder: string): Promise<OutputFolderHandle> {
+    await fsPromises.mkdir(resolvedOutputFolder, { recursive: true });
+    const realOutputFolder = await fsPromises.realpath(resolvedOutputFolder);
+    return { resolvedOutputFolder, realOutputFolder };
 }
 
 /**
@@ -30,8 +61,10 @@ function isEscapingRelativePath(rel: string): boolean {
  * the same conversion if they expect to reuse the same output names. The input object is not
  * mutated; callers receive the resolved path from the return value.
  */
-export async function savePNGfile(name: string, content: Buffer, resolvedOutputFolder: string, realOutputFolder: string): Promise<string> {
-    if (PATH_SEPARATOR_PATTERN.test(name)) {
+export async function savePNGfile(name: string, content: Buffer, folder: OutputFolderHandle): Promise<string> {
+    const { resolvedOutputFolder, realOutputFolder } = folder;
+
+    if (containsPathSeparator(name)) {
         throw new Error(`Output file name must be a flat filename without ${SEPARATOR_DESCRIPTION} path separators: ${name}`);
     }
 

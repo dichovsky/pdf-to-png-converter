@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- An input value that is not a byte container at all — no numeric `length`, not an `ArrayBuffer.isView`, not an `ArrayBuffer`/`SharedArrayBuffer` (e.g. `{}` or a number) — is now rejected at the input seam with `Unsupported buffer type: <shape>` instead of being passed through to pdf.js, which reported it as `The PDF file is empty, i.e. its size is zero bytes.` — misleading, since the value is the wrong type rather than an empty document. The set of inputs that successfully convert is unchanged: cross-realm typed arrays and `ArrayBuffer`s (from `node:vm` / `isolated-vm`, where `instanceof` is realm-bound), `Uint8ClampedArray`, and byte array-likes such as the `data` field of a `Buffer` that round-tripped through JSON as `{ type: 'Buffer', data: number[] }` are all still accepted and normalized to `Uint8Array`. `DataView` input, which previously reached pdf.js and failed as an "empty" PDF, now converts. `maxInputBytes` is applied to array-like inputs, which carry no `byteLength` and previously escaped the cap.
+
+### Refactored
+
+- Output-folder preparation moved from `pdfToPngCore` into `outputWriter`, which now exposes `resolveOutputFolder()` and `prepareOutputFolder()` returning an `OutputFolderHandle` (the resolved path plus the `realpath` baseline every write is checked against). `savePNGfile()` and `FilesystemSink` take that handle instead of two positional strings that callers had to keep in sync, and the whole SEC-001/002/003 threat model — folder creation, the baseline, and the per-write re-check that consumes it — now lives in one module. Call order is unchanged in both directions that matter: the path is still resolved against the CWD at conversion start, before any user-supplied `outputFileMaskFunc` can call `process.chdir()` and redirect a relative `outputFolder`; and the duplicate-output-filename check still runs before any output I/O, so a conversion that fails validation still creates no directory. Both invariants now have explicit regression tests. Internal only; `savePNGfile` is not part of the public API (resolves ARCH-012).
+- The flat-filename predicate is now owned by a single module, `src/flatFilename.ts` (`containsPathSeparator` + `SEPARATOR_DESCRIPTION`), instead of being duplicated verbatim in `pageOrchestrator` and `outputWriter`. Both call sites keep their existing, distinct error messages. This predicate is load-bearing for SEC-001 — rejecting path separators is what closes the TOCTOU window on intermediate directory components — so a future fix landing in only one copy was a real risk (resolves ARCH-016).
+- `getPdfFileBuffer()` now returns `Uint8Array` rather than `Uint8Array | ArrayBufferLike`, making `src/pdfInput.ts` the single owner of the shape handed to pdf.js. The `pdfFileBuffer instanceof Uint8Array ? … : new Uint8Array(…)` re-derivation is gone from both `getPdfDocument()` (whose parameter is now `Uint8Array`) and the worker-mode buffer copy in `pdfToPngCore`. Rendered output and the defensive-copy guarantees for caller-owned buffers are unchanged (resolves ARCH-014).
+
 ## [4.2.0] — 2026-07-29
 
 ### Added

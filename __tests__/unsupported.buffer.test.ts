@@ -4,7 +4,10 @@ import { pdfToPng } from '../src/pdfToPng';
 describe('pdfToPng', () => {
     it('should throw an error for unsupported buffer type', async () => {
         const unsupportedBuffer: any = {}; // Not an ArrayBuffer or Buffer
-        await expect(pdfToPng(unsupportedBuffer)).rejects.toThrow('The PDF file is empty, i.e. its size is zero bytes.');
+        // ARCH-014: rejected at the input seam. This previously fell through to pdfjs, which
+        // reported "The PDF file is empty, i.e. its size is zero bytes." — misleading, since the
+        // value is the wrong type rather than an empty document.
+        await expect(pdfToPng(unsupportedBuffer)).rejects.toThrow('Unsupported buffer type: [object Object]');
     });
 
     it('should handle Buffer type', async () => {

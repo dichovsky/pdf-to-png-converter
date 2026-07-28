@@ -27,7 +27,7 @@ The codebase is organized around one public library entrypoint (`pdfToPng`) plus
     - `content`: `renderPdfPage()`, returned in memory
     - `file`: `renderPdfPage()` then a sink write, returned as the discriminated `file` output shape
 6. `pageRenderer.ts` obtains the page, computes the viewport, normalizes `rotation`, renders through pdf.js's built-in Node canvas factory (`pdf.canvasFactory`, backed by `@napi-rs/canvas`), and returns an in-memory page result.
-7. `outputWriter.ts` validates filename containment, checks realpaths, writes via `fs.promises.open(..., 'wx')`, and returns the absolute file path.
+7. `outputWriter.ts` owns the disk seam end to end: `prepareOutputFolder()` resolves the folder, creates it, and captures its `realpath` as an `OutputFolderHandle`; `savePNGfile()` validates filename containment, re-checks the folder realpath against that baseline, writes via `fs.promises.open(..., 'wx')`, and returns the absolute file path.
 8. `pdfToPng()` always calls `pdfDocument.destroy()` in `finally`.
 
 ## Module map
@@ -41,7 +41,8 @@ The codebase is organized around one public library entrypoint (`pdfToPng`) plus
 | `src/pageOrchestrator.ts`         | Per-page naming, `PageMode` branching, sink integration     | `resolvePageName`, `processAndSavePage`                          |
 | `src/pageMode.ts`                 | Per-page render/output mode union + pure mapping            | `PageMode`, `optionsToPageMode`                                  |
 | `src/pageRenderer.ts`             | Page metadata extraction, rendering, rotation normalization | `normalizeRotation`, `getPageMetadata`, `renderPdfPage`          |
-| `src/outputWriter.ts`             | Path-containment enforcement and secure file writes         | `savePNGfile`                                                    |
+| `src/outputWriter.ts`             | Output-folder preparation, path containment, secure writes  | `prepareOutputFolder`, `OutputFolderHandle`, `savePNGfile`       |
+| `src/flatFilename.ts`             | The shared flat-filename predicate (SEC-001 load-bearing)   | `containsPathSeparator`, `SEPARATOR_DESCRIPTION`                 |
 | `src/filesystemSink.ts`           | Disk-backed sink using `savePNGfile()` (sole `OutputSink`)  | `FilesystemSink`                                                 |
 | `src/propsToPdfDocInitParams.ts`  | Maps library options to `pdfjs-dist` init params            | `propsToPdfDocInitParams`                                        |
 | `src/cli.ts`                      | CLI adapter and reusable CLI helpers                        | `run`, `buildPdfToPngOptions`, `executeConversion`, `getVersion` |

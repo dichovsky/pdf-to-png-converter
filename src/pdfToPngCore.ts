@@ -1,5 +1,4 @@
-import { promises as fsPromises } from 'node:fs';
-import { parse, resolve } from 'node:path';
+import { parse } from 'node:path';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { PDF_TO_PNG_OPTIONS_DEFAULTS, SEQUENTIAL_PIPELINE_WINDOW } from './const.js';
 import { FilesystemSink } from './filesystemSink.js';
@@ -7,6 +6,7 @@ import type { InMemoryPngPageOutput, PngPageOutput } from './interfaces/index.js
 import type { OutputSink } from './interfaces/output.sink.js';
 import type { WorkerDocumentOptions } from './interfaces/worker.protocol.js';
 import type { NormalizedPdfToPngOptions } from './normalizePdfToPngOptions.js';
+import { prepareOutputFolder, resolveOutputFolder } from './outputWriter.js';
 import { optionsToPageMode } from './pageMode.js';
 import { finalizePageOutput, processAndSavePage, resolvePageName, shouldMaterializeContent } from './pageOrchestrator.js';
 import { getPdfFileBuffer } from './pdfInput.js';
@@ -101,17 +101,13 @@ export async function pdfToPngCore(
     normalizedProps: NormalizedPdfToPngOptions,
 ): Promise<PngPageOutput[]> {
     const pageViewportScale = normalizedProps.viewportScale;
-    const pdfFileBuffer: Uint8Array | ArrayBufferLike = await getPdfFileBuffer(pdfFile, normalizedProps.maxInputBytes);
+    const pdfFileBuffer: Uint8Array = await getPdfFileBuffer(pdfFile, normalizedProps.maxInputBytes);
 
     // Worker mode needs the raw bytes AFTER the main-thread document load, but getPdfDocument
     // transfers (detaches) the buffer it is given — so copy first. Worker-mode-only cost: one
     // extra copy of the input; each worker then receives its own structured-clone of this copy.
     const useWorkerThreads = normalizedProps.renderInWorkerThreads === true && !normalizedProps.returnMetadataOnly;
-    let workerPdfBytes: Uint8Array | undefined;
-    if (useWorkerThreads) {
-        const view = pdfFileBuffer instanceof Uint8Array ? pdfFileBuffer : new Uint8Array(pdfFileBuffer);
-        workerPdfBytes = Uint8Array.from(view);
-    }
+    const workerPdfBytes: Uint8Array | undefined = useWorkerThreads ? Uint8Array.from(pdfFileBuffer) : undefined;
 
     const pdfDocument: PDFDocumentProxy = await getPdfDocument(pdfFileBuffer, normalizedProps);
 
@@ -122,8 +118,14 @@ export async function pdfToPngCore(
             normalizedProps.pagesToProcess ?? Array.from({ length: pdfDocument.numPages }, (_, index) => index + 1);
         const validPagesToProcess: number[] = pagesToProcess.filter((pageNumber) => pageNumber <= pdfDocument.numPages && pageNumber >= 1);
         const returnMetadataOnly = normalizedProps.returnMetadataOnly;
+        // Metadata-only conversions render nothing and write nothing, so they never prepare a folder.
+        // The path is resolved HERE, before any user-supplied outputFileMaskFunc runs below, so a
+        // mask callback calling process.chdir() cannot redirect a relative outputFolder. Creation
+        // and the realpath baseline happen later, after validation.
         const resolvedOutputFolder: string | undefined =
-            normalizedProps.outputFolder !== undefined && !returnMetadataOnly ? resolve(normalizedProps.outputFolder) : undefined;
+            returnMetadataOnly || normalizedProps.outputFolder === undefined
+                ? undefined
+                : resolveOutputFolder(normalizedProps.outputFolder);
 
         const defaultMask: string = typeof pdfFile === 'string' ? parse(pdfFile).name : PDF_TO_PNG_OPTIONS_DEFAULTS.outputFileMask;
 
@@ -144,15 +146,12 @@ export async function pdfToPngCore(
                         `Each processed page must resolve to a unique filename.`,
                 );
             }
-            await fsPromises.mkdir(resolvedOutputFolder, { recursive: true });
         }
-        const realOutputFolder: string | undefined =
-            resolvedOutputFolder !== undefined ? await fsPromises.realpath(resolvedOutputFolder) : undefined;
 
+        // Folder creation and the realpath baseline live in outputWriter.ts — this is the first
+        // output I/O of the conversion, so it must follow the duplicate check.
         const outputSink: OutputSink | undefined =
-            resolvedOutputFolder !== undefined && realOutputFolder !== undefined
-                ? new FilesystemSink(resolvedOutputFolder, realOutputFolder)
-                : undefined;
+            resolvedOutputFolder !== undefined ? new FilesystemSink(await prepareOutputFolder(resolvedOutputFolder)) : undefined;
         const pageMode = optionsToPageMode(normalizedProps, outputSink);
 
         // Worker-thread mode: pages rasterize + encode inside a pool of worker threads (true
