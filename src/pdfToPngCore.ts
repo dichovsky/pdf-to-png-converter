@@ -101,17 +101,13 @@ export async function pdfToPngCore(
     normalizedProps: NormalizedPdfToPngOptions,
 ): Promise<PngPageOutput[]> {
     const pageViewportScale = normalizedProps.viewportScale;
-    const pdfFileBuffer: Uint8Array | ArrayBufferLike = await getPdfFileBuffer(pdfFile, normalizedProps.maxInputBytes);
+    const pdfFileBuffer: Uint8Array = await getPdfFileBuffer(pdfFile, normalizedProps.maxInputBytes);
 
     // Worker mode needs the raw bytes AFTER the main-thread document load, but getPdfDocument
     // transfers (detaches) the buffer it is given — so copy first. Worker-mode-only cost: one
     // extra copy of the input; each worker then receives its own structured-clone of this copy.
     const useWorkerThreads = normalizedProps.renderInWorkerThreads === true && !normalizedProps.returnMetadataOnly;
-    let workerPdfBytes: Uint8Array | undefined;
-    if (useWorkerThreads) {
-        const view = pdfFileBuffer instanceof Uint8Array ? pdfFileBuffer : new Uint8Array(pdfFileBuffer);
-        workerPdfBytes = Uint8Array.from(view);
-    }
+    const workerPdfBytes: Uint8Array | undefined = useWorkerThreads ? Uint8Array.from(pdfFileBuffer) : undefined;
 
     const pdfDocument: PDFDocumentProxy = await getPdfDocument(pdfFileBuffer, normalizedProps);
 

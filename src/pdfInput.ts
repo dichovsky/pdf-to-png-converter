@@ -6,10 +6,13 @@ function rejectOversized(byteLength: number, maxInputBytes: number): void {
     }
 }
 
-export async function getPdfFileBuffer(
-    pdfFile: string | ArrayBufferLike | Uint8Array,
-    maxInputBytes: number,
-): Promise<Uint8Array | ArrayBufferLike> {
+/**
+ * Normalizes every supported input shape to a `Uint8Array` that pdfjs may safely transfer
+ * (detach). Closing the return type here means this module is the single owner of "what shape we
+ * hand pdfjs" — downstream seams (`getPdfDocument`, the worker dispatch) take a `Uint8Array` and
+ * re-derive nothing.
+ */
+export async function getPdfFileBuffer(pdfFile: string | ArrayBufferLike | Uint8Array, maxInputBytes: number): Promise<Uint8Array> {
     if (typeof pdfFile === 'string') {
         const stats = await fsPromises.stat(pdfFile);
         if (!stats.isFile()) {
@@ -23,7 +26,8 @@ export async function getPdfFileBuffer(
         // maxInputBytes — reject it before it propagates further into pdfjs parsing.
         rejectOversized(buffer.byteLength, maxInputBytes);
         if (buffer instanceof ArrayBuffer) {
-            return buffer;
+            // Fresh allocation owned by this call — a full-span view is safe to hand over.
+            return new Uint8Array(buffer);
         }
         if (Buffer.isBuffer(buffer)) {
             // Zero-copy handoff. This Buffer was freshly allocated by readFile and is never
@@ -52,13 +56,12 @@ export async function getPdfFileBuffer(
     // Returning the caller's buffer by reference would therefore neuter their input and break
     // reuse across calls. The string-path and Node-Buffer branches above already allocate fresh
     // memory; copy the Uint8Array / ArrayBuffer branch too so every supported input shape leaves
-    // the caller's buffer intact. Out-of-contract values fall through unchanged so pdfjs still
-    // raises its own validation error.
+    // the caller's buffer intact.
     if (pdfFile instanceof Uint8Array) {
         return Uint8Array.from(pdfFile);
     }
     if (pdfFile instanceof ArrayBuffer) {
-        return pdfFile.slice(0);
+        return new Uint8Array(pdfFile.slice(0));
     }
     if (pdfFile instanceof SharedArrayBuffer) {
         // `slice()` would yield another SharedArrayBuffer (non-transferable, shared) — copy into a
@@ -66,5 +69,10 @@ export async function getPdfFileBuffer(
         // unshared memory. `new Uint8Array(sab)` only views the SAB, so copy via `Uint8Array.from`.
         return Uint8Array.from(new Uint8Array(pdfFile));
     }
-    return pdfFile;
+
+    // Out of contract for TypeScript callers (the parameter type covers every branch above), but
+    // reachable from JavaScript. Reject here with the same message the file-path branch uses,
+    // rather than passing the value through for pdfjs to reject: this module owns the input
+    // contract, so an unsupported shape must not escape it.
+    throw new Error(`Unsupported buffer type: ${Object.prototype.toString.call(pdfFile)}`);
 }

@@ -10,6 +10,4 @@
 
 ## ⚙️ ARCH / Core
 
-- [ ] 🟢 ♻️ ARCH-014 Core: close `Uint8Array | ArrayBufferLike` union at getPdfFileBuffer
-    - getPdfFileBuffer always returns Uint8Array; remove the `instanceof Uint8Array ? ... : new Uint8Array(...)` in getPdfDocument
-    - narrows interfaces at both seams; one place owns "what shape we hand pdfjs"
+_No open ARCH items._

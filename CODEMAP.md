@@ -10,7 +10,7 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
     "name": "pdf-to-png-converter",
     "version": "4.2.0"
   },
-  "sourceHash": "b3fbfaf07d21f3890f3576ae9b1beeb0f9a4601a8b44a1be28ea12ba3da1b6db",
+  "sourceHash": "aa22be2e45702af6cab767d1203eb5b6e8aad6959c1562ed54c4b4d82c9e02c5",
   "entrypoints": [
     "src/index.ts"
   ],
@@ -1027,9 +1027,9 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
         {
           "name": "getPdfFileBuffer",
           "kind": "function",
-          "line": 9,
+          "line": 15,
           "exported": true,
-          "signature": "export async function getPdfFileBuffer( pdfFile: string | ArrayBufferLike | Uint8Array, maxInputBytes: number, ): Promise<Uint8Array | ArrayBufferLike>"
+          "signature": "export async function getPdfFileBuffer(pdfFile: string | ArrayBufferLike | Uint8Array, maxInputBytes: number): Promise<Uint8Array>"
         }
       ],
       "imports": [
@@ -1215,7 +1215,7 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
           "kind": "function",
           "line": 8,
           "exported": true,
-          "signature": "export async function getPdfDocument( pdfFileBuffer: Uint8Array | ArrayBufferLike, opts: NormalizedPdfToPngOptions, ): Promise<PDFDocumentProxy>"
+          "signature": "export async function getPdfDocument(pdfFileBuffer: Uint8Array, opts: NormalizedPdfToPngOptions): Promise<PDFDocumentProxy>"
         }
       ],
       "imports": [
