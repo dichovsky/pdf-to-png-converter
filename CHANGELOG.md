@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `release:postcheck` now runs a real conversion against the freshly published package, in worker-thread mode, and compares the result with single-threaded output (Q5). `renderInWorkerThreads` spawns `out/pageRenderWorker.js` by a path resolved inside the installed `out/` directory, and every in-repo test runs against the source tree where that file always exists — so a packaging change that dropped or relocated it would have broken worker mode for consumers with the whole suite still green. Release tooling only; no runtime or API change.
+
 ## [4.2.0] — 2026-07-29
 
 ### Added

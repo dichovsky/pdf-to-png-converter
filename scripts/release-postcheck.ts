@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -118,6 +118,69 @@ function smokeTestInstall(name: string, version: string): void {
     }
 }
 
+// Q5 — the published package can actually render, including in worker-thread mode.
+//
+// `renderInWorkerThreads` spawns `out/pageRenderWorker.js` by a path resolved relative to the
+// installed `out/` directory. Every in-repo test runs against the source tree, where that file is
+// always present, so a packaging change that drops or relocates it would break worker mode for
+// consumers with the whole suite still green. This is the only check that exercises the worker
+// entry as an npm consumer sees it.
+//
+// Comparing worker output against single-threaded output also catches a worker that starts but
+// renders differently — a silent-corruption failure a "did it throw?" check would pass.
+function buildRenderSmokeScript(name: string, samplePdf: string): string {
+    return `
+const assert = require('node:assert/strict');
+const { existsSync } = require('node:fs');
+const { join } = require('node:path');
+const { pdfToPng } = require(${JSON.stringify(name)});
+
+const PDF = ${JSON.stringify(samplePdf)};
+
+async function main() {
+    const outputFolder = join(__dirname, 'worker-out');
+    const workers = await pdfToPng(PDF, { renderInWorkerThreads: true, concurrencyLimit: 2, outputFolder });
+    const single = await pdfToPng(PDF);
+
+    assert.ok(workers.length > 0, 'worker mode rendered no pages');
+    assert.equal(workers.length, single.length, 'worker mode returned a different page count');
+    assert.deepEqual(
+        workers.map((page) => page.pageNumber),
+        single.map((page) => page.pageNumber),
+        'worker mode did not preserve page order',
+    );
+
+    for (let index = 0; index < workers.length; index += 1) {
+        const pageNumber = workers[index].pageNumber;
+        assert.ok(workers[index].content.equals(single[index].content), 'page ' + pageNumber + ' differs from single-threaded output');
+        assert.ok(existsSync(workers[index].path), 'page ' + pageNumber + ' was not written: ' + workers[index].path);
+    }
+}
+
+main().catch((error) => {
+    console.error(error);
+    process.exit(4);
+});
+`;
+}
+
+function smokeTestRender(name: string, version: string): void {
+    // The repo checkout is available in the publish workflow, so a real multi-page asset is used
+    // rather than a synthetic one — this must fail on a genuinely broken renderer, not on a
+    // hand-rolled PDF that pdf.js merely tolerates.
+    const samplePdf = join(REPO_ROOT, 'test-data', 'sample.pdf');
+    const dir = mkdtempSync(join(tmpdir(), 'p2p-render-smoke-'));
+    try {
+        runNpm(['init', '-y'], dir);
+        runNpm(['install', `${name}@${version}`, '--no-audit', '--no-fund'], dir);
+        const scriptPath = join(dir, 'render-smoke.js');
+        writeFileSync(scriptPath, buildRenderSmokeScript(name, samplePdf), 'utf-8');
+        execFileSync(process.execPath, [scriptPath], { cwd: dir, stdio: ['ignore', 'pipe', 'pipe'] });
+    } finally {
+        rmSync(dir, { recursive: true, force: true });
+    }
+}
+
 async function main(): Promise<void> {
     const { name, version } = readManifest();
     console.log(`release:postcheck for ${name}@${version}`);
@@ -142,6 +205,9 @@ async function main(): Promise<void> {
 
     smokeTestInstall(name, version);
     console.log('  Q4 clean-install smoke:    OK');
+
+    smokeTestRender(name, version);
+    console.log('  Q5 worker-thread render:   OK');
 
     console.log('\nrelease:postcheck PASSED');
 }
