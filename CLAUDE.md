@@ -79,6 +79,7 @@ Always extend `PDF_TO_PNG_OPTIONS_DEFAULTS` using `??` — never hardcode defaul
 
 ## TypeScript Conventions
 
+- **Split compiler toolchain (dev-only):** `@typescript/native` (alias for `typescript@7.x`, the native compiler) runs `build` / `build:test` / `build:strict`; the `typescript` package name is the official TS 6 compatibility alias (`@typescript/typescript6`) providing the JS compiler API for the codemap generator, ts-node scripts, and typescript-eslint. The `build*` scripts must invoke the native compiler by explicit path (`node ./node_modules/@typescript/native/bin/tsc`) — never bare `tsc`, whose `.bin` link depends on install history. Re-unification tracked in BACKLOG.md (TOOL-001).
 - **`"module": "nodenext"` / `"moduleResolution": "node16"`** — use `.js` extensions in all relative imports even though source files are `.ts`:
     ```typescript
     import { normalizePath } from './normalizePath.js'; // correct
