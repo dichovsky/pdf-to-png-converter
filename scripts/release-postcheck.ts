@@ -175,7 +175,11 @@ function smokeTestRender(name: string, version: string): void {
         runNpm(['install', `${name}@${version}`, '--no-audit', '--no-fund'], dir);
         const scriptPath = join(dir, 'render-smoke.js');
         writeFileSync(scriptPath, buildRenderSmokeScript(name, samplePdf), 'utf-8');
-        execFileSync(process.execPath, [scriptPath], { cwd: dir, stdio: ['ignore', 'pipe', 'pipe'] });
+        // Inherited stdio, unlike the piped registry reads above: the script is silent on success,
+        // and on failure its assertion message is the whole diagnostic. Piping would capture it
+        // onto the thrown error's `.stderr`, which `main()`'s handler (printing only `.message`)
+        // discards — leaving the Actions log with "Command failed" and nothing else.
+        execFileSync(process.execPath, [scriptPath], { cwd: dir, stdio: ['ignore', 'inherit', 'inherit'] });
     } finally {
         rmSync(dir, { recursive: true, force: true });
     }
