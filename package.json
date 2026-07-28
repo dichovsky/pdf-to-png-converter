@@ -78,16 +78,16 @@
         ]
     },
     "dependencies": {
-        "@napi-rs/canvas": "~1.0.2",
-        "pdfjs-dist": "~6.1.200"
+        "@napi-rs/canvas": "~1.0.3",
+        "pdfjs-dist": "~6.2.108"
     },
     "devDependencies": {
         "@eslint/js": "^10.0.1",
-        "@types/node": "^26.1.1",
+        "@types/node": "^26.1.2",
         "@typescript-eslint/eslint-plugin": "^8.65.0",
         "@typescript-eslint/parser": "^8.65.0",
         "@vitest/coverage-v8": "^4.1.10",
-        "eslint": "^10.7.0",
+        "eslint": "^10.8.0",
         "husky": "^9.1.7",
         "license-checker-rseidelsohn": "^5.0.1",
         "lint-staged": "^17.2.0",
