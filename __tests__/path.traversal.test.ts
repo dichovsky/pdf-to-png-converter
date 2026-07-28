@@ -80,22 +80,24 @@ test('resolvePageName should accept a flat filename unchanged', () => {
     expect(resolvePageName(1, 'sample', () => 'page.png')).toBe('page.png');
 });
 
+// These names are rejected before any I/O, so the handle never has to point at a real folder.
+const posixFolder = { resolvedOutputFolder: '/tmp/does-not-matter', realOutputFolder: '/tmp/does-not-matter' };
+const windowsFolder = { resolvedOutputFolder: 'C:\\tmp', realOutputFolder: 'C:\\tmp' };
+
 test('savePNGfile should reject a name containing "/" before any I/O', async () => {
-    await expect(savePNGfile('sub/page.png', Buffer.alloc(0), '/tmp/does-not-matter', '/tmp/does-not-matter')).rejects.toThrow(
+    await expect(savePNGfile('sub/page.png', Buffer.alloc(0), posixFolder)).rejects.toThrow(
         /Output file name must be a flat filename without .* path separators/,
     );
 });
 
 test.runIf(isWindows)('savePNGfile should reject "\\" on Windows before any I/O', async () => {
-    await expect(savePNGfile('sub\\page.png', Buffer.alloc(0), 'C:\\tmp', 'C:\\tmp')).rejects.toThrow(
+    await expect(savePNGfile('sub\\page.png', Buffer.alloc(0), windowsFolder)).rejects.toThrow(
         /Output file name must be a flat filename without .* path separators/,
     );
 });
 
 test('savePNGfile should reject "." before any I/O (would collapse to the output folder itself)', async () => {
-    await expect(savePNGfile('.', Buffer.alloc(0), '/tmp/does-not-matter', '/tmp/does-not-matter')).rejects.toThrow(
-        'Output file name must be a plain filename',
-    );
+    await expect(savePNGfile('.', Buffer.alloc(0), posixFolder)).rejects.toThrow('Output file name must be a plain filename');
 });
 
 test('pdfToPng should reject outputFileMaskFunc returning a subdirectory filename', async () => {

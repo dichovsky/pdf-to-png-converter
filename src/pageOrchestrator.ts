@@ -1,5 +1,5 @@
-import { sep } from 'node:path';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
+import { containsPathSeparator, SEPARATOR_DESCRIPTION } from './flatFilename.js';
 import type { FilePngPageOutput, InMemoryPngPageOutput, PngPageOutput } from './interfaces/index.js';
 import type { PageMode } from './pageMode.js';
 import { getPageMetadata, renderPdfPage } from './pageRenderer.js';
@@ -7,15 +7,8 @@ import { getPageMetadata, renderPdfPage } from './pageRenderer.js';
 /** The two `PageMode`s that involve an actual render (everything except `metadata`). */
 export type RenderedPageMode = Exclude<PageMode, { kind: 'metadata' }>;
 
-// Reject only characters the host OS treats as path separators. On Windows both "\" and "/"
-// are separators; on POSIX only "/" is — "\" is a valid filename character there, so PDFs
-// such as `foo\bar.pdf` must still convert successfully when the library derives the default
-// page-name mask from `path.parse(pdfFile).name`.
-const PATH_SEPARATOR_PATTERN = sep === '\\' ? /[\\/]/ : /\//;
-const SEPARATOR_DESCRIPTION = sep === '\\' ? '"/" or "\\"' : '"/"';
-
 function assertFlatFilename(name: string, pageNumber: number): void {
-    if (PATH_SEPARATOR_PATTERN.test(name)) {
+    if (containsPathSeparator(name)) {
         throw new Error(
             `outputFileMaskFunc returned a filename containing a path separator for page ${pageNumber}: "${name}". The filename must be a flat name with no ${SEPARATOR_DESCRIPTION} characters.`,
         );
