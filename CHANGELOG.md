@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Refactored
+
+- Output-folder preparation moved from `pdfToPngCore` into `outputWriter`, which now exposes `prepareOutputFolder()` returning an `OutputFolderHandle` (the resolved path plus the `realpath` baseline every write is checked against). `savePNGfile()` and `FilesystemSink` take that handle instead of two positional strings that callers had to keep in sync, and the whole SEC-001/002/003 threat model — folder creation, the baseline, and the per-write re-check that consumes it — now lives in one module. Call order is unchanged: the duplicate-output-filename check still runs before any output I/O, so a conversion that fails validation still leaves no directory behind. Internal only; `savePNGfile` is not part of the public API (resolves ARCH-012).
+- The flat-filename predicate is now owned by a single module, `src/flatFilename.ts` (`containsPathSeparator` + `SEPARATOR_DESCRIPTION`), instead of being duplicated verbatim in `pageOrchestrator` and `outputWriter`. Both call sites keep their existing, distinct error messages. This predicate is load-bearing for SEC-001 — rejecting path separators is what closes the TOCTOU window on intermediate directory components — so a future fix landing in only one copy was a real risk (resolves ARCH-016).
+
 ## [4.2.0] — 2026-07-29
 
 ### Added

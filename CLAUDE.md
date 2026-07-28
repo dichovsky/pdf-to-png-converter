@@ -26,7 +26,7 @@ Published to npm as `pdf-to-png-converter`. Entry: `out/index.js`, types: `out/i
 5. Invalid page numbers (< 1 or > numPages) in `pagesToProcess` are silently filtered before the render loop
 6. `renderPdfPage()` / `getPageMetadata()` in `src/pageRenderer.ts` — when `returnMetadataOnly` is true returns dimensions and rotation immediately; otherwise creates a canvas via pdf.js's built-in Node canvas factory (`pdf.canvasFactory`, backed by `@napi-rs/canvas`), renders via `page.render()`, encodes to PNG, cleans up in `finally`
 7. `processAndSavePage()` in `src/pageOrchestrator.ts` — switches on the per-page `PageMode` (`src/pageMode.ts`, derived once per conversion by `optionsToPageMode()`): `metadata` returns dimensions only; `content` renders in memory; `file` renders and writes through the `OutputSink` (`FilesystemSink`)
-8. `savePNGfile()` in `src/outputWriter.ts` — joins `outputFolder` + `name`, validates `content !== undefined`, writes with `fsPromises.writeFile` (with realpath-based path-traversal guard from SEC-001/002/003)
+8. `src/outputWriter.ts` owns the whole disk seam: `prepareOutputFolder()` resolves `outputFolder`, creates it, and captures the `realpath` baseline as an `OutputFolderHandle` (called after the duplicate-name check, so a failed conversion leaves no directory behind); `savePNGfile()` joins the handle's folder + `name`, re-checks the folder's realpath against the baseline, and writes with `fsPromises.open(..., 'wx')` (path-traversal guard from SEC-001/002/003)
 9. Returns `PngPageOutput[]` — one entry per processed page
 
 **Single validation boundary:** `normalizePdfToPngOptions` produces `NormalizedPdfToPngOptions`, which is consumed by `pdfToPngCore`, `getPdfDocument`, and `propsToPdfDocInitParams`. No downstream module re-applies `??` defaults — all defaulting happens in the normalizer.
@@ -55,8 +55,9 @@ Key modules (current sizes are typical, not authoritative):
 - `src/pageRenderer.ts` — `renderPdfPage` / `getPageMetadata`.
 - `src/pageMode.ts` — `PageMode` discriminated union (`metadata` | `content` | `file`) + pure `optionsToPageMode()`; the single source of the per-page render/output decision.
 - `src/pageOrchestrator.ts` — switches on a `PageMode` to compose render → write through an `OutputSink`.
-- `src/outputWriter.ts` — `savePNGfile` with realpath-based path-traversal guard.
-- `src/filesystemSink.ts` — the sole `OutputSink` implementation (disk writes); in-memory pages use no sink.
+- `src/outputWriter.ts` — `prepareOutputFolder` (resolve + mkdir + realpath baseline, returned as an `OutputFolderHandle`) and `savePNGfile` with realpath-based path-traversal guard. The SEC-001/002/003 threat model lives entirely here.
+- `src/flatFilename.ts` — the single owner of the flat-filename predicate (`containsPathSeparator`, `SEPARATOR_DESCRIPTION`), shared by `pageOrchestrator` (name resolution) and `outputWriter` (write). Each caller keeps its own error message.
+- `src/filesystemSink.ts` — the sole `OutputSink` implementation (disk writes, constructed from an `OutputFolderHandle`); in-memory pages use no sink.
 - `src/const.ts` — runtime constants (limits + defaults); test-only asset lists are in `__tests__/test-data-constants.ts`.
 - `src/interfaces/` — PdfToPngOptions, PngPageOutput, OutputSink, CanvasAndContext.
 - `src/types/verbosity.level.ts` — VerbosityLevel enum (ERRORS=0, WARNINGS=1, INFOS=5).

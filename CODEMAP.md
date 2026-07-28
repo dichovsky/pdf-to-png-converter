@@ -10,7 +10,7 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
     "name": "pdf-to-png-converter",
     "version": "4.2.0"
   },
-  "sourceHash": "ee10136526ff246b62be5a622bb4ef949d9ae041481a33eb79e213e6c586aaa3",
+  "sourceHash": "b3fbfaf07d21f3890f3576ae9b1beeb0f9a4601a8b44a1be28ea12ba3da1b6db",
   "entrypoints": [
     "src/index.ts"
   ],
@@ -286,19 +286,19 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
         {
           "name": "FilesystemSink",
           "kind": "class",
-          "line": 4,
+          "line": 5,
           "exported": true,
           "signature": "export class FilesystemSink implements OutputSink {",
           "members": [
             {
               "name": "constructor",
               "kind": "constructor",
-              "line": 5
+              "line": 6
             },
             {
               "name": "write",
               "kind": "method",
-              "line": 10
+              "line": 8
             }
           ]
         }
@@ -313,7 +313,48 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
         {
           "from": "./outputWriter.js",
           "names": [
+            "OutputFolderHandle"
+          ]
+        },
+        {
+          "from": "./outputWriter.js",
+          "names": [
             "savePNGfile"
+          ]
+        }
+      ],
+      "reExports": []
+    },
+    {
+      "path": "src/flatFilename.ts",
+      "symbols": [
+        {
+          "name": "PATH_SEPARATOR_PATTERN",
+          "kind": "variable",
+          "line": 10,
+          "exported": false,
+          "signature": "const PATH_SEPARATOR_PATTERN = sep === '\\\\' ? /[\\\\/]/ : /\\"
+        },
+        {
+          "name": "SEPARATOR_DESCRIPTION",
+          "kind": "variable",
+          "line": 13,
+          "exported": true,
+          "signature": "export const SEPARATOR_DESCRIPTION = sep === '\\\\' ? '\"/\" or \"\\\\\"' : '\"/\"'"
+        },
+        {
+          "name": "containsPathSeparator",
+          "kind": "function",
+          "line": 16,
+          "exported": true,
+          "signature": "export function containsPathSeparator(name: string): boolean"
+        }
+      ],
+      "imports": [
+        {
+          "from": "node:path",
+          "names": [
+            "sep"
           ]
         }
       ],
@@ -626,35 +667,42 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
       "path": "src/outputWriter.ts",
       "symbols": [
         {
-          "name": "PATH_SEPARATOR_PATTERN",
-          "kind": "variable",
-          "line": 8,
-          "exported": false,
-          "signature": "const PATH_SEPARATOR_PATTERN = sep === '\\\\' ? /[\\\\/]/ : /\\"
-        },
-        {
-          "name": "SEPARATOR_DESCRIPTION",
-          "kind": "variable",
-          "line": 9,
-          "exported": false,
-          "signature": "const SEPARATOR_DESCRIPTION = sep === '\\\\' ? '\"/\" or \"\\\\\"' : '\"/\"'"
-        },
-        {
           "name": "isEscapingRelativePath",
           "kind": "function",
-          "line": 11,
+          "line": 5,
           "exported": false,
           "signature": "function isEscapingRelativePath(rel: string): boolean"
         },
         {
+          "name": "OutputFolderHandle",
+          "kind": "interface",
+          "line": 15,
+          "exported": true,
+          "signature": "export interface OutputFolderHandle { readonly resolvedOutputFolder: string; readonly realOutputFolder: string; }"
+        },
+        {
+          "name": "prepareOutputFolder",
+          "kind": "function",
+          "line": 30,
+          "exported": true,
+          "signature": "export async function prepareOutputFolder(outputFolder: string): Promise<OutputFolderHandle>"
+        },
+        {
           "name": "savePNGfile",
           "kind": "function",
-          "line": 33,
+          "line": 55,
           "exported": true,
-          "signature": "export async function savePNGfile(name: string, content: Buffer, resolvedOutputFolder: string, realOutputFolder: string): Promise<string>"
+          "signature": "export async function savePNGfile(name: string, content: Buffer, folder: OutputFolderHandle): Promise<string>"
         }
       ],
       "imports": [
+        {
+          "from": "./flatFilename.js",
+          "names": [
+            "SEPARATOR_DESCRIPTION",
+            "containsPathSeparator"
+          ]
+        },
         {
           "from": "node:fs",
           "names": [
@@ -667,6 +715,7 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
             "isAbsolute",
             "join",
             "relative",
+            "resolve",
             "sep"
           ]
         }
@@ -718,56 +767,49 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
           "signature": "export type RenderedPageMode = Exclude<PageMode, { kind: 'metadata' }>;"
         },
         {
-          "name": "PATH_SEPARATOR_PATTERN",
-          "kind": "variable",
-          "line": 14,
-          "exported": false,
-          "signature": "const PATH_SEPARATOR_PATTERN = sep === '\\\\' ? /[\\\\/]/ : /\\"
-        },
-        {
-          "name": "SEPARATOR_DESCRIPTION",
-          "kind": "variable",
-          "line": 15,
-          "exported": false,
-          "signature": "const SEPARATOR_DESCRIPTION = sep === '\\\\' ? '\"/\" or \"\\\\\"' : '\"/\"'"
-        },
-        {
           "name": "assertFlatFilename",
           "kind": "function",
-          "line": 17,
+          "line": 10,
           "exported": false,
           "signature": "function assertFlatFilename(name: string, pageNumber: number): void"
         },
         {
           "name": "resolvePageName",
           "kind": "function",
-          "line": 25,
+          "line": 18,
           "exported": true,
           "signature": "export function resolvePageName( pageNumber: number, defaultMask: string, outputFileMaskFunc: ((page: number) => string) | undefined, ): string"
         },
         {
           "name": "finalizePageOutput",
           "kind": "function",
-          "line": 58,
+          "line": 51,
           "exported": true,
           "signature": "export async function finalizePageOutput(pageOutput: InMemoryPngPageOutput, mode: RenderedPageMode): Promise<PngPageOutput>"
         },
         {
           "name": "shouldMaterializeContent",
           "kind": "function",
-          "line": 80,
+          "line": 73,
           "exported": true,
           "signature": "export function shouldMaterializeContent(mode: RenderedPageMode): boolean"
         },
         {
           "name": "processAndSavePage",
           "kind": "function",
-          "line": 84,
+          "line": 77,
           "exported": true,
           "signature": "export async function processAndSavePage( pdfDocument: PDFDocumentProxy, pageName: string, pageNumber: number, pageViewportScale: number, mode: PageMode, ): Promise<PngPageOutput>"
         }
       ],
       "imports": [
+        {
+          "from": "./flatFilename.js",
+          "names": [
+            "SEPARATOR_DESCRIPTION",
+            "containsPathSeparator"
+          ]
+        },
         {
           "from": "./interfaces/index.js",
           "names": [
@@ -787,12 +829,6 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
           "names": [
             "getPageMetadata",
             "renderPdfPage"
-          ]
-        },
-        {
-          "from": "node:path",
-          "names": [
-            "sep"
           ]
         },
         {
@@ -1105,6 +1141,12 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
           ]
         },
         {
+          "from": "./outputWriter.js",
+          "names": [
+            "prepareOutputFolder"
+          ]
+        },
+        {
           "from": "./pageMode.js",
           "names": [
             "optionsToPageMode"
@@ -1144,16 +1186,9 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
           ]
         },
         {
-          "from": "node:fs",
-          "names": [
-            "fsPromises"
-          ]
-        },
-        {
           "from": "node:path",
           "names": [
-            "parse",
-            "resolve"
+            "parse"
           ]
         },
         {
