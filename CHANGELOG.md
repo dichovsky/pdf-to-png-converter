@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The development toolchain now type-checks and builds with the TypeScript 7 native compiler (`@typescript/native`, alias for `typescript@~7.0.2`), while the `typescript` package name is the official TypeScript 6 compatibility alias (`@typescript/typescript6`) that keeps the JS compiler API available to the codemap generator, ts-node scripts, and typescript-eslint. Dev-only change — no runtime, type, or API change to the published package.
+
 ## [4.1.1] — 2026-06-19
 
 ### Fixed
