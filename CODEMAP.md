@@ -10,7 +10,7 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
     "name": "pdf-to-png-converter",
     "version": "4.1.1"
   },
-  "sourceHash": "e1652ed20183c632529a999d894636195eb21b2ba77f476fda7275e9ad9adccf",
+  "sourceHash": "f166bb5c78ea168131d1fc4d5ead03212accbe88c703725e75470947d6a35d3e",
   "entrypoints": [
     "src/index.ts"
   ],
@@ -237,35 +237,35 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
         {
           "name": "SEQUENTIAL_PIPELINE_WINDOW",
           "kind": "variable",
-          "line": 45,
+          "line": 46,
           "exported": true,
           "signature": "export const SEQUENTIAL_PIPELINE_WINDOW = 3"
         },
         {
           "name": "PDF_TO_PNG_OPTIONS_DEFAULTS",
           "kind": "variable",
-          "line": 51,
+          "line": 52,
           "exported": true,
           "signature": "export const PDF_TO_PNG_OPTIONS_DEFAULTS = { viewportScale: 1, disableFontFace: true, useSystemFonts: false, enableXfa: true, outputFileMask: 'buffer', pdfFilePassword: undefined, concurrencyLimit: 4,…"
         },
         {
           "name": "CMAP_RELATIVE_URL",
           "kind": "variable",
-          "line": 70,
+          "line": 71,
           "exported": true,
           "signature": "export const CMAP_RELATIVE_URL = './node_modules/pdfjs-dist/cmaps/'"
         },
         {
           "name": "STANDARD_FONTS_RELATIVE_URL",
           "kind": "variable",
-          "line": 71,
+          "line": 72,
           "exported": true,
           "signature": "export const STANDARD_FONTS_RELATIVE_URL = './node_modules/pdfjs-dist/standard_fonts/'"
         },
         {
           "name": "DOCUMENT_INIT_PARAMS_DEFAULTS",
           "kind": "variable",
-          "line": 83,
+          "line": 84,
           "exported": true,
           "signature": "export const DOCUMENT_INIT_PARAMS_DEFAULTS: DocumentInitParameters = { cMapUrl: CMAP_RELATIVE_URL, cMapPacked: true, standardFontDataUrl: STANDARD_FONTS_RELATIVE_URL, }"
         }
