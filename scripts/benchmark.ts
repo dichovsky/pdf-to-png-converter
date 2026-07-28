@@ -115,6 +115,16 @@ const SCENARIOS: Scenario[] = [
         options: { returnPageContent: false, processPagesInParallel: true, outputFolder: join(BENCH_OUTPUT_ROOT, 'large-par') },
     },
     {
+        name: 'large_pdf (12p) → buffers, workers(4)',
+        pdfFile: join(TEST_DATA, 'large_pdf.pdf'),
+        options: { returnPageContent: true, renderInWorkerThreads: true },
+    },
+    {
+        name: 'TAMReview → buffers, workers(4)',
+        pdfFile: join(TEST_DATA, 'TAMReview.pdf'),
+        options: { returnPageContent: true, renderInWorkerThreads: true },
+    },
+    {
         name: 'sample (2p) → buffers, sequential',
         pdfFile: join(TEST_DATA, 'sample.pdf'),
         options: { returnPageContent: true },

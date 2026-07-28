@@ -3,13 +3,16 @@ import { parse, resolve } from 'node:path';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { PDF_TO_PNG_OPTIONS_DEFAULTS, SEQUENTIAL_PIPELINE_WINDOW } from './const.js';
 import { FilesystemSink } from './filesystemSink.js';
-import type { PngPageOutput } from './interfaces/index.js';
+import type { InMemoryPngPageOutput, PngPageOutput } from './interfaces/index.js';
 import type { OutputSink } from './interfaces/output.sink.js';
+import type { WorkerDocumentOptions } from './interfaces/worker.protocol.js';
 import type { NormalizedPdfToPngOptions } from './normalizePdfToPngOptions.js';
 import { optionsToPageMode } from './pageMode.js';
-import { processAndSavePage, resolvePageName } from './pageOrchestrator.js';
+import { finalizePageOutput, processAndSavePage, resolvePageName, shouldMaterializeContent } from './pageOrchestrator.js';
 import { getPdfFileBuffer } from './pdfInput.js';
 import { getPdfDocument } from './pdfjsLoader.js';
+import type { WorkerPageTask } from './workerPool.js';
+import { renderPagesInWorkerPool } from './workerPool.js';
 
 async function processPagesWithSlidingWindow<T>(
     pageNumbers: number[],
@@ -99,6 +102,17 @@ export async function pdfToPngCore(
 ): Promise<PngPageOutput[]> {
     const pageViewportScale = normalizedProps.viewportScale;
     const pdfFileBuffer: Uint8Array | ArrayBufferLike = await getPdfFileBuffer(pdfFile, normalizedProps.maxInputBytes);
+
+    // Worker mode needs the raw bytes AFTER the main-thread document load, but getPdfDocument
+    // transfers (detaches) the buffer it is given — so copy first. Worker-mode-only cost: one
+    // extra copy of the input; each worker then receives its own structured-clone of this copy.
+    const useWorkerThreads = normalizedProps.renderInWorkerThreads === true && !normalizedProps.returnMetadataOnly;
+    let workerPdfBytes: Uint8Array | undefined;
+    if (useWorkerThreads) {
+        const view = pdfFileBuffer instanceof Uint8Array ? pdfFileBuffer : new Uint8Array(pdfFileBuffer);
+        workerPdfBytes = Uint8Array.from(view);
+    }
+
     const pdfDocument: PDFDocumentProxy = await getPdfDocument(pdfFileBuffer, normalizedProps);
 
     // Wrap ALL post-load work in this try so the worker is destroyed even if setup steps
@@ -140,14 +154,58 @@ export async function pdfToPngCore(
                 ? new FilesystemSink(resolvedOutputFolder, realOutputFolder)
                 : undefined;
         const pageMode = optionsToPageMode(normalizedProps, outputSink);
+
+        // Worker-thread mode: pages rasterize + encode inside a pool of worker threads (true
+        // multi-core parallelism — the main-thread modes below share one JS thread for all
+        // rendering). The main thread keeps everything else: page filtering, name resolution,
+        // duplicate detection (all above), and per-page output finalization — file writes go
+        // through the same sink and path-security guards as every other mode.
+        if (useWorkerThreads && pageMode.kind !== 'metadata' && workerPdfBytes !== undefined) {
+            const workerResults = new Array<PngPageOutput>(validPagesToProcess.length);
+            const tasks: WorkerPageTask[] = validPagesToProcess.map((pageNumber, index) => ({
+                index,
+                pageNumber,
+                pageName: resolvedNames[index],
+            }));
+            const documentOptions: WorkerDocumentOptions = {
+                viewportScale: normalizedProps.viewportScale,
+                disableFontFace: normalizedProps.disableFontFace,
+                useSystemFonts: normalizedProps.useSystemFonts,
+                enableXfa: normalizedProps.enableXfa,
+                pdfFilePassword: normalizedProps.pdfFilePassword,
+                verbosityLevel: normalizedProps.verbosityLevel,
+            };
+            await renderPagesInWorkerPool(
+                workerPdfBytes,
+                documentOptions,
+                shouldMaterializeContent(pageMode),
+                tasks,
+                normalizedProps.concurrencyLimit,
+                async (index, page) => {
+                    const rendered: InMemoryPngPageOutput = {
+                        kind: 'content',
+                        pageNumber: page.pageNumber,
+                        name: page.name,
+                        content: page.content,
+                        path: '',
+                        width: page.width,
+                        height: page.height,
+                        rotation: page.rotation,
+                    };
+                    workerResults[index] = await finalizePageOutput(rendered, pageMode);
+                },
+            );
+            return workerResults;
+        }
+
         const processPage = async (pageNumber: number, index: number): Promise<PngPageOutput> =>
             await processAndSavePage(pdfDocument, resolvedNames[index], pageNumber, pageViewportScale, pageMode);
 
-        // Sequential mode also runs through the sliding window, with a fixed window of 2: up to
-        // two pages are in flight, so page N's PNG encode (libuv threadpool) and disk write
-        // overlap page N+1's render on the JS thread. Result order and rendered pixels are
-        // identical to a strict one-at-a-time loop; side effects (disk writes) may complete out
-        // of page order, and at most one extra canvas is alive at a time.
+        // Sequential mode also runs through the sliding window, with a fixed window of
+        // SEQUENTIAL_PIPELINE_WINDOW (3): the PNG encodes (libuv threadpool) and disk writes of
+        // finished pages overlap the next page's render on the JS thread. Result order and
+        // rendered pixels are identical to a strict one-at-a-time loop; side effects (disk
+        // writes) may complete out of page order, and up to three canvases are alive at a time.
         const windowSize = normalizedProps.processPagesInParallel === true ? normalizedProps.concurrencyLimit : SEQUENTIAL_PIPELINE_WINDOW;
         // Returned directly (not spread into push(...)) — spreading a huge result array into one
         // call exceeds V8's argument-count cap and crashes on very large page counts.

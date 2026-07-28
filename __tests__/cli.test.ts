@@ -86,6 +86,7 @@ describe('buildPdfToPngOptions', () => {
                 'verbosity-level': '1',
                 'process-pages-in-parallel': true,
                 'concurrency-limit': '2',
+                'render-in-worker-threads': true,
             },
             ['test.pdf'],
         );
@@ -105,10 +106,17 @@ describe('buildPdfToPngOptions', () => {
                 verbosityLevel: 1,
                 processPagesInParallel: true,
                 concurrencyLimit: 2,
+                renderInWorkerThreads: true,
                 returnMetadataOnly: undefined,
                 returnPageContent: false,
             }),
         );
+        expect(built.options.renderInWorkerThreads).toBe(true);
+    });
+
+    it('defaults renderInWorkerThreads to false when the flag is absent', () => {
+        const built = buildPdfToPngOptions({ 'return-metadata-only': true }, ['test.pdf']);
+        expect(built.options.renderInWorkerThreads).toBe(false);
     });
 
     it('throws when no pdf path is provided', () => {

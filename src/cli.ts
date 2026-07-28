@@ -24,7 +24,8 @@ Options:
   --verbosity-level <number>        pdfjs verbosity level (0=errors, 1=warnings, 5=infos)
   --return-metadata-only            Return page metadata without rendering images
   --process-pages-in-parallel       Process pages concurrently
-  --concurrency-limit <number>      Maximum number of pages rendered simultaneously
+  --concurrency-limit <number>      Max concurrent pages (parallel) / worker-pool size (worker threads)
+  --render-in-worker-threads        Rasterize pages in a pool of worker threads (multi-core)
   --silent                          Suppress output unless there is an error
   --version                         Show version
   --help                            Show this help message`;
@@ -47,6 +48,7 @@ const CLI_OPTIONS = {
     'return-page-content': { type: 'boolean' },
     'process-pages-in-parallel': { type: 'boolean' },
     'concurrency-limit': { type: 'string' },
+    'render-in-worker-threads': { type: 'boolean' },
     silent: { type: 'boolean' },
     version: { type: 'boolean' },
     help: { type: 'boolean' },
@@ -65,6 +67,7 @@ type ParsedValues = {
     'return-page-content'?: boolean;
     'process-pages-in-parallel'?: boolean;
     'concurrency-limit'?: string;
+    'render-in-worker-threads'?: boolean;
     silent?: boolean;
     version?: boolean;
     help?: boolean;
@@ -181,6 +184,7 @@ export function buildPdfToPngOptions(
         returnPageContent: values['return-page-content'] ?? false,
         processPagesInParallel: values['process-pages-in-parallel'],
         concurrencyLimit: parseIntegerOption(values['concurrency-limit'], '--concurrency-limit must be a valid integer.'),
+        renderInWorkerThreads: values['render-in-worker-threads'],
     };
 
     const options = normalizePdfToPngOptions(rawOptions);

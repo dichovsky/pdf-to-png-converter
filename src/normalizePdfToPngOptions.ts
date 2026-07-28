@@ -15,6 +15,7 @@ export interface NormalizedPdfToPngOptions {
     returnPageContent: boolean;
     returnMetadataOnly: boolean;
     processPagesInParallel: boolean;
+    renderInWorkerThreads: boolean;
     concurrencyLimit: number;
     maxInputBytes: number;
 }
@@ -45,8 +46,10 @@ export function normalizePdfToPngOptions(props: PdfToPngOptions | undefined): No
     });
 
     const processPagesInParallel = props?.processPagesInParallel ?? false;
+    const renderInWorkerThreads = props?.renderInWorkerThreads ?? false;
     const concurrencyLimit: number = props?.concurrencyLimit ?? PDF_TO_PNG_OPTIONS_DEFAULTS.concurrencyLimit;
-    if (processPagesInParallel) {
+    // concurrencyLimit doubles as the worker-pool size, so worker mode validates it too.
+    if (processPagesInParallel || renderInWorkerThreads) {
         if (!Number.isInteger(concurrencyLimit) || concurrencyLimit < 1) {
             throw new Error(`concurrencyLimit must be a positive integer >= 1, received: ${concurrencyLimit}`);
         }
@@ -73,6 +76,7 @@ export function normalizePdfToPngOptions(props: PdfToPngOptions | undefined): No
         returnPageContent: props?.returnPageContent ?? true,
         returnMetadataOnly: props?.returnMetadataOnly ?? false,
         processPagesInParallel,
+        renderInWorkerThreads,
         concurrencyLimit,
         maxInputBytes,
     };

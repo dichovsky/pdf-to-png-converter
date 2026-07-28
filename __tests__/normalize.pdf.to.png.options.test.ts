@@ -17,6 +17,7 @@ test('should apply defaults when options are undefined', () => {
         returnPageContent: true,
         returnMetadataOnly: false,
         processPagesInParallel: false,
+        renderInWorkerThreads: false,
         concurrencyLimit: 4,
         maxInputBytes: MAX_INPUT_BYTES,
     });
@@ -39,6 +40,7 @@ test('should preserve explicitly provided happy-path values', () => {
             returnPageContent: false,
             returnMetadataOnly: true,
             processPagesInParallel: true,
+            renderInWorkerThreads: true,
             concurrencyLimit: 2,
             maxInputBytes: 1024,
         }),
@@ -55,9 +57,20 @@ test('should preserve explicitly provided happy-path values', () => {
         returnPageContent: false,
         returnMetadataOnly: true,
         processPagesInParallel: true,
+        renderInWorkerThreads: true,
         concurrencyLimit: 2,
         maxInputBytes: 1024,
     });
+});
+
+test('should validate concurrencyLimit when renderInWorkerThreads is enabled (it sizes the pool)', () => {
+    expect(() => normalizePdfToPngOptions({ renderInWorkerThreads: true, concurrencyLimit: 0 })).toThrow(
+        'concurrencyLimit must be a positive integer >= 1',
+    );
+    expect(() => normalizePdfToPngOptions({ renderInWorkerThreads: true, concurrencyLimit: MAX_CONCURRENCY_LIMIT + 1 })).toThrow(
+        `concurrencyLimit must be between 1 and ${MAX_CONCURRENCY_LIMIT}`,
+    );
+    expect(normalizePdfToPngOptions({ renderInWorkerThreads: true, concurrencyLimit: 2 }).renderInWorkerThreads).toBe(true);
 });
 
 test('should reject concurrencyLimit values above MAX_CONCURRENCY_LIMIT when parallel is enabled', () => {

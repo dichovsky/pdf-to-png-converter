@@ -1,8 +1,11 @@
 import { sep } from 'node:path';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
-import type { FilePngPageOutput, PngPageOutput } from './interfaces/index.js';
+import type { FilePngPageOutput, InMemoryPngPageOutput, PngPageOutput } from './interfaces/index.js';
 import type { PageMode } from './pageMode.js';
 import { getPageMetadata, renderPdfPage } from './pageRenderer.js';
+
+/** The two `PageMode`s that involve an actual render (everything except `metadata`). */
+export type RenderedPageMode = Exclude<PageMode, { kind: 'metadata' }>;
 
 // Reject only characters the host OS treats as path separators. On Windows both "\" and "/"
 // are separators; on POSIX only "/" is — "\" is a valid filename character there, so PDFs
@@ -45,23 +48,14 @@ export function resolvePageName(
     return name;
 }
 
-export async function processAndSavePage(
-    pdfDocument: PDFDocumentProxy,
-    pageName: string,
-    pageNumber: number,
-    pageViewportScale: number,
-    mode: PageMode,
-): Promise<PngPageOutput> {
-    if (mode.kind === 'metadata') {
-        return await getPageMetadata(pdfDocument, pageName, pageNumber, pageViewportScale);
-    }
-
-    // The page is always rendered (the canvas is needed for dimensions); this flag only controls
-    // whether the PNG Buffer is materialized. `file` mode always materializes it so the page can be
-    // written; `content` mode materializes it only when the caller asked to keep it.
-    const shouldReturnContent = mode.kind === 'file' ? true : mode.returnContent;
-    const pageOutput = await renderPdfPage(pdfDocument, pageName, pageNumber, pageViewportScale, shouldReturnContent);
-
+/**
+ * Applies the output half of a page's lifecycle to an already-rendered page: pass-through for
+ * in-memory mode, or sink write + content trimming for file mode. Split out from
+ * `processAndSavePage` so worker-thread conversions — where rendering happens off-thread but
+ * output must stay on the main thread (path-security guards live here) — reuse the exact same
+ * output logic.
+ */
+export async function finalizePageOutput(pageOutput: InMemoryPngPageOutput, mode: RenderedPageMode): Promise<PngPageOutput> {
     if (mode.kind === 'content') {
         return pageOutput;
     }
@@ -77,4 +71,28 @@ export async function processAndSavePage(
         content: mode.returnContent ? pageOutput.content : undefined,
     };
     return filePageOutput;
+}
+
+/**
+ * Returns whether a rendered page must materialize its PNG Buffer. `file` mode always does (the
+ * bytes are needed for the write); `content` mode only when the caller asked to keep it.
+ */
+export function shouldMaterializeContent(mode: RenderedPageMode): boolean {
+    return mode.kind === 'file' ? true : mode.returnContent;
+}
+
+export async function processAndSavePage(
+    pdfDocument: PDFDocumentProxy,
+    pageName: string,
+    pageNumber: number,
+    pageViewportScale: number,
+    mode: PageMode,
+): Promise<PngPageOutput> {
+    if (mode.kind === 'metadata') {
+        return await getPageMetadata(pdfDocument, pageName, pageNumber, pageViewportScale);
+    }
+
+    const pageOutput = await renderPdfPage(pdfDocument, pageName, pageNumber, pageViewportScale, shouldMaterializeContent(mode));
+
+    return await finalizePageOutput(pageOutput, mode);
 }

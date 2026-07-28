@@ -245,43 +245,6 @@ describe('pdfToPng', () => {
         expect(mockCanvasFactory.destroy).toHaveBeenCalledWith(created);
     });
 
-    it('should throw when outputFolder directory resolves outside outputFolder via symlink (symlink escape on dirname)', async () => {
-        // Simulates a symlink swap: the filename is safe-looking but realpath(dirname(file))
-        // resolves to a path outside realOutputFolder — L458 in savePNGfile.
-        const mockCanvas = { encode: vi.fn().mockResolvedValue(Buffer.alloc(0)) };
-        const mockCanvasFactory = {
-            create: vi.fn().mockReturnValue({ canvas: mockCanvas, context: {} }),
-            destroy: vi.fn(),
-        };
-        const mockPage = {
-            getViewport: vi.fn().mockReturnValue({ width: 10, height: 10 }),
-            render: vi.fn().mockReturnValue({ promise: Promise.resolve() }),
-            rotate: 0,
-            cleanup: vi.fn(),
-        };
-        const mockDocument = {
-            numPages: 1,
-            getPage: vi.fn().mockResolvedValue(mockPage),
-            cleanup: vi.fn(),
-            loadingTask: { destroy: vi.fn().mockResolvedValue(undefined) },
-            canvasFactory: mockCanvasFactory,
-        };
-
-        (fsPromises.readFile as Mock).mockResolvedValueOnce(new ArrayBuffer(8));
-        (getDocument as Mock).mockReturnValueOnce({
-            promise: Promise.resolve(mockDocument),
-        });
-        (fsPromises.mkdir as Mock).mockResolvedValueOnce(undefined);
-        // 1st realpath: resolvedOutputFolder in pdfToPng → establishes realOutputFolder
-        // 2nd realpath: dirname(resolvedFilePath) in savePNGfile → escapes (simulates symlink)
-        (fsPromises.realpath as Mock).mockResolvedValueOnce('/safe/output').mockResolvedValueOnce('/evil');
-
-        await expect(pdfToPng('/path/to/test.pdf', { outputFolder: 'test-output' })).rejects.toThrow(
-            'Output file name escapes the output folder',
-        );
-        expect(fsPromises.open).not.toHaveBeenCalled();
-    });
-
     it('should throw when content is undefined at write time (defensive guard)', async () => {
         // Simulates canvas.encode() resolving to undefined (e.g. broken canvas implementation).
         // Guards L463: the savePNGfile defensive check that content must not be undefined.
@@ -309,9 +272,9 @@ describe('pdfToPng', () => {
             promise: Promise.resolve(mockDocument),
         });
         (fsPromises.mkdir as Mock).mockResolvedValueOnce(undefined);
-        // Both realpath calls return the same safe path so the symlink check (L457) passes;
-        // L463 fires before the TOCTOU re-check (L474) is reached.
-        (fsPromises.realpath as Mock).mockResolvedValueOnce('/safe/output').mockResolvedValueOnce('/safe/output');
+        // Only the initial realpath in pdfToPngCore is consumed — the undefined-content guard
+        // fires in the page orchestrator before savePNGfile is ever called.
+        (fsPromises.realpath as Mock).mockResolvedValueOnce('/safe/output');
 
         await expect(pdfToPng('/path/to/test.pdf', { outputFolder: 'test-output' })).rejects.toThrow('Cannot write PNG file');
         expect(fsPromises.open).not.toHaveBeenCalled();
@@ -344,13 +307,12 @@ describe('pdfToPng', () => {
             promise: Promise.resolve(mockDocument),
         });
         (fsPromises.mkdir as Mock).mockResolvedValueOnce(undefined);
-        // 1st realpath: resolvedOutputFolder in pdfToPng (cached as realOutputFolder) — passes
-        // 2nd realpath: dirname(resolvedFilePath) in savePNGfile (symlink containment check) — passes
-        // 3rd realpath: resolvedOutputFolder in savePNGfile (final TOCTOU re-check) — differs → throws
-        (fsPromises.realpath as Mock)
-            .mockResolvedValueOnce('/safe/output')
-            .mockResolvedValueOnce('/safe/output')
-            .mockResolvedValueOnce('/swapped/evil');
+        // 1st realpath: resolvedOutputFolder in pdfToPngCore (cached as realOutputFolder) — passes
+        // 2nd realpath: resolvedOutputFolder in savePNGfile (pre-open re-check) — differs → throws.
+        // This single equality re-check also subsumes the old dirname containment check: with
+        // flat filenames the file's directory IS the output folder, and any symlink swap makes
+        // the fresh realpath differ from the cached one.
+        (fsPromises.realpath as Mock).mockResolvedValueOnce('/safe/output').mockResolvedValueOnce('/swapped/evil');
 
         await expect(pdfToPng('/path/to/test.pdf', { outputFolder: 'test-output' })).rejects.toThrow(
             'Output folder was modified during write',
