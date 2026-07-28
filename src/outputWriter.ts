@@ -18,17 +18,26 @@ export interface OutputFolderHandle {
 }
 
 /**
- * Resolves `outputFolder` against the process CWD, creates it, and captures its `realpath` as the
- * baseline every subsequent write is checked against. Colocated with `savePNGfile` so the whole
- * SEC-001/002/003 threat model — folder creation, the realpath baseline, and the per-write
- * re-check that consumes it — lives in this one module.
+ * Resolves `outputFolder` against the process CWD. Kept separate from `prepareOutputFolder` so the
+ * CWD is captured at conversion start, before any user-supplied `outputFileMaskFunc` runs: a mask
+ * callback that calls `process.chdir()` must not be able to redirect where a relative
+ * `outputFolder` lands.
+ */
+export function resolveOutputFolder(outputFolder: string): string {
+    return resolve(outputFolder);
+}
+
+/**
+ * Creates the already-resolved output folder and captures its `realpath` as the baseline every
+ * subsequent write is checked against. Colocated with `savePNGfile` so the whole SEC-001/002/003
+ * threat model — folder creation, the realpath baseline, and the per-write re-check that consumes
+ * it — lives in this one module.
  *
  * Callers must reject duplicate output filenames BEFORE calling this: it is the first output I/O
  * of a conversion, and running it earlier would leave a created directory behind on a conversion
  * that then fails validation.
  */
-export async function prepareOutputFolder(outputFolder: string): Promise<OutputFolderHandle> {
-    const resolvedOutputFolder = resolve(outputFolder);
+export async function prepareOutputFolder(resolvedOutputFolder: string): Promise<OutputFolderHandle> {
     await fsPromises.mkdir(resolvedOutputFolder, { recursive: true });
     const realOutputFolder = await fsPromises.realpath(resolvedOutputFolder);
     return { resolvedOutputFolder, realOutputFolder };

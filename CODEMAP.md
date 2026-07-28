@@ -10,7 +10,7 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
     "name": "pdf-to-png-converter",
     "version": "4.2.0"
   },
-  "sourceHash": "aa22be2e45702af6cab767d1203eb5b6e8aad6959c1562ed54c4b4d82c9e02c5",
+  "sourceHash": "892aa3dfd2946dabcd27adf286e1a268a35f70bc8b9ed32abe6e274075137bd5",
   "entrypoints": [
     "src/index.ts"
   ],
@@ -681,16 +681,23 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
           "signature": "export interface OutputFolderHandle { readonly resolvedOutputFolder: string; readonly realOutputFolder: string; }"
         },
         {
+          "name": "resolveOutputFolder",
+          "kind": "function",
+          "line": 26,
+          "exported": true,
+          "signature": "export function resolveOutputFolder(outputFolder: string): string"
+        },
+        {
           "name": "prepareOutputFolder",
           "kind": "function",
-          "line": 30,
+          "line": 40,
           "exported": true,
-          "signature": "export async function prepareOutputFolder(outputFolder: string): Promise<OutputFolderHandle>"
+          "signature": "export async function prepareOutputFolder(resolvedOutputFolder: string): Promise<OutputFolderHandle>"
         },
         {
           "name": "savePNGfile",
           "kind": "function",
-          "line": 55,
+          "line": 64,
           "exported": true,
           "signature": "export async function savePNGfile(name: string, content: Buffer, folder: OutputFolderHandle): Promise<string>"
         }
@@ -1025,9 +1032,16 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
           "signature": "function rejectOversized(byteLength: number, maxInputBytes: number): void"
         },
         {
+          "name": "isByteArrayLike",
+          "kind": "function",
+          "line": 10,
+          "exported": false,
+          "signature": "function isByteArrayLike(value: unknown): value is ArrayLike<number>"
+        },
+        {
           "name": "getPdfFileBuffer",
           "kind": "function",
-          "line": 15,
+          "line": 20,
           "exported": true,
           "signature": "export async function getPdfFileBuffer(pdfFile: string | ArrayBufferLike | Uint8Array, maxInputBytes: number): Promise<Uint8Array>"
         }
@@ -1143,7 +1157,8 @@ Verified by `npm run codemap:check` (CI). Do not hand-edit.
         {
           "from": "./outputWriter.js",
           "names": [
-            "prepareOutputFolder"
+            "prepareOutputFolder",
+            "resolveOutputFolder"
           ]
         },
         {

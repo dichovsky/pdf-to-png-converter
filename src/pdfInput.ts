@@ -6,6 +6,11 @@ function rejectOversized(byteLength: number, maxInputBytes: number): void {
     }
 }
 
+/** An object exposing a finite numeric `length` — the shape pdf.js itself accepts as byte data. */
+function isByteArrayLike(value: unknown): value is ArrayLike<number> {
+    return typeof value === 'object' && value !== null && Number.isFinite((value as { length?: unknown }).length);
+}
+
 /**
  * Normalizes every supported input shape to a `Uint8Array` that pdfjs may safely transfer
  * (detach). Closing the return type here means this module is the single owner of "what shape we
@@ -70,9 +75,34 @@ export async function getPdfFileBuffer(pdfFile: string | ArrayBufferLike | Uint8
         return Uint8Array.from(new Uint8Array(pdfFile));
     }
 
-    // Out of contract for TypeScript callers (the parameter type covers every branch above), but
-    // reachable from JavaScript. Reject here with the same message the file-path branch uses,
-    // rather than passing the value through for pdfjs to reject: this module owns the input
-    // contract, so an unsupported shape must not escape it.
+    // The branches below are unreachable for TypeScript callers — the parameter type is exhausted
+    // above — but `instanceof` is realm-bound, so genuine byte containers created in another realm
+    // land here. pdf.js accepted all of these before this seam closed the union (`getDataProp`
+    // takes anything satisfying `ArrayBuffer.isView` or having a numeric `length`, and the old
+    // loader coerced the rest with `new Uint8Array(value)`), so they must keep converting.
+    const candidate: unknown = pdfFile;
+
+    // Cross-realm typed arrays and `DataView`s — e.g. built inside `node:vm` or `isolated-vm`,
+    // where a real `Uint8Array` fails `instanceof` while still satisfying the declared type.
+    if (ArrayBuffer.isView(candidate)) {
+        return Uint8Array.from(new Uint8Array(candidate.buffer, candidate.byteOffset, candidate.byteLength));
+    }
+
+    // Cross-realm `ArrayBuffer`, for the same reason.
+    if (Object.prototype.toString.call(candidate) === '[object ArrayBuffer]') {
+        return Uint8Array.from(new Uint8Array(candidate as ArrayBuffer));
+    }
+
+    // Array-likes of byte values — most commonly a Node `Buffer` that round-tripped through JSON
+    // as `{ type: 'Buffer', data: number[] }` and reaches us as that `data` array. `byteLength` is
+    // `undefined` on these, so the size cap above skipped them; apply it to `length` here.
+    if (isByteArrayLike(candidate)) {
+        rejectOversized(candidate.length, maxInputBytes);
+        return Uint8Array.from(candidate);
+    }
+
+    // Genuinely unsupported. Reject here with the same message the file-path branch uses, rather
+    // than passing the value through for pdfjs to reject: this module owns the input contract, so
+    // an unsupported shape must not escape it.
     throw new Error(`Unsupported buffer type: ${Object.prototype.toString.call(pdfFile)}`);
 }
