@@ -89,12 +89,21 @@ function checkTarballContents(failures: string[]): void {
     let files: string[];
     try {
         const out = runNpm(['pack', '--dry-run', '--ignore-scripts', '--json']);
-        const start = out.indexOf('[');
+        // npm <= 11 prints a JSON ARRAY of pack results; npm >= 12 prints an OBJECT keyed by
+        // package name. Anchoring on the first "[" parsed the nested "files" array and then
+        // choked on the trailing keys, so P4 reported "could not inspect the tarball" and blocked
+        // the release. Accept both shapes — publish.yml currently pins npm@11.13.0, so this is
+        // latent there but active for anyone running the precheck locally on npm 12.
+        const start = out.search(/[[{]/);
         if (start === -1) {
-            throw new Error('no JSON array in "npm pack" output');
+            throw new Error('no JSON in "npm pack" output');
         }
-        const result = JSON.parse(out.slice(start)) as PackResult[];
-        files = result[0].files.map((file) => file.path.replace(/\\/g, '/'));
+        const parsed: unknown = JSON.parse(out.slice(start));
+        const result = (Array.isArray(parsed) ? parsed[0] : Object.values(parsed as Record<string, unknown>)[0]) as PackResult | undefined;
+        if (result?.files === undefined) {
+            throw new Error('"npm pack" output has no file list');
+        }
+        files = result.files.map((file) => file.path.replace(/\\/g, '/'));
     } catch (err) {
         failures.push(`P4 could not inspect the tarball: ${err instanceof Error ? err.message : String(err)}`);
         return;
@@ -118,6 +127,43 @@ function checkTarballContents(failures: string[]): void {
     }
 }
 
+// P5 — `[Unreleased]` must be empty at publish time.
+//
+// P3 only asks whether a section for THIS version exists; it says nothing about entries still
+// sitting under `[Unreleased]`. Those entries are in the working tree, so they are in the tarball
+// — the release would ship code its own changelog calls unreleased. This is not hypothetical: it
+// happened while 4.2.0 sat version-bumped but unpublished and later work landed on top of it, and
+// P1-P4 all passed. The documented flow (CONTRIBUTING "Cutting a release", step 2) is to move
+// `[Unreleased]` into the new version section, so a non-empty one at this point means that step
+// was skipped.
+function checkUnreleasedIsEmpty(failures: string[]): void {
+    const changelog = readFileSync(join(REPO_ROOT, 'CHANGELOG.md'), 'utf-8');
+    const start = changelog.search(/^##\s*\[Unreleased\]/m);
+    if (start === -1) {
+        // No `[Unreleased]` heading at all is fine — nothing can be stranded under it.
+        console.log('  P5 [Unreleased] is empty:  OK (no [Unreleased] section)');
+        return;
+    }
+    const rest = changelog.slice(start);
+    const nextHeading = rest.slice(1).search(/^##\s/m);
+    const body = nextHeading === -1 ? rest.replace(/^##.*$/m, '') : rest.slice(0, nextHeading + 1).replace(/^##.*$/m, '');
+    const stranded = body
+        .split('\n')
+        .map((line) => line.trim())
+        // Sub-headings are scaffolding, not content: an `[Unreleased]` left holding an empty
+        // "### Changed" ships nothing and must not block the release. Everything else counts —
+        // narrowing this to bullet lines would let stranded prose through, and prose under
+        // `[Unreleased]` describes shipped behaviour just as much as a bullet does.
+        .filter((line) => line.length > 0 && !line.startsWith('#'));
+    if (stranded.length > 0) {
+        failures.push(
+            `P5 CHANGELOG.md still has ${stranded.length} entry line(s) under "## [Unreleased]" — move them into the version section being released, or they ship undocumented`,
+        );
+        return;
+    }
+    console.log('  P5 [Unreleased] is empty:  OK');
+}
+
 function main(): void {
     const { name, version } = readManifest();
     console.log(`release:precheck for ${name}@${version}`);
@@ -126,6 +172,7 @@ function main(): void {
     checkNotAlreadyPublished(name, version, failures);
     checkChangelogEntry(version, failures);
     checkTarballContents(failures);
+    checkUnreleasedIsEmpty(failures);
     if (failures.length > 0) {
         console.error('\nrelease:precheck FAILED:');
         for (const failure of failures) {
