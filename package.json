@@ -78,33 +78,32 @@
         ]
     },
     "dependencies": {
-        "@napi-rs/canvas": "~1.0.3",
+        "@napi-rs/canvas": "~1.0.5",
         "pdfjs-dist": "~6.2.108"
     },
     "devDependencies": {
         "@eslint/js": "^10.0.1",
-        "@types/node": "^26.1.2",
-        "@typescript-eslint/eslint-plugin": "^8.65.0",
-        "@typescript-eslint/parser": "^8.65.0",
+        "@types/node": "^26.2.0",
+        "@typescript-eslint/eslint-plugin": "^8.67.0",
+        "@typescript-eslint/parser": "^8.67.0",
         "@typescript/native": "npm:typescript@~7.0.2",
         "@vitest/coverage-v8": "^4.1.10",
-        "eslint": "^10.8.0",
+        "eslint": "^10.8.1",
         "husky": "^9.1.7",
         "license-checker-rseidelsohn": "^5.0.1",
-        "lint-staged": "^17.2.0",
-        "png-visual-compare": "^6.2.0",
+        "lint-staged": "^17.3.0",
+        "png-visual-compare": "^6.3.0",
         "prettier": "^3.9.6",
         "rimraf": "^6.1.3",
         "ts-node": "^10.9.2",
         "typescript": "npm:@typescript/typescript6@~6.0.2",
         "vitest": "^4.1.10"
     },
-    "overrides": {
-        "brace-expansion": "^5.0.8"
-    },
-    "packageManager": "npm@11.13.0",
     "engines": {
-        "node": ">=22.13.0 || >=24"
+        "node": ">=24"
     },
-    "_packageFormatNote": "CJS-only — nodenext TS with .js specifiers is compatible."
+    "_packageFormatNote": "CJS-only — nodenext TS with .js specifiers is compatible.",
+    "allowScripts": {
+        "fsevents@2.3.3": true
+    }
 }
