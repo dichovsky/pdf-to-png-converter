@@ -1,4 +1,7 @@
-import { promises as fsPromises } from 'node:fs';
+import { constants as fsConstants, promises as fsPromises } from 'node:fs';
+import type { FileHandle } from 'node:fs/promises';
+
+const FILE_READ_GROWTH_BYTES = 64 * 1024;
 
 function rejectOversized(byteLength: number, maxInputBytes: number): void {
     if (byteLength > maxInputBytes) {
@@ -11,6 +14,54 @@ function isByteArrayLike(value: unknown): value is ArrayLike<number> {
     return typeof value === 'object' && value !== null && Number.isFinite((value as { length?: unknown }).length);
 }
 
+function toTransferableView(buffer: Buffer, byteLength: number): Uint8Array {
+    // A full-span allocation is owned exclusively by this read, so pdf.js may transfer its
+    // ArrayBuffer without a copy. A short read must be copied into an exact-size allocation: its
+    // unused tail is uninitialized and must neither be exposed nor transferred.
+    if (byteLength > 0 && byteLength === buffer.byteLength && buffer.byteOffset === 0 && buffer.byteLength === buffer.buffer.byteLength) {
+        return new Uint8Array(buffer.buffer);
+    }
+    return Uint8Array.from(buffer.subarray(0, byteLength));
+}
+
+/** Reads one already-open regular file, never allocating or reading more than the configured cap plus a one-byte overflow probe. */
+async function readBoundedFile(fileHandle: FileHandle, reportedSize: number, maxInputBytes: number): Promise<Uint8Array> {
+    // allocUnsafeSlow produces a dedicated, full-span ArrayBuffer. That preserves the normal
+    // stable-file zero-copy handoff without exposing bytes from Node's shared small-buffer pool.
+    let buffer = Buffer.allocUnsafeSlow(reportedSize);
+    let totalBytesRead = 0;
+
+    while (true) {
+        if (totalBytesRead === buffer.byteLength) {
+            // A file may have grown since fstat(). Probe one byte past the current allocation to
+            // distinguish EOF from growth without ever allocating an unbounded read buffer.
+            const probe = Buffer.allocUnsafeSlow(1);
+            const { bytesRead } = await fileHandle.read(probe, 0, 1, totalBytesRead);
+            if (bytesRead === 0) {
+                return toTransferableView(buffer, totalBytesRead);
+            }
+            if (totalBytesRead === maxInputBytes) {
+                rejectOversized(totalBytesRead + 1, maxInputBytes);
+            }
+
+            const doubledCapacity = buffer.byteLength === 0 ? FILE_READ_GROWTH_BYTES : buffer.byteLength * 2;
+            const nextCapacity = Math.min(maxInputBytes, Math.max(totalBytesRead + 1, doubledCapacity));
+            const expanded = Buffer.allocUnsafeSlow(nextCapacity);
+            buffer.copy(expanded, 0, 0, totalBytesRead);
+            expanded[totalBytesRead] = probe[0];
+            buffer = expanded;
+            totalBytesRead += 1;
+            continue;
+        }
+
+        const { bytesRead } = await fileHandle.read(buffer, totalBytesRead, buffer.byteLength - totalBytesRead, totalBytesRead);
+        if (bytesRead === 0) {
+            return toTransferableView(buffer, totalBytesRead);
+        }
+        totalBytesRead += bytesRead;
+    }
+}
+
 /**
  * Normalizes every supported input shape to a `Uint8Array` that pdfjs may safely transfer
  * (detach). Closing the return type here means this module is the single owner of "what shape we
@@ -19,35 +70,21 @@ function isByteArrayLike(value: unknown): value is ArrayLike<number> {
  */
 export async function getPdfFileBuffer(pdfFile: string | ArrayBufferLike | Uint8Array, maxInputBytes: number): Promise<Uint8Array> {
     if (typeof pdfFile === 'string') {
-        const stats = await fsPromises.stat(pdfFile);
-        if (!stats.isFile()) {
-            throw new Error(`Input PDF path is not a regular file: ${pdfFile}`);
-        }
-        rejectOversized(stats.size, maxInputBytes);
-
-        const buffer = await fsPromises.readFile(pdfFile);
-        // Post-read re-check: closes the TOCTOU window between stat() and readFile().
-        // If the file was replaced or grew between the two calls, the buffer may exceed
-        // maxInputBytes — reject it before it propagates further into pdfjs parsing.
-        rejectOversized(buffer.byteLength, maxInputBytes);
-        if (buffer instanceof ArrayBuffer) {
-            // Fresh allocation owned by this call — a full-span view is safe to hand over.
-            return new Uint8Array(buffer);
-        }
-        if (Buffer.isBuffer(buffer)) {
-            // Zero-copy handoff. This Buffer was freshly allocated by readFile and is never
-            // exposed to the caller, so pdfjs may safely transfer (detach) its underlying
-            // ArrayBuffer — unlike the caller-owned branches below, no defensive copy is needed.
-            // readFile allocates non-pooled memory today; the full-span guard protects against
-            // any future pooled allocation whose ArrayBuffer is shared with unrelated data.
-            // Empty (or detached, byteLength 0) buffers take the copy path so pdfjs raises its
-            // clear "empty PDF" error instead of an opaque constructor TypeError.
-            if (buffer.byteLength > 0 && buffer.byteOffset === 0 && buffer.byteLength === buffer.buffer.byteLength) {
-                return new Uint8Array(buffer.buffer);
+        // Open once, then inspect and read through that same descriptor. A path replacement after
+        // open() cannot make validation apply to one file while bytes come from another.
+        // O_NONBLOCK avoids waiting on special paths such as FIFOs on platforms that honor the
+        // flag; fstat() then rejects anything non-regular. It has no effect on regular-file reads.
+        const fileHandle = await fsPromises.open(pdfFile, fsConstants.O_RDONLY | fsConstants.O_NONBLOCK);
+        try {
+            const stats = await fileHandle.stat();
+            if (!stats.isFile()) {
+                throw new Error(`Input PDF path is not a regular file: ${pdfFile}`);
             }
-            return new Uint8Array(buffer);
+            rejectOversized(stats.size, maxInputBytes);
+            return await readBoundedFile(fileHandle, stats.size, maxInputBytes);
+        } finally {
+            await fileHandle.close();
         }
-        throw new Error(`Unsupported buffer type: ${Object.prototype.toString.call(buffer)}`);
     }
 
     if (Buffer.isBuffer(pdfFile)) {

@@ -22,7 +22,15 @@ interface PackResult {
 
 const NPM: string = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const REPO_ROOT: string = join(__dirname, '..');
-const REQUIRED_TARBALL_FILES: readonly string[] = ['out/index.js', 'out/index.d.ts', 'out/cli.js'];
+const REQUIRED_TARBALL_FILES: readonly string[] = [
+    'out/index.js',
+    'out/index.d.ts',
+    'out/types.d.ts',
+    'out/cli.js',
+    // Loaded by runtime path rather than the main import graph, so TypeScript can build and the
+    // package can load successfully even when this independently executable artifact is absent.
+    'out/pageRenderWorker.js',
+];
 
 function readManifest(): PackageManifest {
     const raw: string = readFileSync(join(REPO_ROOT, 'package.json'), 'utf-8');

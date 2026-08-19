@@ -1,8 +1,23 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { expect, test } from 'vitest';
+import type { PDFDocumentProxy } from 'pdfjs-dist';
+import { afterEach, expect, test, vi } from 'vitest';
 import type { PngPageOutput } from '../src';
 import { pdfToPng } from '../src';
+import * as pageRenderer from '../src/pageRenderer.js';
+import * as pdfjsLoader from '../src/pdfjsLoader.js';
+
+afterEach(() => {
+    vi.restoreAllMocks();
+});
+
+function deferred(): { promise: Promise<void>; resolve: () => void } {
+    let resolve!: () => void;
+    const promise = new Promise<void>((accept) => {
+        resolve = accept;
+    });
+    return { promise, resolve };
+}
 
 test('should return metadata without rendering when returnMetadataOnly is true', async () => {
     const pdfFilePath: string = resolve('./test-data/sample.pdf');
@@ -79,6 +94,32 @@ test('should return metadata in parallel mode when returnMetadataOnly is true', 
         expect(page.height).toBeGreaterThan(0);
         expect(typeof page.rotation).toBe('number');
     }
+});
+
+test.each([1, 4])('metadata parallel mode honors concurrencyLimit %s', async (concurrencyLimit) => {
+    const destroy = vi.fn().mockResolvedValue(undefined);
+    vi.spyOn(pdfjsLoader, 'getPdfDocument').mockResolvedValue({ numPages: 5, loadingTask: { destroy } } as unknown as PDFDocumentProxy);
+
+    const startedPages: number[] = [];
+    const gates = Array.from({ length: 5 }, deferred);
+    vi.spyOn(pageRenderer, 'getPageMetadata').mockImplementation(async (_pdf, pageNumber) => {
+        startedPages.push(pageNumber);
+        await gates[pageNumber - 1].promise;
+        return { content: undefined, width: 10, height: 10, rotation: 0 };
+    });
+
+    const conversion = pdfToPng(new Uint8Array([1]), {
+        returnMetadataOnly: true,
+        processPagesInParallel: true,
+        concurrencyLimit,
+    });
+
+    await vi.waitFor(() => {
+        expect(startedPages).toEqual(Array.from({ length: concurrencyLimit }, (_, index) => index + 1));
+    });
+    for (const gate of gates) gate.resolve();
+    await expect(conversion).resolves.toHaveLength(5);
+    expect(destroy).toHaveBeenCalledOnce();
 });
 
 test('should respect viewportScale for width and height in metadata', async () => {

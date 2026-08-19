@@ -1,9 +1,8 @@
 import { parentPort, workerData } from 'node:worker_threads';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
-import type { RenderPageRequest, WorkerInitData, WorkerResponse } from './interfaces/worker.protocol.js';
-import { normalizePdfToPngOptions } from './normalizePdfToPngOptions.js';
 import { renderPdfPage } from './pageRenderer.js';
 import { getPdfDocument } from './pdfjsLoader.js';
+import type { RenderPageRequest, WorkerInitData, WorkerResponse } from './workerPool.js';
 
 /**
  * Worker-thread entry point for `renderInWorkerThreads` mode.
@@ -22,16 +21,12 @@ if (parentPort === null) {
 }
 const port = parentPort;
 const init = workerData as WorkerInitData;
-// Re-normalize inside the worker: pure, keeps NormalizedPdfToPngOptions the single validation
-// boundary on both sides of the thread hop, and reconstructs defaulted fields dropped from the
-// serializable subset.
-const normalizedOptions = normalizePdfToPngOptions(init.documentOptions);
 
 let documentPromise: Promise<PDFDocumentProxy> | undefined;
 
 /**
- * Posts a response that carries a thrown value. Error instances structured-clone with
- * name/message/stack preserved; values that cannot be cloned (functions, exotic objects some
+ * Posts a response that carries a thrown value. Error instances retain their useful standard
+ * fields through structured clone; values that cannot be cloned (functions, exotic objects some
  * libraries throw) are downgraded to a plain Error so the response always gets through.
  */
 function postErrorResponse(build: (error: unknown) => WorkerResponse, error: unknown): void {
@@ -47,7 +42,9 @@ async function handleRender(request: RenderPageRequest): Promise<void> {
     try {
         // Loaded lazily once per worker; getPdfDocument transfers (detaches) this worker's
         // private copy of the buffer, which is fine — it is loaded exactly once.
-        documentPromise ??= getPdfDocument(init.pdfBuffer, normalizedOptions);
+        // The main thread has already normalized and selected the exact fields consumed here;
+        // workers do not repeat option defaulting or validation.
+        documentPromise ??= getPdfDocument(init.pdfBuffer, init.renderOptions);
         pdfDocument = await documentPromise;
     } catch (error: unknown) {
         postErrorResponse((cause) => ({ type: 'fatal', error: cause }), error);
@@ -55,18 +52,10 @@ async function handleRender(request: RenderPageRequest): Promise<void> {
     }
 
     try {
-        const page = await renderPdfPage(
-            pdfDocument,
-            request.pageName,
-            request.pageNumber,
-            normalizedOptions.viewportScale,
-            init.materializeContent,
-        );
+        const page = await renderPdfPage(pdfDocument, request.pageNumber, init.renderOptions.viewportScale, init.materializeContent);
         const response: WorkerResponse = {
             type: 'result',
             index: request.index,
-            pageNumber: page.pageNumber,
-            name: page.name,
             width: page.width,
             height: page.height,
             rotation: page.rotation,

@@ -4,6 +4,16 @@ import { promises as fsPromises } from 'node:fs';
 import { join } from 'node:path';
 
 describe('pdfToPng returnPageContent', () => {
+    it('should skip in-memory PNG content when returnPageContent is false', async () => {
+        const result = await pdfToPng('test-data/sample.pdf', {
+            pagesToProcess: [1],
+            returnPageContent: false,
+        });
+
+        expect(result).toHaveLength(1);
+        expect(result[0]).toMatchObject({ kind: 'content', content: undefined, path: '' });
+    });
+
     it('should return content when returnPageContent is true', async () => {
         const pdfFilePath = 'test-data/sample.pdf';
         const outputFolder = 'test-results/pdf.to.png.returnPageContent.true';

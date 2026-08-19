@@ -2,8 +2,7 @@ import { promises as fsPromises } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative, resolve } from 'node:path';
 import { expect, test } from 'vitest';
-import type { PdfToPngOptions } from '../src/interfaces/pdf.to.png.options.js';
-import { resolvePageName } from '../src/pageOrchestrator.js';
+import type { PdfToPngOptions } from '../src/types.js';
 import { pdfToPng } from '../src';
 
 const SAMPLE_PDF = resolve('./test-data/sample.pdf');
@@ -64,8 +63,10 @@ test('should reject absolute outputFileMaskFunc values', async () => {
     }
 });
 
-test('should reject empty outputFileMaskFunc filenames', () => {
-    expect(() => resolvePageName(1, 'sample', () => '')).toThrow('outputFileMaskFunc returned an empty filename');
+test('should reject empty outputFileMaskFunc filenames', async () => {
+    await expect(pdfToPng(SAMPLE_PDF, { outputFileMaskFunc: () => '', pagesToProcess: [1] })).rejects.toThrow(
+        'outputFileMaskFunc returned an empty filename',
+    );
 });
 
 test('should reject an empty outputFolder before any I/O', async () => {

@@ -1,7 +1,8 @@
 import { afterEach, expect, test, vi } from 'vitest';
-import type { RenderPageRequest, WorkerResponse } from '../src/interfaces/worker.protocol';
+import type { PageRenderResult } from '../src/pageRenderer';
+import { VerbosityLevel } from '../src/types';
 import { renderPagesInWorkerPool } from '../src/workerPool';
-import type { WorkerPageTask, WorkerRenderedPage } from '../src/workerPool';
+import type { RenderPageRequest, WorkerPageTask, WorkerRenderOptions, WorkerResponse } from '../src/workerPool';
 
 /**
  * Unit tests for the pool's scheduling and error-routing logic with FAKE workers — no threads.
@@ -14,6 +15,7 @@ const harness = vi.hoisted(() => {
     class FakeWorker {
         public posted: unknown[] = [];
         public terminated = false;
+        public terminationPromise: Promise<number> = Promise.resolve(0);
         private readonly handlers = new Map<string, Handler[]>();
 
         constructor(
@@ -36,7 +38,7 @@ const harness = vi.hoisted(() => {
 
         public terminate(): Promise<number> {
             this.terminated = true;
-            return Promise.resolve(0);
+            return this.terminationPromise;
         }
 
         public emit(event: string, ...args: unknown[]): void {
@@ -60,16 +62,22 @@ function makeTasks(count: number): WorkerPageTask[] {
     return Array.from({ length: count }, (_, index) => ({
         index,
         pageNumber: index + 1,
-        pageName: `page_${index + 1}.png`,
     }));
 }
+
+const RENDER_OPTIONS = {
+    viewportScale: 1,
+    disableFontFace: true,
+    useSystemFonts: false,
+    enableXfa: true,
+    pdfFilePassword: undefined,
+    verbosityLevel: VerbosityLevel.ERRORS,
+} satisfies WorkerRenderOptions;
 
 function resultMessage(index: number, content?: Uint8Array): WorkerResponse {
     return {
         type: 'result',
         index,
-        pageNumber: index + 1,
-        name: `page_${index + 1}.png`,
         width: 10,
         height: 10,
         rotation: 0,
@@ -84,9 +92,18 @@ async function flushAsync(): Promise<void> {
     }
 }
 
+test('returns without creating workers when no pages are selected', async () => {
+    const onPageRendered = vi.fn();
+
+    await renderPagesInWorkerPool(new Uint8Array([1]), RENDER_OPTIONS, true, [], 4, onPageRendered);
+
+    expect(harness.instances).toHaveLength(0);
+    expect(onPageRendered).not.toHaveBeenCalled();
+});
+
 test('dispatches one task per worker, then the next task as each result arrives', async () => {
-    const rendered: Array<{ index: number; page: WorkerRenderedPage }> = [];
-    const poolPromise = renderPagesInWorkerPool(new Uint8Array([1]), {}, true, makeTasks(3), 2, async (index, page) => {
+    const rendered: Array<{ index: number; page: PageRenderResult }> = [];
+    const poolPromise = renderPagesInWorkerPool(new Uint8Array([1]), RENDER_OPTIONS, true, makeTasks(3), 2, async (index, page) => {
         rendered.push({ index, page });
     });
     await flushAsync();
@@ -94,8 +111,15 @@ test('dispatches one task per worker, then the next task as each result arrives'
     // Pool size 2 for 3 tasks: two workers spawned, tasks 0 and 1 dispatched.
     expect(harness.instances).toHaveLength(2);
     const [workerA, workerB] = harness.instances;
-    expect((workerA.posted[0] as RenderPageRequest).index).toBe(0);
-    expect((workerB.posted[0] as RenderPageRequest).index).toBe(1);
+    expect(workerA.posted[0]).toEqual({ type: 'render', index: 0, pageNumber: 1 } satisfies RenderPageRequest);
+    expect(workerB.posted[0]).toEqual({ type: 'render', index: 1, pageNumber: 2 } satisfies RenderPageRequest);
+    expect(workerA.options).toEqual({
+        workerData: {
+            pdfBuffer: new Uint8Array([1]),
+            renderOptions: RENDER_OPTIONS,
+            materializeContent: true,
+        },
+    });
 
     workerB.emit('message', resultMessage(1, new Uint8Array([7, 8])));
     await flushAsync();
@@ -115,7 +139,7 @@ test('dispatches one task per worker, then the next task as each result arrives'
 });
 
 test('throws the LOWEST-index error when multiple in-flight pages fail, and stops dispatching', async () => {
-    const poolPromise = renderPagesInWorkerPool(new Uint8Array([1]), {}, true, makeTasks(4), 2, async () => undefined);
+    const poolPromise = renderPagesInWorkerPool(new Uint8Array([1]), RENDER_OPTIONS, true, makeTasks(4), 2, async () => undefined);
     await flushAsync();
     const [workerA, workerB] = harness.instances;
 
@@ -131,7 +155,7 @@ test('throws the LOWEST-index error when multiple in-flight pages fail, and stop
 });
 
 test('an onPageRendered failure (e.g. disk write) is attributed to that page index', async () => {
-    const poolPromise = renderPagesInWorkerPool(new Uint8Array([1]), {}, true, makeTasks(2), 2, async (index) => {
+    const poolPromise = renderPagesInWorkerPool(new Uint8Array([1]), RENDER_OPTIONS, true, makeTasks(2), 2, async (index) => {
         if (index === 0) {
             throw new Error('write failed for page 1');
         }
@@ -147,7 +171,7 @@ test('an onPageRendered failure (e.g. disk write) is attributed to that page ind
 });
 
 test('a fatal worker error (document load failure) wins over page errors and stops the pool', async () => {
-    const poolPromise = renderPagesInWorkerPool(new Uint8Array([1]), {}, true, makeTasks(3), 2, async () => undefined);
+    const poolPromise = renderPagesInWorkerPool(new Uint8Array([1]), RENDER_OPTIONS, true, makeTasks(3), 2, async () => undefined);
     await flushAsync();
     const [workerA, workerB] = harness.instances;
 
@@ -160,7 +184,7 @@ test('a fatal worker error (document load failure) wins over page errors and sto
 });
 
 test('a worker crash is fatal and wins over a LOWER-index page error (no page attribution)', async () => {
-    const poolPromise = renderPagesInWorkerPool(new Uint8Array([1]), {}, true, makeTasks(3), 2, async () => undefined);
+    const poolPromise = renderPagesInWorkerPool(new Uint8Array([1]), RENDER_OPTIONS, true, makeTasks(3), 2, async () => undefined);
     await flushAsync();
     const [workerA, workerB] = harness.instances;
 
@@ -174,7 +198,7 @@ test('a worker crash is fatal and wins over a LOWER-index page error (no page at
 });
 
 test('an unexpected worker exit (no error event) rejects instead of hanging the pool', async () => {
-    const poolPromise = renderPagesInWorkerPool(new Uint8Array([1]), {}, true, makeTasks(2), 2, async () => undefined);
+    const poolPromise = renderPagesInWorkerPool(new Uint8Array([1]), RENDER_OPTIONS, true, makeTasks(2), 2, async () => undefined);
     await flushAsync();
     const [workerA, workerB] = harness.instances;
 
@@ -187,7 +211,7 @@ test('an unexpected worker exit (no error event) rejects instead of hanging the 
 
 test('a message arriving after the worker settled is ignored', async () => {
     const rendered: number[] = [];
-    const poolPromise = renderPagesInWorkerPool(new Uint8Array([1]), {}, true, makeTasks(1), 1, async (index) => {
+    const poolPromise = renderPagesInWorkerPool(new Uint8Array([1]), RENDER_OPTIONS, true, makeTasks(1), 1, async (index) => {
         rendered.push(index);
     });
     await flushAsync();
@@ -203,8 +227,49 @@ test('a message arriving after the worker settled is ignored', async () => {
     expect(rendered).toEqual([0]);
 });
 
+test('does not settle until pending output finalization and worker termination both resolve', async () => {
+    let resolveFinalization: (() => void) | undefined;
+    const finalizationPromise = new Promise<void>((resolve) => {
+        resolveFinalization = resolve;
+    });
+    let resolveTermination: ((exitCode: number) => void) | undefined;
+    const terminationPromise = new Promise<number>((resolve) => {
+        resolveTermination = resolve;
+    });
+    let poolSettled = false;
+    const poolPromise = renderPagesInWorkerPool(new Uint8Array([1]), RENDER_OPTIONS, true, makeTasks(1), 1, async () => {
+        await finalizationPromise;
+    });
+    void poolPromise.then(
+        () => {
+            poolSettled = true;
+        },
+        () => {
+            poolSettled = true;
+        },
+    );
+    await flushAsync();
+    const [worker] = harness.instances;
+    worker.terminationPromise = terminationPromise;
+
+    worker.emit('message', resultMessage(0));
+    await flushAsync();
+
+    expect(worker.terminated).toBe(false);
+    expect(poolSettled).toBe(false);
+
+    resolveFinalization?.();
+    await flushAsync();
+    expect(worker.terminated).toBe(true);
+    expect(poolSettled).toBe(false);
+
+    resolveTermination?.(0);
+    await poolPromise;
+    expect(poolSettled).toBe(true);
+});
+
 test('spawns no more workers than there are tasks', async () => {
-    const poolPromise = renderPagesInWorkerPool(new Uint8Array([1]), {}, true, makeTasks(2), 4, async () => undefined);
+    const poolPromise = renderPagesInWorkerPool(new Uint8Array([1]), RENDER_OPTIONS, true, makeTasks(2), 4, async () => undefined);
     await flushAsync();
     expect(harness.instances).toHaveLength(2);
 
@@ -215,6 +280,6 @@ test('spawns no more workers than there are tasks', async () => {
 });
 
 test('resolves immediately for an empty task list without spawning workers', async () => {
-    await renderPagesInWorkerPool(new Uint8Array([1]), {}, true, [], 4, async () => undefined);
+    await renderPagesInWorkerPool(new Uint8Array([1]), RENDER_OPTIONS, true, [], 4, async () => undefined);
     expect(harness.instances).toHaveLength(0);
 });

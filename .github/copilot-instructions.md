@@ -3,347 +3,142 @@
 ## Commands
 
 ```bash
-npm run build          # Compile TypeScript to ./out/ (runs clean first via prebuild)
-npm run build:test     # Type-check without emitting files
-npm run clean          # Delete ./out, ./coverage, ./test-results
-npm test               # Build then run all tests with v8 coverage (vitest)
-npm run lint           # ESLint (src/**/*.ts only; .js and .d.ts are ignored)
-
-# Run a single test file
-npx vitest run __tests__/pdf.to.png.buffer.readfile.test.ts
-
-# Docker
-npm run docker:build   # Build Docker image
-npm run docker:run     # Run tests inside container, mount ./test-results
-npm run test:docker    # clean + docker:build + docker:run
-npm run test:license   # Check all production deps use permitted SPDX licenses
+npm run build:test                         # Type-check src + tests, no emit
+npm run build:strict                       # Strict upstream/dependency type-check
+npm run test:fast                          # Fast Vitest loop, no coverage
+npx vitest run __tests__/<file>.test.ts    # One test file
+npm test                                   # Vitest with V8 coverage only
+npm run lint                               # ESLint
+npm run format:check                       # Prettier check
+npm run check                              # Full CI/prepublish validation graph
+npm run build                              # Clean production compile to out/
+npm run bench                              # Public-interface benchmark
 ```
 
-## Architecture
+`npm test` has no `pretest` validation hook. Run `npm run check` for the complete gate: clean, both type-checks, formatting, lint, production-license validation, and tests.
 
-Zero-native-binary Node.js library that converts PDF pages to PNG images.
-Published to npm as `pdf-to-png-converter`. Entry: `out/index.js`, types: `out/index.d.ts`.
+## Product boundary
 
-**Data flow:**
+This repository publishes a Node.js 24+ CommonJS library and CLI. It converts PDF paths or byte containers into ordered page metadata, PNG buffers, or PNG files. `pdfjs-dist` renders through its built-in Node canvas factory backed by `@napi-rs/canvas`.
 
-1. `pdfToPng(pdfFile, props?)` in `src/pdfToPng.ts` — sole public entry point
-2. `getPdfFileBuffer()` — reads file path via `fsPromises.readFile` or passes `ArrayBufferLike` through; normalises Node `Buffer` → `ArrayBuffer`
-3. `getPdfDocument()` — dynamically imports `pdfjs-dist/legacy/build/pdf.mjs`, calls `getDocument()` with params from `propsToPdfDocInitParams()`
-4. Invalid page numbers (< 1 or > numPages) in `pagesToProcess` are silently filtered by `pdfToPng` before the render loop
-5. `processPdfPage()` — obtains page from `PDFDocumentProxy`; when `returnMetadataOnly` is true returns dimensions and rotation immediately (no canvas, no render); otherwise creates a canvas via `NodeCanvasFactory`, renders via `page.render()`, encodes to PNG via `canvas.toBuffer('image/png')`, cleans up in `finally`
-6. `savePNGfile()` — joins `outputFolder` + `name`, validates `content !== undefined`, writes with `fsPromises.writeFile`
-7. Returns `PngPageOutput[]` — one entry per processed page
-
-**Concurrency:** when `processPagesInParallel: true`, pages are chunked into batches of `concurrencyLimit` (default 4) and each batch runs via `Promise.all`. Sequential mode (default) processes pages one at a time in document order.
-
-**`outputFolder` + `returnPageContent` + `returnMetadataOnly` interaction:**
-
-- When `returnMetadataOnly: true`, no rendering occurs, no output folder is created, no files are written, and `content` is always `undefined` — regardless of `outputFolder` or `returnPageContent`
-- When `returnMetadataOnly` is false and `outputFolder` is set, content is always retrieved internally (even if `returnPageContent: false`) so it can be written to disk
-- After writing, if `returnPageContent === false`, `content` is set to `undefined` on the output object to free memory
-- `shouldReturnContent` is resolved as: `returnMetadataOnly ? false : outputFolder ? true : (returnPageContent ?? true)`
-
-## Source Code Structure
-
-```
-src/
-├── index.ts                  # Public API surface — re-exports only
-├── pdfToPng.ts               # All conversion logic (exported + private helpers)
-├── node.canvas.factory.ts    # NodeCanvasFactory class — pdfjs canvas contract
-├── propsToPdfDocInitParams.ts # Maps PdfToPngOptions → pdfjs DocumentInitParameters
-├── const.ts                  # PDF_TO_PNG_OPTIONS_DEFAULTS, DOCUMENT_INIT_PARAMS_DEFAULTS
-│                             #   (STANDARD_FONTS, STANDARD_CMAPS → __tests__/test-data-constants.ts)
-├── normalizePath.ts          # resolve() + normalize() + trailing slash
-├── interfaces/               # Object-shape interfaces (exported publicly or internally)
-│   ├── index.ts              # Barrel: re-exports all three interfaces
-│   ├── canvas.and.context.ts # CanvasAndContext — canvas + context pair (nullable after destroy)
-│   ├── pdf.to.png.options.ts # PdfToPngOptions — all conversion options
-│   └── png.page.output.ts    # PngPageOutput — single rendered page result
-└── types/
-    ├── index.ts              # Barrel: re-exports VerbosityLevel
-    └── verbosity.level.ts    # VerbosityLevel enum — ERRORS=0, WARNINGS=1, INFOS=5
-```
-
-**Public API (`src/index.ts`):**
+The package root exports only:
 
 ```typescript
-export { pdfToPng } from './pdfToPng';
-export type { PngPageOutput, PdfToPngOptions } from './interfaces';
-export { VerbosityLevel } from './types';
+export { pdfToPng } from './pdfToPng.js';
+export type { PdfToPngOptions, PngPageOutput } from './types.js';
+export { VerbosityLevel } from './types.js';
 ```
 
-`CanvasAndContext` is not re-exported from `src/index.ts`; it is available from internal paths for internal use.
+Do not expose internal source paths or add a second conversion entrypoint.
 
-**Key private functions in `src/pdfToPng.ts`** (not exported):
+## Current module design
 
-- `getPdfFileBuffer(pdfFile)` — file read + ArrayBuffer normalisation
-- `getPdfDocument(pdfFileBuffer, props?)` — dynamic pdfjs import + `getDocument()`
-- `processPdfPage(pdf, pageName, pageNumber, pageViewportScale, returnPageContent, returnMetadataOnly)` — single page render or metadata-only fast path
-- `savePNGfile(pngPageOutput, outputFolder)` — disk write, mutates `pngPageOutput.path`
+The source tree contains 11 TypeScript modules:
 
-## Folder Conventions
+| Module                    | Responsibility                                                                            |
+| ------------------------- | ----------------------------------------------------------------------------------------- |
+| `src/index.ts`            | Public re-exports only                                                                    |
+| `src/types.ts`            | Public options, output union, rotation, and verbosity                                     |
+| `src/const.ts`            | Defaults and input/concurrency/canvas limits                                              |
+| `src/pdfToPng.ts`         | Validation, planning, scheduling, mode selection, output finalization, document lifecycle |
+| `src/pdfInput.ts`         | Input normalization, ownership, one-handle bounded file reads                             |
+| `src/pdfjsLoader.ts`      | Cached dynamic pdf.js import, init parameters, load cleanup                               |
+| `src/pageRenderer.ts`     | Metadata, pixel/rotation guards, canvas render/encode/cleanup                             |
+| `src/outputWriter.ts`     | Disk filename validation, folder preparation, realpath defense, exclusive-create writes   |
+| `src/workerPool.ts`       | Worker protocol, dynamic scheduling, main-thread finalization, error/teardown policy      |
+| `src/pageRenderWorker.ts` | Compiled worker entry, lazy per-worker document load, render responses                    |
+| `src/cli.ts`              | CLI parsing/policy/output; delegates to public `pdfToPng`                                 |
 
-```
-src/types/       — const objects and enums (VerbosityLevel)
-src/interfaces/  — TypeScript interfaces for object shapes (CanvasAndContext, PdfToPngOptions, PngPageOutput)
-src/             — functions, classes, constants
-```
+Keep this consolidated ownership. Add another seam only when a new independent implementation or lifecycle boundary justifies it. `docs/ARCHITECTURE.md` is the detailed source of truth.
 
-One file per entity. All object-shape types use `interface`, not `type`.
+## Conversion flow
 
-## Defaults (`src/const.ts`)
+1. `pdfToPng()` calls its private `normalizeOptions()` once and snapshots `pagesToProcess`.
+2. `getPdfFileBuffer()` returns owned, unshared `Uint8Array` bytes under `maxInputBytes`.
+3. Worker mode retains one byte copy; `getPdfDocument()` loads the main document and maps the already validated pdf.js fields.
+4. Page selection, output-folder resolution, page naming, disk-name validation, and case-insensitive duplicate checks happen before output-folder creation.
+5. Metadata calls `getPageMetadata()`. Main-thread rendering calls `renderPdfPage()` through `mapLimitOrdered()`. Worker rendering calls `renderPagesInWorkerPool()` and uses the same loader/renderer in each worker.
+6. `finalizePage()` attaches the public identity fields. Disk output goes through `savePNGfile()` on the main thread in every rendering mode.
+7. The main loading task is destroyed in `finally`; pages, canvases, failed loads, worker finalizers, and workers have paired cleanup paths.
 
-```typescript
-PDF_TO_PNG_OPTIONS_DEFAULTS = {
-    viewportScale: 1,
-    disableFontFace: true,
-    useSystemFonts: false,
-    enableXfa: true,
-    outputFileMask: 'buffer', // stem used when PDF is supplied as ArrayBufferLike
-    pdfFilePassword: undefined,
-    concurrencyLimit: 4,
-};
+The CLI builds ordinary `PdfToPngOptions` and calls `pdfToPng()`. Image conversion requires `--output-folder`; metadata-only mode prints JSON; `--return-page-content` is rejected because in-memory buffers are a library-only result.
 
-DOCUMENT_INIT_PARAMS_DEFAULTS = {
-    cMapUrl: normalizePath('./node_modules/pdfjs-dist/cmaps/'),
-    cMapPacked: true,
-    standardFontDataUrl: normalizePath('./node_modules/pdfjs-dist/standard_fonts/'),
-};
-```
+## Modes and ordering
 
-Always extend `PDF_TO_PNG_OPTIONS_DEFAULTS` using `??` — never hardcode default values in function bodies.
-`outputFileMask` defaults to `'buffer'` for `ArrayBufferLike` input; defaults to the PDF filename stem (via `parse(pdfFile).name`) for string input.
+- `returnMetadataOnly: true`: no canvas, PNG encode, worker pool, folder creation, or file write.
+- Default: ordered window of `SEQUENTIAL_PIPELINE_WINDOW` (`3`) so asynchronous encode/write work can overlap later rendering.
+- `processPagesInParallel: true`: ordered main-thread window of `concurrencyLimit`; use `1` for one page task in flight.
+- `renderInWorkerThreads: true`: dynamic pool with at most `concurrencyLimit` workers, takes precedence over main-thread parallelism, and is ignored for metadata.
 
-## `PdfToPngOptions` → `DocumentInitParameters` Mapping
+Every mode returns results in requested page order. Once an error occurs, no new work is dispatched and in-flight work drains. Page errors are reported deterministically by lowest page index; worker-level fatal errors take priority in worker mode. Workers and pending main-thread output finalizers must finish teardown before the call settles.
 
-`propsToPdfDocInitParams()` merges `DOCUMENT_INIT_PARAMS_DEFAULTS` with these mapped fields:
+## Output contract
 
-| `PdfToPngOptions` field | `DocumentInitParameters` field | Default                     |
-| ----------------------- | ------------------------------ | --------------------------- |
-| `verbosityLevel`        | `verbosity`                    | `VerbosityLevel.ERRORS` (0) |
-| `disableFontFace`       | `disableFontFace`              | `true`                      |
-| `useSystemFonts`        | `useSystemFonts`               | `false`                     |
-| `enableXfa`             | `enableXfa`                    | `true`                      |
-| `pdfFilePassword`       | `password`                     | `undefined`                 |
+`PngPageOutput` is a discriminated union:
 
-Fields `viewportScale`, `outputFolder`, `outputFileMaskFunc`, `pagesToProcess`, `returnPageContent`, `returnMetadataOnly`, `processPagesInParallel`, `concurrencyLimit` are handled entirely within `pdfToPng.ts` and are **not** passed to pdfjs.
+- `kind: 'metadata'`: `content` is `undefined`, `path` is `''`.
+- `kind: 'content'`: `path` is `''`; `content` may be omitted when `returnPageContent` is false.
+- `kind: 'file'`: `path` is absolute; content is materialized for the write and retained only when requested.
 
-## TypeScript Conventions
+All variants include `pageNumber`, `name`, floored integer `width`/`height`, and normalized `rotation`. Metadata and render paths must share zero-size and `MAX_CANVAS_PIXELS` rejection behavior.
 
-- **`"module": "nodenext"` / `"moduleResolution": "node16"`** — use `.js` extensions in all relative imports even though the source files are `.ts`
-    ```typescript
-    import { normalizePath } from './normalizePath.js'; // correct
-    import { normalizePath } from './normalizePath'; // incorrect — will fail at runtime
-    ```
-- **`import type`** for type-only imports — enforced by ESLint `@typescript-eslint/consistent-type-imports`
-    ```typescript
-    import type { PdfToPngOptions } from './interfaces/pdf.to.png.options.js';
-    ```
-- Unused variables/parameters must be prefixed with `_` (enforced: `argsIgnorePattern: "^_"`)
-- All class members need explicit accessibility modifiers (`public`, `private`, etc.) except constructors
-- All functions in `src/` need explicit return types (`@typescript-eslint/explicit-function-return-type`)
-- **`tsconfig.json` settings:** `target: es2022`, `lib: [es2024, ESNext.Array, ESNext.Collection, ESNext.Iterator]`, `strict: true`, `declaration: true`, `outDir: ./out`, `include: ./src/**/*` only
+`pagesToProcess` accepts positive integers. Page numbers above `numPages` are silently filtered. Duplicate page requests remain duplicate tasks; they fail only when disk output resolves them to colliding names.
 
-## ESLint Rules (enforced on `src/**/*.ts`)
+## Security invariants
 
-Key rules beyond recommended:
+### Input
 
-- `@typescript-eslint/no-floating-promises: error` — always `await` promises or explicitly void them
-- `@typescript-eslint/no-misused-promises: error` — don't pass async callbacks where sync is expected
-- `@typescript-eslint/await-thenable: error` — don't `await` non-Promise values
-- `@typescript-eslint/consistent-type-imports: warn` — use `import type` for type-only imports
-- `@typescript-eslint/explicit-function-return-type: warn` — explicit return types on all `src/` functions
-- `@typescript-eslint/explicit-member-accessibility: warn` — `public`/`private` on all class members
-- `@typescript-eslint/prefer-nullish-coalescing: warn` — prefer `??` over `||` for defaults
-- `@typescript-eslint/prefer-optional-chain: warn` — prefer `?.` over `&&` chains
-- `@typescript-eslint/no-explicit-any: off` — `any` is allowed
-- Test files (`__tests__/**/*.ts`) are linted with relaxed rules — no return type or member accessibility requirements
+- Open a path once with `O_RDONLY | O_NONBLOCK`; inspect and positionally read through that same handle, then close in `finally`.
+- Reject non-regular files and enforce `maxInputBytes` across initial size, later growth, buffers, cross-realm views, and supported array-likes.
+- Preserve caller byte containers by copying before pdf.js can transfer/detach them. Preserve the path-input dedicated-allocation zero-copy handoff where safe.
 
-## Formatting (Prettier)
+### Output
 
-From `.prettierrc`:
+- Resolve relative output folders before user filename callbacks run.
+- Preflight disk filenames and duplicates before `prepareOutputFolder()` so validation failures create no directory.
+- Revalidate with `assertValidOutputFilename()` in `savePNGfile()` as defense in depth.
+- Keep filenames to one flat path segment under the host's separator rules and reject `"."` / `".."` disk aliases.
+- Preserve `OutputFolderHandle`, the per-write realpath equality check, and `'wx'` opens.
+- Do not claim the path checks eliminate directory-swap races. Callers must use an output folder that untrusted users cannot modify.
 
-```json
-{
-    "trailingComma": "all",
-    "tabWidth": 4,
-    "semi": true,
-    "singleQuote": true,
-    "printWidth": 140,
-    "useTabs": false,
-    "arrowParens": "always"
-}
-```
+## Defaults and limits
 
-4-space indent, single quotes, trailing commas everywhere, 140-char line width, always parentheses around arrow function params.
+`src/const.ts` is authoritative for shared defaults and limits. Mode defaults are applied in `normalizeOptions()`.
 
-## Testing
+- viewport scale: `1`, maximum `100`
+- canvas area: `100_000_000` pixels
+- input size: `256 MiB`
+- concurrency: default `4`, maximum `16`
+- default in-memory content: enabled
+- metadata, main-thread parallelism, and worker threads: disabled
 
-**Framework:** Vitest with `testTimeout: 90000` (PDF rendering is slow).
+Use `??`, not `||`, for optional values where `false` or `0` are meaningful. Keep `src/types.ts` JSDoc synchronized with behavior.
 
-**Coverage:** v8 provider, includes `src/**/*.ts`, excludes `src/types/**/*.ts`. Run via `npm test`.
+## TypeScript and style
 
-**Test file locations and naming:**
+- Relative TypeScript imports use `.js` specifiers because the project compiles with NodeNext semantics to CommonJS.
+- Use `import type` for type-only imports.
+- Give functions in `src/` explicit return types and prefix intentionally unused parameters with `_`.
+- Use interfaces for object shapes and type aliases for unions.
+- Do not add DOM globals to the normal build. `tsconfig.strict.json` includes DOM only for upstream canvas declaration checking.
+- Build scripts invoke `@typescript/native` by explicit path. The `typescript` package is the TypeScript 6 compatibility compiler API used by ts-node and typescript-eslint; toolchain reunification remains in `BACKLOG.md`.
 
-- `__tests__/<description>.test.ts` (kebab/dot-separated, e.g. `pdf.to.png.buffer.readfile.test.ts`)
-- Both `.ts` and `.js` test files are valid
+## Tests
 
-**Test data:**
+Vitest has a 180-second timeout. V8 coverage thresholds are 95% for statements, lines, functions, and branches. Worker integration compiles `out/pageRenderWorker.js` before starting real workers; do not call `npm run build` from a running test because its clean hook removes shared output directories.
 
-```
-test-data/
-├── sample.pdf              # 2-page sample PDF
-├── large_pdf.pdf           # 12-page PDF used in most file output tests
-├── large_pdf-protected.pdf # same PDF, password: 'uES69xm545C/HP!'
-├── 10-page-sample.pdf      # 10-page PDF
-├── layers.pdf              # 1-page PDF with layers
-├── TAMReview.pdf           # additional test PDF
-├── sample/expected/        # expected PNGs for sample.pdf tests
-├── pdf.to.buffer/expected/ # expected PNGs for buffer output tests
-├── pdf.to.file/expected/   # expected PNGs for file output tests
-├── protected.pdf/expected/ # expected PNGs for password-protected PDF
-└── layers/expected/        # expected PNG for layers.pdf
-```
+Fixtures live in `test-data/`; generated output and coverage live in `test-results/`. Prefer focused tests while iterating, then run `npm run check`.
 
-Test output goes to `test-results/` (gitignored). Temporary output goes to `output/` or `tmp/`.
+High-value regression areas:
 
-**Import patterns in tests:**
+- caller-buffer ownership and cross-realm input shapes
+- same-handle file checks, shrinking/growing reads, caps, and special-file rejection
+- output callback CWD changes, flat names, duplicate names, symlink changes, and `'wx'` collisions
+- metadata/render dimension parity and cleanup on every failure hop
+- result order and deterministic failures in default, parallel, and worker modes
+- worker document reuse, crashes, output-finalizer failures, and complete termination
+- CLI metadata JSON, required output-folder policy, silent behavior, and packaging/version errors
 
-```typescript
-import { expect, test } from 'vitest'; // flat tests
-import { describe, it, expect, vi } from 'vitest'; // grouped / mock tests
-import type { Mock } from 'vitest'; // mock typing
-import { pdfToPng } from '../src/pdfToPng'; // direct src import
-import { pdfToPng, PngPageOutput } from '../src'; // via barrel
-import { comparePNG } from './comparePNG'; // shared PNG comparison helper
-```
+## Benchmark
 
-**`comparePNG` helper (`__tests__/comparePNG.ts`):**
-
-```typescript
-comparePNG({
-    actualFile: Buffer | string,   // path or buffer of actual PNG
-    expectedFile: string,          // path to expected PNG
-    createExpectedFileIfMissing: boolean, // when true, writes actual as expected if file missing
-    opts?: ComparePngOptions,
-}): number  // 0 = identical, >0 = pixel diff count
-```
-
-Uses `png-visual-compare` package. Returns `0` for identical images. Creates expected file automatically on first run when `createExpectedFileIfMissing: true`.
-
-**Typical integration test pattern:**
-
-```typescript
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { expect, test } from 'vitest';
-import { pdfToPng, PngPageOutput } from '../src';
-import { comparePNG } from './comparePNG';
-
-test('should convert PDF to PNG files', async () => {
-    const pngPages: PngPageOutput[] = await pdfToPng(resolve('./test-data/large_pdf.pdf'), {
-        outputFolder: resolve('./test-results/my-test/actual'),
-        processPagesInParallel: false,
-    });
-
-    expect(pngPages.length).toBeGreaterThan(0);
-    for (const pngPage of pngPages) {
-        const compareResult = comparePNG({
-            actualFile: readFileSync(pngPage.path),
-            expectedFile: resolve('./test-data/pdf.to.file/expected', pngPage.name),
-            createExpectedFileIfMissing: true,
-        });
-        expect(compareResult).to.equal(0);
-    }
-});
-```
-
-**Mocking `node:fs` for unit tests:**
-
-```typescript
-vi.mock('node:fs', () => ({
-    promises: {
-        readFile: vi.fn(),
-        mkdir: vi.fn(),
-        writeFile: vi.fn(),
-    },
-}));
-
-// Then in tests:
-(fsPromises.readFile as Mock).mockResolvedValue(someBuffer);
-```
-
-**Mocking `pdfjs-dist`:**
-
-```typescript
-vi.mock('pdfjs-dist/legacy/build/pdf.mjs', () => ({
-    getDocument: vi.fn(),
-}));
-```
-
-**Parameterised tests (data-driven pattern):**
-
-```typescript
-const testDataArray = [{ id: 'case 1', props: {...}, expected: {...} }, ...];
-for (const testData of testDataArray) {
-    test(`should ... when ${testData.id}`, async () => { ... });
-}
-```
-
-**Key test scenarios covered:**
-
-- Sequential vs. parallel page processing
-- `pagesToProcess` with valid, invalid (0, -1, 999999), and out-of-range page numbers
-- `returnPageContent: true/false` with and without `outputFolder`
-- `returnMetadataOnly: true` — no rendering, no files written, no output folder created; `content` undefined, `path` empty; works with `pagesToProcess`, `processPagesInParallel`, `viewportScale`, and `outputFolder` set
-- `outputFileMaskFunc` for custom filenames from both file path and buffer inputs
-- Password-protected PDFs (`pdfFilePassword`)
-- PDF with layers
-- ArrayBuffer and Node `Buffer` as input
-- `fs.readFile` returning `ArrayBuffer` vs `Buffer` vs unsupported type
-- `NodeCanvasFactory` create/reset/destroy lifecycle and error cases
-- `normalizePath` with relative, absolute, empty paths
-- All `propsToPdfDocInitParams` option combinations including CMap/font asset verification
-- Public exports from `src/index.ts`
-
-## Key Behaviours and Edge Cases
-
-- **Page filtering:** `pagesToProcess` values outside `[1, numPages]` are silently ignored; no error is thrown
-- **Output naming:** default mask is `<pdfBasename>_page_<n>.png`; for buffer input it's `buffer_page_<n>.png`; `outputFileMaskFunc` overrides this entirely
-- **Resource cleanup:** `pdfDocument.cleanup()` is always called in a `finally` block; `page.cleanup()` is called in `finally` after each page render (both in the normal rendering path and in the `returnMetadataOnly` fast path); canvas is destroyed in `finally` after each normal render
-- **`returnMetadataOnly`:** when `true`, `processPdfPage` skips all canvas/render work, calls only `pdf.getPage()` + `page.getViewport()` + `page.rotate`, then cleans up. No `mkdir` is called, no `savePNGfile` is called, `content` is always `undefined`, `path` is always `""`. Works with both sequential and parallel modes and respects `pagesToProcess` and `viewportScale`
-- **`rotation` field:** always populated on every `PngPageOutput`; derived from `PDFPageProxy.rotate` which is the intrinsic page rotation in the PDF (0, 90, 180, or 270 degrees)
-- **`path` field:** `PngPageOutput.path` is `''` when `outputFolder` is not set or `returnMetadataOnly` is true; set to the absolute file path after writing
-- **`content` field:** present as `Buffer` by default; `undefined` when `returnPageContent: false` and no `outputFolder`; `undefined` after memory-free when `returnPageContent: false` + `outputFolder` is set; always `undefined` when `returnMetadataOnly: true`
-- **CMap / font paths:** resolved via `normalizePath()` relative to `process.cwd()` at module load time; must point to `node_modules/pdfjs-dist/cmaps/` and `node_modules/pdfjs-dist/standard_fonts/`
-- **Dynamic import:** pdfjs is dynamically imported (`await import('pdfjs-dist/legacy/build/pdf.mjs')`) inside `getPdfDocument()` on each call — not a top-level import
-
-## GitHub Actions
-
-**`test.yml`** — runs on every push:
-
-- Ubuntu only, Node 24
-- Steps: `npm ci` → `npm run build:test && npm run lint` → `npm test`
-
-**`publish.yml`** — runs when a GitHub release is published:
-
-- Ubuntu, Node 24.x
-- Auth via npm **Trusted Publishing (OIDC)** — no `NPM_TOKEN`; `id-token: write` mints a short-lived token and attaches provenance
-- Steps: pin `npm@11.13.0` → `npm ci` → `npm audit` → `npm run build` → `release:precheck` → `npm publish --provenance` → `release:postcheck`
-
-## Dependencies
-
-**Runtime:**
-
-- `@napi-rs/canvas ~0.1.95` — native Node canvas (no browser required); provides `Canvas`, `SKRSContext2D`
-- `pdfjs-dist ~5.4.624` — Mozilla PDF.js; provides `getDocument`, `PDFDocumentProxy`
-
-**Dev:**
-
-- `typescript ^5.9.3`, `vitest ^4.0.18`, `@vitest/coverage-v8 ^4.0.18`
-- `eslint ^10.0.2`, `@typescript-eslint/eslint-plugin ^8.56.1`, `@typescript-eslint/parser ^8.56.1`
-- `png-visual-compare ^4.0.0` — pixel-level PNG comparison in tests
-- `rimraf ^6.1.3` — cross-platform `clean` script
-- `@types/node ^25.3.1`
-
-**Node version requirement:** `>=20`
+`scripts/benchmark.ts` imports only the compiled public API. `BENCH_FIXTURE`, `BENCH_PAGES`, `BENCH_MODES` (or legacy `BENCH_MODE`), `BENCH_ITERATIONS`, `BENCH_WARMUP`, `BENCH_CONCURRENCY`, and `BENCH_LABEL` configure a run. Requested counts cycle valid fixture page numbers, so expensive counts such as 20 or 100 are explicit opt-ins rather than defaults.

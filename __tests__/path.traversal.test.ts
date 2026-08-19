@@ -1,8 +1,7 @@
 import { promises as fsPromises } from 'node:fs';
 import { resolve, sep } from 'node:path';
 import { expect, test } from 'vitest';
-import { resolvePageName } from '../src/pageOrchestrator';
-import { savePNGfile } from '../src/outputWriter';
+import { assertValidOutputFilename, savePNGfile } from '../src/outputWriter';
 import { pdfToPng } from '../src';
 
 const isWindows = sep === '\\';
@@ -62,22 +61,22 @@ test('should accept outputFileMaskFunc returning a safe filename', async () => {
     }
 });
 
-test('resolvePageName should reject names containing the platform path separator "/"', () => {
-    expect(() => resolvePageName(1, 'sample', () => 'sub/page.png')).toThrow('path separator');
+test('filename validation should reject names containing the platform path separator "/"', () => {
+    expect(() => assertValidOutputFilename('sub/page.png')).toThrow('path separator');
 });
 
-test.runIf(isWindows)('resolvePageName should reject "\\" on Windows where it is a path separator', () => {
-    expect(() => resolvePageName(1, 'sample', () => 'sub\\page.png')).toThrow('path separator');
+test.runIf(isWindows)('filename validation should reject "\\" on Windows where it is a path separator', () => {
+    expect(() => assertValidOutputFilename('sub\\page.png')).toThrow('path separator');
 });
 
-test.skipIf(isWindows)('resolvePageName should accept "\\" on POSIX where it is a valid filename character', () => {
+test.skipIf(isWindows)('filename validation should accept "\\" on POSIX where it is a valid filename character', () => {
     // PDFs named e.g. `foo\bar.pdf` produce a default mask of `foo\bar` via `path.parse(pdfFile).name`.
     // The SEC-001 guard must not break that legitimate POSIX use case.
-    expect(resolvePageName(1, 'sample', () => 'foo\\bar.png')).toBe('foo\\bar.png');
+    expect(() => assertValidOutputFilename('foo\\bar.png')).not.toThrow();
 });
 
-test('resolvePageName should accept a flat filename unchanged', () => {
-    expect(resolvePageName(1, 'sample', () => 'page.png')).toBe('page.png');
+test('filename validation should accept a flat filename', () => {
+    expect(() => assertValidOutputFilename('page.png')).not.toThrow();
 });
 
 // These names are rejected before any I/O, so the handle never has to point at a real folder.

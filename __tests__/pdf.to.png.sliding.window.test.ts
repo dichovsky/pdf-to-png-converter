@@ -28,15 +28,11 @@ test('should start the next page as soon as a parallel slot frees up', async () 
         deferredRenders.set(pageNumber, createDeferred());
     }
 
-    vi.spyOn(pageRenderer, 'renderPdfPage').mockImplementation(async (_pdf, pageName, pageNumber) => {
+    vi.spyOn(pageRenderer, 'renderPdfPage').mockImplementation(async (_pdf, pageNumber) => {
         startedPages.push(pageNumber);
         await deferredRenders.get(pageNumber)?.promise;
         return {
-            kind: 'content',
-            pageNumber,
-            name: pageName,
             content: Buffer.from(String(pageNumber)),
-            path: '',
             width: 100,
             height: 100,
             rotation: 0,
@@ -90,15 +86,11 @@ test('sequential mode pipelines with a window of 3 while preserving output order
         deferredRenders.set(pageNumber, createDeferred());
     }
 
-    vi.spyOn(pageRenderer, 'renderPdfPage').mockImplementation(async (_pdf, pageName, pageNumber) => {
+    vi.spyOn(pageRenderer, 'renderPdfPage').mockImplementation(async (_pdf, pageNumber) => {
         startedPages.push(pageNumber);
         await deferredRenders.get(pageNumber)?.promise;
         return {
-            kind: 'content',
-            pageNumber,
-            name: pageName,
             content: Buffer.from(String(pageNumber)),
-            path: '',
             width: 100,
             height: 100,
             rotation: 0,
@@ -144,18 +136,14 @@ test('sequential mode: a failure stops new pages after the in-flight ones and th
     for (const pageNumber of [2, 3]) {
         deferredRenders.set(pageNumber, createDeferred());
     }
-    vi.spyOn(pageRenderer, 'renderPdfPage').mockImplementation(async (_pdf, pageName, pageNumber) => {
+    vi.spyOn(pageRenderer, 'renderPdfPage').mockImplementation(async (_pdf, pageNumber) => {
         startedPages.push(pageNumber);
         if (pageNumber === 1) {
             throw new Error('page 1 render failed');
         }
         await deferredRenders.get(pageNumber)?.promise;
         return {
-            kind: 'content',
-            pageNumber,
-            name: pageName,
             content: Buffer.from(String(pageNumber)),
-            path: '',
             width: 100,
             height: 100,
             rotation: 0,

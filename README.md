@@ -63,7 +63,7 @@ npm install pdf-to-png-converter
 yarn add pdf-to-png-converter
 ```
 
-> **Node.js Requirement:** Node.js 22.13 or higher is required.
+> **Node.js Requirement:** Node.js 24 or higher is required.
 
 ---
 
@@ -118,7 +118,8 @@ npx pdf-to-png-converter my-document.pdf --output-folder ./output
 - `--verbosity-level <number>`: pdfjs verbosity level (0=errors, 1=warnings, 5=infos).
 - `--return-metadata-only`: Return page metadata without rendering images. This prints JSON to stdout and does not require `--output-folder`.
 - `--process-pages-in-parallel`: Process pages concurrently.
-- `--concurrency-limit <number>`: Maximum number of pages rendered simultaneously.
+- `--concurrency-limit <number>`: Maximum number of in-flight pages, or worker-pool size with worker-thread rendering.
+- `--render-in-worker-threads`: Rasterize pages across worker threads for true multi-core rendering.
 - `--silent`: Suppress normal output messages unless there is an error.
 - `--version`: Show package version.
 - `--help`: Show help text.
@@ -170,9 +171,10 @@ Converts PDF pages to PNG images.
     // Security
     pdfFilePassword?: string,        // Password for encrypted PDFs
     maxInputBytes?: number,          // Max input PDF size in bytes (default: 256 * 1024 * 1024)
-                                     // Path inputs are stat()'d before reading and non-regular files
-                                     // (FIFOs, sockets, /dev/zero) are rejected. Buffer / Uint8Array
-                                     // inputs are validated against the same cap by byteLength.
+                                     // Path inputs are opened once, then fstat()'d and bounded-read
+                                     // through that same handle; non-regular files are rejected.
+                                     // In-memory byte containers, including cross-realm views and
+                                     // supported array-likes, are copied and checked against the cap.
 
     // Processing
     pagesToProcess?: number[],       // 1-indexed integer pages to convert (e.g., [1, 3, 5])

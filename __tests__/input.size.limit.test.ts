@@ -1,4 +1,5 @@
 import { promises as fsPromises } from 'node:fs';
+import type { FileHandle } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
@@ -38,22 +39,26 @@ test('pdfToPng rejects a Buffer input larger than maxInputBytes', async () => {
 
 test('getPdfFileBuffer rejects a path whose stat() reports it is not a regular file', async () => {
     const fakePath = '/dev/zero';
-    vi.spyOn(fsPromises, 'stat').mockResolvedValueOnce({
-        size: 0,
-        isFile: (): boolean => false,
-    } as Awaited<ReturnType<typeof fsPromises.stat>>);
+    const close = vi.fn().mockResolvedValue(undefined);
+    vi.spyOn(fsPromises, 'open').mockResolvedValueOnce({
+        stat: vi.fn().mockResolvedValue({ size: 0, isFile: (): boolean => false }),
+        close,
+    } as unknown as FileHandle);
 
     await expect(getPdfFileBuffer(fakePath, MAX_INPUT_BYTES)).rejects.toThrow(/not a regular file/);
+    expect(close).toHaveBeenCalledOnce();
 });
 
 test('getPdfFileBuffer rejects a path whose stat() reports size above maxInputBytes', async () => {
     const fakePath = join(tmpdir(), 'pretend-huge.pdf');
-    vi.spyOn(fsPromises, 'stat').mockResolvedValueOnce({
-        size: MAX_INPUT_BYTES + 1,
-        isFile: (): boolean => true,
-    } as Awaited<ReturnType<typeof fsPromises.stat>>);
+    const close = vi.fn().mockResolvedValue(undefined);
+    vi.spyOn(fsPromises, 'open').mockResolvedValueOnce({
+        stat: vi.fn().mockResolvedValue({ size: MAX_INPUT_BYTES + 1, isFile: (): boolean => true }),
+        close,
+    } as unknown as FileHandle);
 
     await expect(getPdfFileBuffer(fakePath, MAX_INPUT_BYTES)).rejects.toThrow(/exceeds maxInputBytes/);
+    expect(close).toHaveBeenCalledOnce();
 });
 
 test('getPdfFileBuffer reads a path within the size cap', async () => {
@@ -72,17 +77,47 @@ test('getPdfFileBuffer rejects a buffer one byte above maxInputBytes', async () 
     await expect(getPdfFileBuffer(input, 8)).rejects.toThrow(/exceeds maxInputBytes/);
 });
 
-test('getPdfFileBuffer rejects when the file grows between stat() and readFile() (TOCTOU)', async () => {
-    // Pre-check sees a 100-byte file (passes), but readFile() returns a 1 KiB buffer —
-    // simulating an attacker growing the file between the two syscalls. The post-read
-    // re-check must reject the oversized payload.
-    vi.spyOn(fsPromises, 'stat').mockResolvedValueOnce({
-        size: 100,
-        isFile: (): boolean => true,
-    } as Awaited<ReturnType<typeof fsPromises.stat>>);
-    (vi.spyOn(fsPromises, 'readFile') as unknown as { mockResolvedValueOnce: (value: unknown) => unknown }).mockResolvedValueOnce(
-        Buffer.alloc(1024),
-    );
+test('getPdfFileBuffer detects growth with a bounded read and closes the handle', async () => {
+    const bytes = Buffer.alloc(1024, 7);
+    const close = vi.fn().mockResolvedValue(undefined);
+    const read = vi.fn(async (target: Buffer, offset: number, length: number, position: number) => {
+        const bytesRead = Math.min(length, Math.max(0, bytes.byteLength - position));
+        bytes.copy(target, offset, position, position + bytesRead);
+        return { bytesRead, buffer: target };
+    });
+    vi.spyOn(fsPromises, 'open').mockResolvedValueOnce({
+        stat: vi.fn().mockResolvedValue({ size: 100, isFile: (): boolean => true }),
+        read,
+        close,
+    } as unknown as FileHandle);
 
-    await expect(getPdfFileBuffer('/pretend/grew-mid-read.pdf', 512)).rejects.toThrow(/exceeds maxInputBytes/);
+    await expect(getPdfFileBuffer('/pretend/grew-mid-read.pdf', 512)).rejects.toThrow('513 > 512 bytes');
+    expect(close).toHaveBeenCalledOnce();
+    expect(read).toHaveBeenCalled();
+    for (const call of read.mock.calls) {
+        const [, , length, position] = call;
+        expect(length).toBeLessThanOrEqual(512);
+        expect(position + length).toBeLessThanOrEqual(513);
+    }
+});
+
+test('getPdfFileBuffer accepts growth up to exactly maxInputBytes', async () => {
+    const bytes = Buffer.alloc(256, 9);
+    const close = vi.fn().mockResolvedValue(undefined);
+    const read = vi.fn(async (target: Buffer, offset: number, length: number, position: number) => {
+        const bytesRead = Math.min(length, Math.max(0, bytes.byteLength - position));
+        bytes.copy(target, offset, position, position + bytesRead);
+        return { bytesRead, buffer: target };
+    });
+    vi.spyOn(fsPromises, 'open').mockResolvedValueOnce({
+        stat: vi.fn().mockResolvedValue({ size: 16, isFile: (): boolean => true }),
+        read,
+        close,
+    } as unknown as FileHandle);
+
+    const result = await getPdfFileBuffer('/pretend/grew-within-limit.pdf', bytes.byteLength);
+
+    expect(result.byteLength).toBe(bytes.byteLength);
+    expect(Buffer.from(result).equals(bytes)).toBe(true);
+    expect(close).toHaveBeenCalledOnce();
 });

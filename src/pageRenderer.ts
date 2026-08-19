@@ -1,6 +1,21 @@
+import type { Canvas, SKRSContext2D } from '@napi-rs/canvas';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { MAX_CANVAS_PIXELS } from './const.js';
-import type { CanvasAndContext, InMemoryPngPageOutput, MetadataPngPageOutput, PageRotation } from './interfaces/index.js';
+import type { PageRotation } from './types.js';
+
+/** The renderer-owned data for one page; observable identity is attached on the main thread. */
+export interface PageRenderResult {
+    width: number;
+    height: number;
+    rotation: PageRotation;
+    content: Buffer | undefined;
+}
+
+/** The mutable canvas holder returned by pdf.js's built-in Node canvas factory. */
+interface CanvasAndContext {
+    canvas: Canvas | null;
+    context: SKRSContext2D | null;
+}
 
 /**
  * Minimal structural contract for the canvas factory pdf.js installs on each document.
@@ -103,16 +118,11 @@ export function normalizeRotation(raw: number): PageRotation {
     }
 }
 
-export async function getPageMetadata(
-    pdf: PDFDocumentProxy,
-    pageName: string,
-    pageNumber: number,
-    pageViewportScale: number,
-): Promise<MetadataPngPageOutput> {
+export async function getPageMetadata(pdf: PDFDocumentProxy, pageNumber: number, pageViewportScale: number): Promise<PageRenderResult> {
     const page = await pdf.getPage(pageNumber);
-    const viewport = page.getViewport({ scale: pageViewportScale });
 
     try {
+        const viewport = page.getViewport({ scale: pageViewportScale });
         // Bound the canvas that is actually allocated — the floored bitmap — not the fractional
         // viewport area, so a page whose floored dimensions fit the limit is not wrongly rejected.
         const width = toPixelDimension(viewport.width);
@@ -124,11 +134,7 @@ export async function getPageMetadata(
             throw nonRenderableDimensionsError(width, height);
         }
         return {
-            kind: 'metadata',
-            pageNumber,
-            name: pageName,
             content: undefined,
-            path: '',
             width,
             height,
             rotation: normalizeRotation(page.rotate),
@@ -140,37 +146,36 @@ export async function getPageMetadata(
 
 export async function renderPdfPage(
     pdf: PDFDocumentProxy,
-    pageName: string,
     pageNumber: number,
     pageViewportScale: number,
     returnPageContent: boolean,
-): Promise<InMemoryPngPageOutput> {
+): Promise<PageRenderResult> {
     const page = await pdf.getPage(pageNumber);
-    const viewport = page.getViewport({ scale: pageViewportScale });
-
-    // Bound the canvas that is actually allocated — the floored bitmap — not the fractional
-    // viewport area, so a page whose floored dimensions fit the limit is not wrongly rejected.
-    const canvasWidth = toPixelDimension(viewport.width);
-    const canvasHeight = toPixelDimension(viewport.height);
-    if (canvasWidth * canvasHeight > MAX_CANVAS_PIXELS) {
-        page.cleanup();
-        throw canvasPixelLimitError(canvasWidth, canvasHeight);
-    }
-    if (canvasWidth <= 0 || canvasHeight <= 0) {
-        page.cleanup();
-        throw nonRenderableDimensionsError(canvasWidth, canvasHeight);
-    }
-
-    const canvasFactory = pdf.canvasFactory;
-    if (!isCanvasFactory(canvasFactory)) {
-        page.cleanup();
-        throw new Error('pdf.js did not provide a usable canvas factory (missing create/destroy).');
-    }
-
-    const canvasAndContext = canvasFactory.create(canvasWidth, canvasHeight);
-    const { canvas, context } = canvasAndContext;
+    let canvasFactory: CanvasFactory | undefined;
+    let canvasAndContext: CanvasAndContext | undefined;
 
     try {
+        const viewport = page.getViewport({ scale: pageViewportScale });
+
+        // Bound the canvas that is actually allocated — the floored bitmap — not the fractional
+        // viewport area, so a page whose floored dimensions fit the limit is not wrongly rejected.
+        const canvasWidth = toPixelDimension(viewport.width);
+        const canvasHeight = toPixelDimension(viewport.height);
+        if (canvasWidth * canvasHeight > MAX_CANVAS_PIXELS) {
+            throw canvasPixelLimitError(canvasWidth, canvasHeight);
+        }
+        if (canvasWidth <= 0 || canvasHeight <= 0) {
+            throw nonRenderableDimensionsError(canvasWidth, canvasHeight);
+        }
+
+        const factory = pdf.canvasFactory;
+        if (!isCanvasFactory(factory)) {
+            throw new Error('pdf.js did not provide a usable canvas factory (missing create/destroy).');
+        }
+        canvasFactory = factory;
+        canvasAndContext = canvasFactory.create(canvasWidth, canvasHeight);
+        const { canvas, context } = canvasAndContext;
+
         if (!canvas || !context) {
             throw new Error('pdf.js canvas factory returned a null canvas or context.');
         }
@@ -178,26 +183,25 @@ export async function renderPdfPage(
         // @ts-ignore — upstream pdfjs-dist@~6.1.x expects DOM CanvasRenderingContext2D, but @napi-rs/canvas exposes SKRSContext2D here. @ts-ignore (not @ts-expect-error) is required because build:test runs with skipLibCheck:true, which hides this error and would make @ts-expect-error report as unused.
         await page.render({ canvasContext: context, viewport, canvas }).promise;
         return {
-            kind: 'content',
-            pageNumber,
-            name: pageName,
             // Async encode() runs on the libuv threadpool (byte-identical to the synchronous
             // toBuffer — same native Skia encoder) so the JS thread is free to render another
             // page while this one compresses. The await sits inside the try block, so the
             // finally's canvasFactory.destroy() cannot run until encoding has finished.
             content: returnPageContent ? await canvas.encode('png') : undefined,
-            path: '',
             width: canvasWidth,
             height: canvasHeight,
             rotation: normalizeRotation(page.rotate),
         };
     } finally {
-        page.cleanup();
-        // Pass the original object pdf.js handed back so any internal fields it needs for cleanup
-        // survive. Guard on canvas: pdf.js's destroy() asserts a non-null canvas, so skip it when
-        // create() yielded none (the try block has already thrown for that case).
-        if (canvasAndContext.canvas) {
-            canvasFactory.destroy(canvasAndContext);
+        try {
+            page.cleanup();
+        } finally {
+            // Pass the original object pdf.js handed back so any internal fields it needs for cleanup
+            // survive. Guard on canvas: pdf.js's destroy() asserts a non-null canvas, so skip it when
+            // create() yielded none (the try block has already thrown for that case).
+            if (canvasAndContext?.canvas && canvasFactory !== undefined) {
+                canvasFactory.destroy(canvasAndContext);
+            }
         }
     }
 }

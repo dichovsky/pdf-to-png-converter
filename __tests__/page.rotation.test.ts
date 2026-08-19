@@ -7,3 +7,7 @@ test('should normalize supported PDF rotation values', () => {
     expect(normalizeRotation(-90)).toBe(270);
     expect(normalizeRotation(360)).toBe(0);
 });
+
+test('should reject unsupported PDF rotation values', () => {
+    expect(() => normalizeRotation(45)).toThrow('Unsupported PDF page rotation: 45');
+});

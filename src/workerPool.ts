@@ -1,25 +1,58 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { Worker } from 'node:worker_threads';
-import type { PageRotation } from './interfaces/index.js';
-import type { RenderPageRequest, WorkerInitData, WorkerDocumentOptions, WorkerResponse } from './interfaces/worker.protocol.js';
+import type { PageRenderResult } from './pageRenderer.js';
+import type { PdfDocumentOptions } from './pdfjsLoader.js';
+
+/** The exact validated, structured-clone-safe configuration a render worker consumes. */
+export interface WorkerRenderOptions extends PdfDocumentOptions {
+    viewportScale: number;
+}
 
 /** One page-render assignment; `index` is the position in the conversion's ordered task list. */
 export interface WorkerPageTask {
     index: number;
     pageNumber: number;
-    pageName: string;
 }
 
-/** A page as rendered inside a worker, re-materialized on the main thread. */
-export interface WorkerRenderedPage {
+/** Passed once per worker via `workerData`; the PDF bytes are cloned once per worker. */
+export interface WorkerInitData {
+    pdfBuffer: Uint8Array;
+    renderOptions: WorkerRenderOptions;
+    materializeContent: boolean;
+}
+
+/** Main → worker: render one page. Workers are stopped with `terminate()`. */
+export interface RenderPageRequest {
+    type: 'render';
+    index: number;
     pageNumber: number;
-    name: string;
+}
+
+/** Worker → main: one successfully rendered page. */
+interface RenderedPageMessage {
+    type: 'result';
+    index: number;
     width: number;
     height: number;
-    rotation: PageRotation;
-    content: Buffer | undefined;
+    rotation: PageRenderResult['rotation'];
+    content: Uint8Array | undefined;
 }
+
+/** Worker → main: one page failed, but the worker can continue serving other pages. */
+interface RenderErrorMessage {
+    type: 'render-error';
+    index: number;
+    error: unknown;
+}
+
+/** Worker → main: this worker cannot serve any page. */
+interface FatalErrorMessage {
+    type: 'fatal';
+    error: unknown;
+}
+
+export type WorkerResponse = RenderedPageMessage | RenderErrorMessage | FatalErrorMessage;
 
 /**
  * Locates the compiled worker entry. In the published package (and any `out/` build) it sits
@@ -42,7 +75,7 @@ function resolveWorkerEntryPath(): string {
  * shared across threads) and loads the document once. Tasks are dispatched dynamically — a worker
  * gets its next page as soon as it finishes one — so heavy pages don't stall the queue behind
  * them. `onPageRendered` runs on the main thread per completed page (this is where file-mode
- * output is written through the existing sink, keeping every path-security guard main-side);
+ * output is written, keeping every path-security guard main-side);
  * an error it throws is attributed to that page's index. The pool never settles while an
  * `onPageRendered` call is still pending — no write escapes the function's lifetime.
  *
@@ -56,11 +89,11 @@ function resolveWorkerEntryPath(): string {
  */
 export async function renderPagesInWorkerPool(
     pdfBuffer: Uint8Array,
-    documentOptions: WorkerDocumentOptions,
+    renderOptions: WorkerRenderOptions,
     materializeContent: boolean,
     tasks: WorkerPageTask[],
     poolSize: number,
-    onPageRendered: (index: number, page: WorkerRenderedPage) => Promise<void>,
+    onPageRendered: (index: number, page: PageRenderResult) => Promise<void>,
 ): Promise<void> {
     if (tasks.length === 0) {
         return;
@@ -68,7 +101,7 @@ export async function renderPagesInWorkerPool(
 
     const workerEntryPath = resolveWorkerEntryPath();
     const workerCount = Math.min(poolSize, tasks.length);
-    const initData: WorkerInitData = { pdfBuffer, documentOptions, materializeContent };
+    const initData: WorkerInitData = { pdfBuffer, renderOptions, materializeContent };
 
     let nextTaskIndex = 0;
     let fatalError: unknown;
@@ -102,11 +135,30 @@ export async function renderPagesInWorkerPool(
             let pendingWork: Promise<void> = Promise.resolve();
 
             const finish = (): void => {
-                if (!settled) {
-                    settled = true;
-                    void worker.terminate();
-                    void pendingWork.then(() => resolveWorker());
+                if (settled) {
+                    return;
                 }
+                settled = true;
+
+                // Capture both resources at settlement time. A pending output finalizer and the
+                // worker's asynchronous native teardown must BOTH finish before this pool worker
+                // resolves; otherwise writes or worker resources can escape the conversion.
+                const finalization = pendingWork;
+                let termination: Promise<number>;
+                try {
+                    termination = worker.terminate();
+                } catch (error: unknown) {
+                    recordFatal(error);
+                    termination = Promise.resolve(0);
+                }
+                void Promise.allSettled([finalization, termination]).then((outcomes) => {
+                    for (const outcome of outcomes) {
+                        if (outcome.status === 'rejected') {
+                            recordFatal(outcome.reason);
+                        }
+                    }
+                    resolveWorker();
+                });
             };
 
             const dispatchNext = (): void => {
@@ -120,12 +172,21 @@ export async function renderPagesInWorkerPool(
                     type: 'render',
                     index: task.index,
                     pageNumber: task.pageNumber,
-                    pageName: task.pageName,
                 };
-                worker.postMessage(request);
+                try {
+                    worker.postMessage(request);
+                } catch (error: unknown) {
+                    // A synchronous dispatch failure (for example, a worker that died between
+                    // scheduling and postMessage) is worker-level, so stop globally and teardown.
+                    recordFatal(error);
+                    finish();
+                }
             };
 
             const handleResponse = async (response: WorkerResponse): Promise<void> => {
+                if (settled) {
+                    return;
+                }
                 if (response.type === 'fatal') {
                     recordFatal(response.error);
                     finish();
@@ -143,8 +204,6 @@ export async function renderPagesInWorkerPool(
                         : undefined;
                 try {
                     await onPageRendered(response.index, {
-                        pageNumber: response.pageNumber,
-                        name: response.name,
                         width: response.width,
                         height: response.height,
                         rotation: response.rotation,
@@ -160,7 +219,12 @@ export async function renderPagesInWorkerPool(
                 if (settled) {
                     return;
                 }
-                pendingWork = pendingWork.then(() => handleResponse(response)).catch(recordFatal);
+                pendingWork = pendingWork
+                    .then(() => handleResponse(response))
+                    .catch((error: unknown) => {
+                        recordFatal(error);
+                        finish();
+                    });
             });
             worker.on('error', (error: unknown) => {
                 // Any worker 'error' is a worker-level failure (crash, startup failure such as a
