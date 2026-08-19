@@ -87,7 +87,7 @@ Metadata and rendering share pixel-dimension, rotation, zero-dimension, and maxi
 ### Output
 
 - Relative output folders are resolved at conversion start, before `outputFileMaskFunc` can change the process CWD.
-- Disk names are preflighted before folder creation and revalidated at the write boundary. They must be one flat path segment under the host's separator rules; disk outputs also reject `"."` and `".."` aliases.
+- Disk names are preflighted before folder creation and revalidated at the write boundary. They must be one flat path segment under the host's separator rules and contain no NUL; disk outputs also reject `"."` and `".."` aliases. Windows additionally rejects invalid filename characters, alternate-data-stream syntax, reserved device basenames, and trailing dots/spaces.
 - Case-insensitive duplicate disk names fail before output I/O.
 - `prepareOutputFolder()` creates the folder and captures its canonical `realpath`. Every write compares a fresh `realpath` with that baseline.
 - `savePNGfile()` opens with `'wx'`, preventing overwrite of an existing target and rejecting a pre-planted final symlink under normal local-filesystem semantics.
@@ -99,7 +99,7 @@ The realpath comparison does not atomically bind the write to a directory inode.
 - `getPageMetadata()` always calls `page.cleanup()`.
 - `renderPdfPage()` always calls `page.cleanup()` and destroys a successfully created canvas, including render and encode failures.
 - `getPdfDocument()` destroys a failed loading task; `pdfToPng()` destroys a successfully loaded task after all page work.
-- `renderPagesInWorkerPool()` waits for output finalizers and worker termination before returning or throwing.
+- `renderPagesInWorkerPool()` waits for output finalizers and any promise returned by worker termination before returning or throwing. A teardown-only termination failure does not invalidate pages that rendered and finalized successfully.
 
 ## CLI policy
 
@@ -109,7 +109,7 @@ The realpath comparison does not atomically bind the write to a directory inode.
 - `--return-metadata-only` prints the ordered result array as JSON and needs no output folder.
 - `--return-page-content` is rejected because the CLI has no consumer for in-memory buffers; callers needing buffers use the library API.
 - `--silent` suppresses progress, not errors.
-- Semantic options are checked through the conversion module before progress is printed; valid file conversions print their processing banner before input/render work begins.
+- Semantic options receive a fail-fast validation pass through the conversion module before progress is printed; valid file conversions print their processing banner before input/render work begins. `pdfToPng()` then validates defensively at its public boundary, so CLI calls intentionally perform two pure validation passes instead of coupling to a normalized internal core.
 - `getVersion()` treats a missing or malformed `package.json` as a packaging failure.
 
 ## Build and validation

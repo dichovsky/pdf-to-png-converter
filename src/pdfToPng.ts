@@ -1,7 +1,14 @@
 import { parse } from 'node:path';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { MAX_CONCURRENCY_LIMIT, MAX_VIEWPORT_SCALE, PDF_TO_PNG_OPTIONS_DEFAULTS, SEQUENTIAL_PIPELINE_WINDOW } from './const.js';
-import { assertValidOutputFilename, prepareOutputFolder, resolveOutputFolder, savePNGfile } from './outputWriter.js';
+import {
+    assertValidOutputFilename,
+    containsHostPathSeparator,
+    HOST_PATH_SEPARATOR_DESCRIPTION,
+    prepareOutputFolder,
+    resolveOutputFolder,
+    savePNGfile,
+} from './outputWriter.js';
 import type { OutputFolderHandle } from './outputWriter.js';
 import { getPageMetadata, renderPdfPage } from './pageRenderer.js';
 import type { PageRenderResult } from './pageRenderer.js';
@@ -145,9 +152,9 @@ function resolvePageName(pageNumber: number, defaultMask: string, mask: ((page: 
     }
     // Naming remains observable in memory-only mode. Host path-separator validation is retained
     // for compatibility; disk-only aliases such as "." are rejected by output preflight below.
-    if (name.includes('/') || (process.platform === 'win32' && name.includes('\\'))) {
+    if (containsHostPathSeparator(name)) {
         throw new Error(
-            `outputFileMaskFunc returned a filename containing a path separator for page ${pageNumber}: "${name}". The filename must be a flat name with no ${process.platform === 'win32' ? '"/" or "\\"' : '"/"'} characters.`,
+            `outputFileMaskFunc returned a filename containing a path separator for page ${pageNumber}: "${name}". The filename must be a flat name with no ${HOST_PATH_SEPARATOR_DESCRIPTION} characters.`,
         );
     }
     return name;
@@ -233,7 +240,7 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike | Uint8Array, p
         const pageNumbers: number[] =
             options.pagesToProcess === undefined
                 ? Array.from({ length: pdfDocument.numPages }, (_, index) => index + 1)
-                : options.pagesToProcess.filter((pageNumber) => pageNumber <= pdfDocument.numPages);
+                : options.pagesToProcess.filter((pageNumber) => pageNumber >= 1 && pageNumber <= pdfDocument.numPages);
 
         // Resolve the path before callbacks run so process.chdir() cannot redirect a relative folder.
         const resolvedOutputFolder =

@@ -19,15 +19,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Page cleanup now covers viewport and canvas-allocation failures, a created canvas is destroyed even when page cleanup throws, and worker-pool settlement waits for both main-thread page finalization and `Worker.terminate()`.
+- Page cleanup now covers viewport and canvas-allocation failures, a created canvas is destroyed even when page cleanup throws, and worker-pool settlement waits for both main-thread page finalization and the promise returned by `Worker.terminate()`. A teardown-only termination failure no longer discards otherwise successful page results.
 - Duplicate output-name detection is now linear rather than repeatedly copying the accumulated page list for every collision.
-- The CLI again validates semantic options before printing progress, then emits its processing and output-folder banners before conversion work starts.
+- The CLI again validates semantic options before printing progress, then emits its processing and output-folder banners before conversion work starts. It intentionally performs this fail-fast pass before calling `pdfToPng()`, which revalidates at the public boundary; the small duplicate pass replaces the former normalized internal-core coupling.
 - Release prechecks now require the worker-thread entry and root type declarations in the dry-run tarball, catching incomplete packages before publication.
 
 ### Security
 
 - Path inputs are opened once with nonblocking read-only flags, then checked and bounded-read through that same file handle. This closes the previous path-swap gap between `stat()` and `readFile()`, rejects special files without blocking on FIFOs, and prevents a growing file from allocating beyond `maxInputBytes` before rejection.
-- Disk filenames are validated before folder creation as well as at the write boundary, including empty names and `"."` / `".."` aliases. Output documentation now states the residual directory-inode replacement race accurately instead of claiming canonical-path equality is atomic.
+- Disk filenames are validated before folder creation as well as at the write boundary, including NUL, empty names, and `"."` / `".."` aliases. Windows preflight also rejects invalid characters, alternate data streams, reserved device basenames, and trailing dots/spaces before output I/O. The host-separator predicate again has one owner shared by naming and writing. Output documentation now states the residual directory-inode replacement race accurately instead of claiming canonical-path equality is atomic.
 
 ### Removed
 

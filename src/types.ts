@@ -61,6 +61,9 @@ export interface PdfToPngOptions {
      * Custom naming function for output PNG files.
      * Receives the 1-based page number and must return a full filename string including the `.png` extension
      * (e.g. `(pageNumber) => \`page_${pageNumber}.png\``).
+     * The value must be one flat host-valid filename. NUL and host path separators are rejected;
+     * on Windows, invalid filename characters, alternate-data-stream syntax, reserved device
+     * basenames, and trailing dots/spaces are also rejected before output I/O.
      * When omitted, names default to `<pdfBasename>_page_<pageNumber>.png`,
      * or `buffer_page_<pageNumber>.png` when the PDF is supplied as an `ArrayBufferLike`.
      * @since 3.14.0

@@ -84,8 +84,9 @@ function resolveWorkerEntryPath(): string {
  * collected by index and the LOWEST-index one is thrown — mirroring
  * `processPagesWithSlidingWindow`. Worker-level failures (document load failure, worker crash,
  * startup failure, unexpected exit) are FATAL: the first one is thrown with priority over any
- * per-page error, regardless of what the crashed worker was doing at the time. Workers are
- * always terminated before this function settles.
+ * per-page error, regardless of what the crashed worker was doing at the time. Worker termination
+ * is attempted, and its returned promise is awaited, before this function settles. A failure of
+ * that teardown alone does not turn otherwise successful page processing into a conversion error.
  */
 export async function renderPagesInWorkerPool(
     pdfBuffer: Uint8Array,
@@ -147,15 +148,16 @@ export async function renderPagesInWorkerPool(
                 let termination: Promise<number>;
                 try {
                     termination = worker.terminate();
-                } catch (error: unknown) {
-                    recordFatal(error);
+                } catch {
+                    // A teardown-only failure cannot invalidate pages that rendered and finalized
+                    // successfully. There is no asynchronous termination left to await when the
+                    // call itself throws.
                     termination = Promise.resolve(0);
                 }
                 void Promise.allSettled([finalization, termination]).then((outcomes) => {
-                    for (const outcome of outcomes) {
-                        if (outcome.status === 'rejected') {
-                            recordFatal(outcome.reason);
-                        }
+                    const [finalizationOutcome] = outcomes;
+                    if (finalizationOutcome.status === 'rejected') {
+                        recordFatal(finalizationOutcome.reason);
                     }
                     resolveWorker();
                 });

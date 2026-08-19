@@ -1,4 +1,5 @@
 import { afterEach, expect, test, vi } from 'vitest';
+import { setImmediate } from 'node:timers';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import * as pageRenderer from '../src/pageRenderer.js';
 import * as pdfjsLoader from '../src/pdfjsLoader.js';
@@ -163,6 +164,46 @@ test('sequential mode: a failure stops new pages after the in-flight ones and th
     await expect(conversionPromise).rejects.toThrow('page 1 render failed');
     expect(startedPages).toEqual([1, 2, 3]);
     expect(destroy).toHaveBeenCalled();
+});
+
+test('sequential mode reports the lowest-index in-flight error even when a higher index fails first', async () => {
+    const destroy = vi.fn().mockResolvedValue(undefined);
+    const mockDocument = { numPages: 5, loadingTask: { destroy } } as unknown as PDFDocumentProxy;
+    vi.spyOn(pdfjsLoader, 'getPdfDocument').mockResolvedValue(mockDocument);
+
+    const startedPages: number[] = [];
+    const lowerFailureGate = createDeferred();
+    const middleCompletionGate = createDeferred();
+    const higherFailureGate = createDeferred();
+    vi.spyOn(pageRenderer, 'renderPdfPage').mockImplementation(async (_pdf, pageNumber) => {
+        startedPages.push(pageNumber);
+        if (pageNumber === 1) {
+            await lowerFailureGate.promise;
+            throw new Error('lower-index page 1 failed second');
+        }
+        if (pageNumber === 2) {
+            await middleCompletionGate.promise;
+            return { content: Buffer.from('2'), width: 100, height: 100, rotation: 0 };
+        }
+        await higherFailureGate.promise;
+        throw new Error('higher-index page 3 failed first');
+    });
+
+    const conversionPromise = pdfToPng(new Uint8Array([1]), { pagesToProcess: [1, 2, 3, 4, 5] });
+    await vi.waitFor(() => {
+        expect(startedPages).toEqual([1, 2, 3]);
+    });
+
+    higherFailureGate.resolve();
+    // Move to the next event-loop turn so the page-3 rejection is recorded before page 1 is
+    // released. This establishes failure order without a timing delay or fixed microtask count.
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    lowerFailureGate.resolve();
+    middleCompletionGate.resolve();
+
+    await expect(conversionPromise).rejects.toThrow('lower-index page 1 failed second');
+    expect(startedPages).toEqual([1, 2, 3]);
+    expect(destroy).toHaveBeenCalledOnce();
 });
 
 test('should reject when a parallel page rejects with undefined', async () => {

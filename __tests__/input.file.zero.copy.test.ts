@@ -2,12 +2,15 @@ import type { FileHandle } from 'node:fs/promises';
 import { afterEach, expect, test, vi } from 'vitest';
 import { getPdfFileBuffer } from '../src/pdfInput';
 
-vi.mock('node:fs', () => ({
-    constants: { O_RDONLY: 0, O_NONBLOCK: 4 },
-    promises: { open: vi.fn() },
-}));
+vi.mock('node:fs', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('node:fs')>();
+    return {
+        ...actual,
+        promises: { ...actual.promises, open: vi.fn() },
+    };
+});
 
-import { promises as fsPromises } from 'node:fs';
+import { constants as fsConstants, promises as fsPromises } from 'node:fs';
 
 const openMock = vi.mocked(fsPromises.open);
 
@@ -80,7 +83,7 @@ test('path input validates and reads through exactly one opened handle', async (
     await getPdfFileBuffer('/fake/file.pdf', 1024);
 
     expect(openMock).toHaveBeenCalledOnce();
-    expect(openMock).toHaveBeenCalledWith('/fake/file.pdf', 4);
+    expect(openMock).toHaveBeenCalledWith('/fake/file.pdf', fsConstants.O_RDONLY | fsConstants.O_NONBLOCK);
     expect(file.stat).toHaveBeenCalledOnce();
     expect(file.read).toHaveBeenCalled();
     expect(file.close).toHaveBeenCalledOnce();

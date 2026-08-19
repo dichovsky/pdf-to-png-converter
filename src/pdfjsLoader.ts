@@ -16,7 +16,11 @@ export interface PdfDocumentOptions {
 
 let pdfjsLib: typeof PdfjsModule | undefined;
 
-/** Builds a pdf.js factory URL using call-time CWD and a portable trailing forward slash. */
+/**
+ * Builds a pdf.js factory URL using call-time CWD and a portable trailing forward slash.
+ * Do not switch this back to `path.sep`: on Windows a backslash terminator makes pdf.js reject
+ * the value with "must include trailing slash" and breaks every conversion (issue #173).
+ */
 function factoryUrl(path: string): string {
     const absolute = resolve(path).split(sep).join('/');
     return absolute.endsWith('/') ? absolute : `${absolute}/`;

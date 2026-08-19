@@ -4,8 +4,25 @@ import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 // Reject only characters the host OS treats as path separators. On Windows both "\\" and "/"
 // are separators; on POSIX only "/" is. A backslash therefore remains a valid POSIX filename
 // character, including when it comes from a PDF basename.
-const PATH_SEPARATOR_PATTERN = sep === '\\' ? /[\\/]/ : /\//;
-const SEPARATOR_DESCRIPTION = sep === '\\' ? '"/" or "\\"' : '"/"';
+const IS_WINDOWS_PATH = sep === '\\';
+const PATH_SEPARATOR_PATTERN = IS_WINDOWS_PATH ? /[\\/]/ : /\//;
+const WINDOWS_INVALID_FILENAME_CHARACTER_PATTERN = /[<>:"|?*]/u;
+const WINDOWS_RESERVED_DEVICE_BASENAME_PATTERN = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9]|conin\$|conout\$)$/iu;
+
+export const HOST_PATH_SEPARATOR_DESCRIPTION = IS_WINDOWS_PATH ? '"/" or "\\"' : '"/"';
+
+/** Uses node:path semantics so every caller agrees about which characters separate host paths. */
+export function containsHostPathSeparator(name: string): boolean {
+    return PATH_SEPARATOR_PATTERN.test(name);
+}
+
+function containsWindowsInvalidFilenameCharacter(name: string): boolean {
+    if (WINDOWS_INVALID_FILENAME_CHARACTER_PATTERN.test(name)) return true;
+    for (let index = 0; index < name.length; index += 1) {
+        if (name.charCodeAt(index) <= 0x1f) return true;
+    }
+    return false;
+}
 
 function isEscapingRelativePath(rel: string): boolean {
     return rel === '..' || rel.startsWith('..' + sep) || isAbsolute(rel);
@@ -23,8 +40,14 @@ export function assertValidOutputFilename(name: string): void {
         throw new Error('Output file name must be a non-empty plain filename.');
     }
 
-    if (PATH_SEPARATOR_PATTERN.test(name)) {
-        throw new Error(`Output file name must be a flat filename without ${SEPARATOR_DESCRIPTION} path separators: ${name}`);
+    // Node rejects NUL in paths on every supported host. Check it before any filesystem call so
+    // callers get the filename-contract error instead of an environment-dependent fs error.
+    if (name.includes('\0')) {
+        throw new Error('Output file name must not contain a NUL byte.');
+    }
+
+    if (containsHostPathSeparator(name)) {
+        throw new Error(`Output file name must be a flat filename without ${HOST_PATH_SEPARATOR_DESCRIPTION} path separators: ${name}`);
     }
 
     if (isAbsolute(name) || name === '..') {
@@ -34,6 +57,23 @@ export function assertValidOutputFilename(name: string): void {
     // '.' collapses to the output folder itself under join().
     if (name === '.') {
         throw new Error(`Output file name must be a plain filename, received: ${name}`);
+    }
+
+    if (IS_WINDOWS_PATH) {
+        if (containsWindowsInvalidFilenameCharacter(name)) {
+            throw new Error(`Output file name contains a character that is invalid on Windows: ${name}`);
+        }
+
+        if (/[. ]$/u.test(name)) {
+            throw new Error(`Output file name must not end with a dot or space on Windows: ${name}`);
+        }
+
+        // Windows reserves these device basenames even when an extension is appended. Trimming
+        // dots/spaces from the stem also covers names Windows normalizes before device lookup.
+        const stem = name.split('.', 1)[0].replace(/[. ]+$/u, '');
+        if (WINDOWS_RESERVED_DEVICE_BASENAME_PATTERN.test(stem)) {
+            throw new Error(`Output file name uses a reserved Windows device basename: ${name}`);
+        }
     }
 }
 

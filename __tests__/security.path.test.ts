@@ -69,6 +69,25 @@ test('should reject empty outputFileMaskFunc filenames', async () => {
     );
 });
 
+test('should reject NUL in outputFileMaskFunc before creating the output folder', async () => {
+    const baseDir = await fsPromises.mkdtemp(join(tmpdir(), 'pdf-to-png-nul-'));
+    const outputFolder = join(baseDir, 'must-not-be-created');
+
+    try {
+        await expect(
+            pdfToPng(SAMPLE_PDF, {
+                outputFolder,
+                outputFileMaskFunc: () => 'page\0.png',
+                pagesToProcess: [1],
+                returnPageContent: false,
+            }),
+        ).rejects.toThrow('must not contain a NUL byte');
+        await expect(fsPromises.stat(outputFolder)).rejects.toMatchObject({ code: 'ENOENT' });
+    } finally {
+        await fsPromises.rm(baseDir, { recursive: true, force: true });
+    }
+});
+
 test('should reject an empty outputFolder before any I/O', async () => {
     await expect(pdfToPng(SAMPLE_PDF, { outputFolder: '' })).rejects.toThrow('outputFolder must not be empty');
 });
