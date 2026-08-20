@@ -54,6 +54,14 @@ interface FatalErrorMessage {
 
 export type WorkerResponse = RenderedPageMessage | RenderErrorMessage | FatalErrorMessage;
 
+/** Throws the lowest-index recorded error, preserving `undefined` as a valid rejection reason. */
+export function throwLowestIndexedError(errorsByIndex: ReadonlyMap<number, unknown>): void {
+    if (errorsByIndex.size === 0) {
+        return;
+    }
+    throw errorsByIndex.get(Math.min(...errorsByIndex.keys()));
+}
+
 /**
  * Locates the compiled worker entry. In the published package (and any `out/` build) it sits
  * next to this file. When this module runs from `src/` (vitest transforms TypeScript in-place,
@@ -81,12 +89,12 @@ function resolveWorkerEntryPath(): string {
  *
  * Failure semantics: after the first error no new pages are dispatched and in-flight pages
  * settle. Per-page failures (a page that fails to render, or whose output write fails) are
- * collected by index and the LOWEST-index one is thrown — mirroring
- * `processPagesWithSlidingWindow`. Worker-level failures (document load failure, worker crash,
- * startup failure, unexpected exit) are FATAL: the first one is thrown with priority over any
- * per-page error, regardless of what the crashed worker was doing at the time. Worker termination
- * is attempted, and its returned promise is awaited, before this function settles. A failure of
- * that teardown alone does not turn otherwise successful page processing into a conversion error.
+ * collected by index and the LOWEST-index one is thrown through the same helper used by
+ * `mapLimitOrdered`. Worker-level failures (document load failure, worker crash, startup failure,
+ * unexpected exit) are FATAL: the first one is thrown with priority over any per-page error,
+ * regardless of what the crashed worker was doing at the time. Worker termination is attempted,
+ * and its returned promise is awaited, before this function settles. A failure of that teardown
+ * alone does not turn otherwise successful page processing into a conversion error.
  */
 export async function renderPagesInWorkerPool(
     pdfBuffer: Uint8Array,
@@ -252,7 +260,5 @@ export async function renderPagesInWorkerPool(
     if (hasFatalError) {
         throw fatalError;
     }
-    if (errorsByIndex.size > 0) {
-        throw errorsByIndex.get(Math.min(...errorsByIndex.keys()));
-    }
+    throwLowestIndexedError(errorsByIndex);
 }

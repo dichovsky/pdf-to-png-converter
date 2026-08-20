@@ -6,8 +6,9 @@ import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 // character, including when it comes from a PDF basename.
 const IS_WINDOWS_PATH = sep === '\\';
 const PATH_SEPARATOR_PATTERN = IS_WINDOWS_PATH ? /[\\/]/ : /\//;
-const WINDOWS_INVALID_FILENAME_CHARACTER_PATTERN = /[<>:"|?*]/u;
-const WINDOWS_RESERVED_DEVICE_BASENAME_PATTERN = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9]|conin\$|conout\$)$/iu;
+// eslint-disable-next-line no-control-regex -- Windows forbids U+0000-U+001F in filenames.
+const WINDOWS_INVALID_FILENAME_CHARACTER_PATTERN = /[<>:"|?*\u0000-\u001f]/u;
+const WINDOWS_RESERVED_DEVICE_BASENAME_PATTERN = /^(?:con|prn|aux|nul|com[1-9¹²³]|lpt[1-9¹²³]|conin\$|conout\$)$/iu;
 
 export const HOST_PATH_SEPARATOR_DESCRIPTION = IS_WINDOWS_PATH ? '"/" or "\\"' : '"/"';
 
@@ -17,11 +18,7 @@ export function containsHostPathSeparator(name: string): boolean {
 }
 
 function containsWindowsInvalidFilenameCharacter(name: string): boolean {
-    if (WINDOWS_INVALID_FILENAME_CHARACTER_PATTERN.test(name)) return true;
-    for (let index = 0; index < name.length; index += 1) {
-        if (name.charCodeAt(index) <= 0x1f) return true;
-    }
-    return false;
+    return WINDOWS_INVALID_FILENAME_CHARACTER_PATTERN.test(name);
 }
 
 function isEscapingRelativePath(rel: string): boolean {

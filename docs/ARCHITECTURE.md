@@ -43,7 +43,7 @@ The CLI is an adapter over this same public path. It does not bypass validation 
 | `renderInWorkerThreads: true`             | Dynamic worker pool of size `min(concurrencyLimit, selectedPages)`; takes precedence over main-thread parallelism |
 | `processPagesInParallel: true`, limit `1` | Exactly one main-thread page task in flight                                                                       |
 
-All modes preserve result-array order. The bounded main-thread scheduler stops dispatching after an error, drains work already in flight, and throws the failure with the lowest page index. Worker mode also drains main-thread finalizers and terminates every worker before settling; a worker-level fatal error takes precedence over page-level errors.
+All modes preserve result-array order. The bounded main-thread scheduler stops dispatching after an error, drains work already in flight, and throws the failure with the lowest page index. Main-thread and worker schedulers share the same lowest-index error selector. Worker mode also drains main-thread finalizers and terminates every worker before settling; a worker-level fatal error takes precedence over page-level errors.
 
 Each worker receives its own structured-clone copy of the PDF, loads that document lazily once, and renders dynamically assigned pages. PNG bytes are structured-clone copied back to the main thread, then wrapped as a `Buffer` without another copy. Output naming, duplicate detection, and disk security remain main-thread responsibilities.
 
@@ -58,6 +58,8 @@ Each worker receives its own structured-clone copy of the PDF, loads that docume
 | `file`     | PNG written to disk              | `Buffer \| undefined` | absolute file path |
 
 Metadata and rendering share pixel-dimension, rotation, zero-dimension, and maximum-canvas-area rules. File mode always materializes PNG bytes for the write, then drops them from the returned object when `returnPageContent` is false. In-memory mode may skip encoding when `returnPageContent` is false.
+
+Custom names must be non-empty and contain no host path separator in every mode. The remaining host filename rules apply only to disk output; metadata and in-memory results may carry names, such as NUL-containing strings, that are not passed to filesystem APIs.
 
 ## Module map
 
@@ -80,7 +82,7 @@ Metadata and rendering share pixel-dimension, rotation, zero-dimension, and maxi
 ### Input
 
 - A path is opened once with `O_RDONLY | O_NONBLOCK`; the same handle is checked with `stat()`, read positionally, and closed in `finally`.
-- Only regular files are accepted. Reads are capped at `maxInputBytes`, including growth after the initial size check through a one-byte overflow probe.
+- Only regular files are accepted. Reads are capped at `maxInputBytes`, including growth after the initial size check through a one-byte overflow probe. The implementation deliberately avoids `FileHandle.readFile()`, which would allocate through a changed EOF before a post-read cap check could reject growth.
 - Path reads use a dedicated full-span allocation where possible, allowing a zero-copy handoff to pdf.js.
 - Caller-owned `Buffer`, `Uint8Array`, `ArrayBuffer`, `SharedArrayBuffer`, cross-realm views, and supported array-likes are copied into unshared owned bytes before pdf.js can detach them.
 
@@ -109,7 +111,7 @@ The realpath comparison does not atomically bind the write to a directory inode.
 - `--return-metadata-only` prints the ordered result array as JSON and needs no output folder.
 - `--return-page-content` is rejected because the CLI has no consumer for in-memory buffers; callers needing buffers use the library API.
 - `--silent` suppresses progress, not errors.
-- Semantic options receive a fail-fast validation pass through the conversion module before progress is printed; valid file conversions print their processing banner before input/render work begins. `pdfToPng()` then validates defensively at its public boundary, so CLI calls intentionally perform two pure validation passes instead of coupling to a normalized internal core.
+- Semantic options receive a fail-fast validation pass through the conversion module before progress is printed; its normalized snapshot drives CLI-only policy and progress decisions. Valid file conversions print their processing banner before input/render work begins. `pdfToPng()` then validates defensively at its public boundary, so CLI calls intentionally perform two pure validation passes instead of coupling to a normalized internal core. Typed usage and conversion errors keep their output routes independent of message text or incidental `cause` values.
 - `getVersion()` treats a missing or malformed `package.json` as a packaging failure.
 
 ## Build and validation

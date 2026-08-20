@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Consolidated conversion into one canonical `pdfToPng()` path. Option normalization, page planning, bounded main-thread scheduling, mode selection, output finalization, and document teardown now live together; the CLI delegates to that public API instead of a normalized internal core. The public package exports and option/result behavior are unchanged.
 - Colocated one-consumer implementation details with their owners: pdf.js parameter mapping and portable asset URLs with the loader, page identity with main-thread finalization, worker protocol types with the pool, and public declarations in `src/types.ts`. The source tree is reduced from 27 to 11 TypeScript modules without removing execution modes.
-- Reworked `npm run bench` around fresh child processes and the published interface. It now records wall time, CPU time, and process peak RSS for configurable page counts and default, parallel, worker, file, and metadata modes without presenting lifetime high-water deltas as conversion memory growth.
+- Reworked `npm run bench` around fresh child processes, structured Node IPC, and the published interface. It now records wall time, CPU time, and process peak RSS for configurable page counts and default, parallel, worker, file, and metadata modes without presenting lifetime high-water deltas as conversion memory growth.
 - Added an explicit `npm run check` CI/publish gate for both type-checks, formatting, lint, production licenses, and coverage tests. A plain `npm test` now runs the coverage suite without an implicit build/tooling chain.
 - Raised the enforced V8 coverage floor to 95% for statements, lines, functions, and branches, including the production worker entry through in-process protocol coverage.
 
@@ -21,13 +21,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Page cleanup now covers viewport and canvas-allocation failures, a created canvas is destroyed even when page cleanup throws, and worker-pool settlement waits for both main-thread page finalization and the promise returned by `Worker.terminate()`. A teardown-only termination failure no longer discards otherwise successful page results.
 - Duplicate output-name detection is now linear rather than repeatedly copying the accumulated page list for every collision.
-- The CLI again validates semantic options before printing progress, then emits its processing and output-folder banners before conversion work starts. It intentionally performs this fail-fast pass before calling `pdfToPng()`, which revalidates at the public boundary; the small duplicate pass replaces the former normalized internal-core coupling.
+- The CLI again validates semantic options before printing progress, then emits its processing and output-folder banners before conversion work starts. Its fail-fast pass returns the normalized snapshot used for CLI-only policy, and typed usage/conversion errors replace message and `cause` sniffing. `pdfToPng()` still revalidates at the public boundary; the small duplicate pass replaces the former normalized internal-core coupling.
+- Main-thread and worker schedulers now call one shared lowest-index error selector, keeping their deterministic page-error policy aligned. Main-thread limit selection and worker-mode selection each have one source of truth.
 - Release prechecks now require the worker-thread entry and root type declarations in the dry-run tarball, catching incomplete packages before publication.
 
 ### Security
 
 - Path inputs are opened once with nonblocking read-only flags, then checked and bounded-read through that same file handle. This closes the previous path-swap gap between `stat()` and `readFile()`, rejects special files without blocking on FIFOs, and prevents a growing file from allocating beyond `maxInputBytes` before rejection.
-- Disk filenames are validated before folder creation as well as at the write boundary, including NUL, empty names, and `"."` / `".."` aliases. Windows preflight also rejects invalid characters, alternate data streams, reserved device basenames, and trailing dots/spaces before output I/O. The host-separator predicate again has one owner shared by naming and writing. Output documentation now states the residual directory-inode replacement race accurately instead of claiming canonical-path equality is atomic.
+- Disk filenames are validated before folder creation as well as at the write boundary, including NUL, empty names, and `"."` / `".."` aliases. Windows preflight also rejects invalid characters and control bytes, alternate data streams, reserved device basenames (including the documented `COM¹`–`COM³` and `LPT¹`–`LPT³` aliases), and trailing dots/spaces before output I/O. The host-separator predicate again has one owner shared by naming and writing. Output documentation now states the residual directory-inode replacement race accurately instead of claiming canonical-path equality is atomic.
 
 ### Removed
 

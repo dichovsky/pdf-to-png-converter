@@ -160,10 +160,10 @@ Converts PDF pages to PNG images.
     // Output Options
     outputFolder?: string,           // Directory to save PNG files; existing files are not overwritten
     outputFileMaskFunc?: (pageNumber: number) => string, // Custom filename function
-                                     // Must return a flat filename. "/" is rejected on all platforms;
-                                     // "\" is also rejected on Windows. NUL is always rejected;
-                                     // Windows-invalid characters, device names, alternate data
-                                     // streams, and trailing dots/spaces are rejected on Windows.
+                                     // Must return a non-empty flat name. "/" is always rejected;
+                                     // "\" is also rejected on Windows. For disk output, NUL and
+                                     // directory aliases are rejected; Windows also rejects invalid
+                                     // characters, device names, streams, and trailing dots/spaces.
 
     // Rendering Options
     viewportScale?: number,          // PNG scale/zoom level (default: 1.0, max: 100)

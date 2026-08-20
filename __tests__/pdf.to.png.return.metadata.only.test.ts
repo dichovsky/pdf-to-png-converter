@@ -45,6 +45,18 @@ test('should return correct page numbers and names when returnMetadataOnly is tr
     expect(pngPages[1].name).toBe('sample_page_2.png');
 });
 
+test('should preserve disk-only invalid characters in a metadata result name', async () => {
+    const pdfFilePath: string = resolve('./test-data/sample.pdf');
+    const [page] = await pdfToPng(pdfFilePath, {
+        returnMetadataOnly: true,
+        outputFileMaskFunc: () => 'metadata\0:page.png',
+        pagesToProcess: [1],
+    });
+
+    expect(page.name).toBe('metadata\0:page.png');
+    expect(page.path).toBe('');
+});
+
 test('should return metadata only for specific pages when returnMetadataOnly is true', async () => {
     const pdfFilePath: string = resolve('./test-data/large_pdf.pdf');
     const pngPages: PngPageOutput[] = await pdfToPng(pdfFilePath, {

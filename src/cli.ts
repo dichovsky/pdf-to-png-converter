@@ -47,20 +47,40 @@ const CLI_OPTIONS = {
 const PARSE_CONFIG = { options: CLI_OPTIONS, allowPositionals: true } as const;
 type ParsedValues = ReturnType<typeof parseArgs<typeof PARSE_CONFIG>>['values'];
 
+type CliConversionOptions = ReturnType<typeof assertValidPdfToPngOptions>;
+
+class UsageError extends Error {
+    constructor(
+        message: string,
+        public readonly showHelp = false,
+        options?: ErrorOptions,
+    ) {
+        super(message, options);
+        this.name = 'UsageError';
+    }
+}
+
+class ConversionError extends Error {
+    constructor(reason: unknown) {
+        super(reason instanceof Error ? reason.message : String(reason), { cause: reason });
+        this.name = 'ConversionError';
+    }
+}
+
 function parseBoolean(value: string | undefined): boolean | undefined {
     if (value === undefined) return undefined;
     if (value === 'true' || value === '1') return true;
     if (value === 'false' || value === '0') return false;
-    throw new Error(`Invalid boolean value: "${value}". Expected true|false|1|0.`);
+    throw new UsageError(`Invalid boolean value: "${value}". Expected true|false|1|0.`);
 }
 
 function parseNumberList(value: string | undefined): number[] | undefined {
     if (value === undefined) return undefined;
     return value.split(',').map((token) => {
         const trimmed = token.trim();
-        if (trimmed === '') throw new Error('Invalid integer in list: empty value.');
+        if (trimmed === '') throw new UsageError('Invalid integer in list: empty value.');
         const parsed = Number(trimmed);
-        if (!Number.isInteger(parsed)) throw new Error(`Invalid integer in list: "${trimmed}".`);
+        if (!Number.isInteger(parsed)) throw new UsageError(`Invalid integer in list: "${trimmed}".`);
         return parsed;
     });
 }
@@ -69,16 +89,19 @@ function parseNumber(value: string | undefined, errorMessage: string, integer = 
     if (value === undefined) return undefined;
     const parsed = Number(value);
     if (value.trim() === '' || !Number.isFinite(parsed) || (integer && !Number.isInteger(parsed))) {
-        throw new Error(errorMessage);
+        throw new UsageError(errorMessage);
     }
     return parsed;
 }
 
-function buildConversion(values: ParsedValues, positionals: string[]): { pdfFilePath: string; options: PdfToPngOptions } {
+function buildConversion(
+    values: ParsedValues,
+    positionals: string[],
+): { pdfFilePath: string; options: CliConversionOptions; silent: boolean } {
     const pdfFilePath = positionals[0];
-    if (!pdfFilePath) throw new Error('<pdf-file-path> is required.');
+    if (!pdfFilePath) throw new UsageError('<pdf-file-path> is required.', true);
 
-    const options: PdfToPngOptions = {
+    const rawOptions: PdfToPngOptions = {
         outputFolder: values['output-folder'],
         viewportScale: parseNumber(values['viewport-scale'], '--viewport-scale must be a valid number.'),
         useSystemFonts: values['use-system-fonts'],
@@ -94,7 +117,16 @@ function buildConversion(values: ParsedValues, positionals: string[]): { pdfFile
         renderInWorkerThreads: values['render-in-worker-threads'],
     };
 
-    return { pdfFilePath, options };
+    let options: CliConversionOptions;
+    try {
+        // Validate before CLI-only policy and progress output. pdfToPng validates again at its
+        // public boundary for callers that bypass this adapter.
+        options = assertValidPdfToPngOptions(rawOptions);
+    } catch (error: unknown) {
+        throw new UsageError(error instanceof Error ? error.message : String(error), false, { cause: error });
+    }
+
+    return { pdfFilePath, options, silent: values.silent ?? false };
 }
 
 export function getVersion(): string {
@@ -108,13 +140,13 @@ export function getVersion(): string {
 }
 
 function fail(error: unknown): void {
-    if (error instanceof Error && error.cause !== undefined) {
+    if (error instanceof ConversionError) {
         console.error('Error:');
         console.error(error.message);
     } else {
         console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
     }
-    if (error instanceof Error && error.message === '<pdf-file-path> is required.') console.error(HELP_TEXT);
+    if (error instanceof UsageError && error.showHelp) console.error(HELP_TEXT);
     process.exit(1);
 }
 
@@ -147,21 +179,20 @@ export async function run(): Promise<void> {
     }
 
     try {
-        const { pdfFilePath, options } = buildConversion(parsed.values, parsed.positionals);
+        const { pdfFilePath, options, silent } = buildConversion(parsed.values, parsed.positionals);
 
-        // Validate the same contract as the library before CLI-only policy and progress output.
-        // pdfToPng validates again at its public boundary for callers that bypass this adapter.
-        assertValidPdfToPngOptions(options);
         if (parsed.values['return-page-content']) {
-            throw new Error('--return-page-content is not supported by the CLI. Use the library API if you need in-memory PNG buffers.');
+            throw new UsageError(
+                '--return-page-content is not supported by the CLI. Use the library API if you need in-memory PNG buffers.',
+            );
         }
         if (!options.returnMetadataOnly && options.outputFolder === undefined) {
-            throw new Error(
+            throw new UsageError(
                 'The CLI requires --output-folder for image conversion. Use --return-metadata-only for stdout-friendly page metadata.',
             );
         }
 
-        if (!options.returnMetadataOnly && !parsed.values.silent) {
+        if (!options.returnMetadataOnly && !silent) {
             console.log(`Processing PDF: ${pdfFilePath}`);
             console.log(`Output folder: ${options.outputFolder}`);
         }
@@ -170,13 +201,11 @@ export async function run(): Promise<void> {
         try {
             results = await pdfToPng(pdfFilePath, options);
         } catch (error: unknown) {
-            // Keep conversion failures visually distinct from argv/usage failures, matching the
-            // established CLI output while preserving the original value as the cause.
-            throw new Error(error instanceof Error ? error.message : String(error), { cause: error });
+            throw new ConversionError(error);
         }
         if (options.returnMetadataOnly) {
             console.log(JSON.stringify(results, null, 2));
-        } else if (!parsed.values.silent) {
+        } else if (!silent) {
             console.log(`Successfully processed ${results.length} page(s).`);
         }
     } catch (error: unknown) {

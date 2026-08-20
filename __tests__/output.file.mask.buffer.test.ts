@@ -25,3 +25,13 @@ test(`should apply default buffer name if outputFileMaskFunc is not defined for 
         expect(pngPage.name).toBe(`buffer_page_${index + 1}.png`);
     }
 });
+
+test('should preserve disk-only invalid characters in an in-memory result name', async () => {
+    const [page] = await pdfToPng(pdfBuffer, {
+        outputFileMaskFunc: () => 'memory\0:page.png',
+        pagesToProcess: [1],
+    });
+
+    expect(page.name).toBe('memory\0:page.png');
+    expect(page.path).toBe('');
+});

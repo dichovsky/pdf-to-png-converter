@@ -30,9 +30,12 @@ test.each([
     expect(() => assertValidOutputFilename(name)).toThrow('contains a character that is invalid on Windows');
 });
 
-test('rejects non-NUL control characters under Windows semantics', () => {
-    expect(() => assertValidOutputFilename('control\u0001name.png')).toThrow('contains a character that is invalid on Windows');
-});
+test.each(['control\u0001name.png', 'control\u001fname.png'])(
+    'rejects a non-NUL control character under Windows semantics in %j',
+    (name) => {
+        expect(() => assertValidOutputFilename(name)).toThrow('contains a character that is invalid on Windows');
+    },
+);
 
 test.each([
     'CON',
@@ -42,8 +45,14 @@ test.each([
     'NUL',
     'COM1.png',
     'com9.log',
+    'COM¹',
+    'com².png',
+    'CoM³.backup.png',
     'LPT1',
     'lpt9.txt',
+    'LPT¹',
+    'lpt².txt',
+    'LpT³.backup.png',
     'CONIN$.png',
     'conout$.log',
     'CON .png',
@@ -59,9 +68,12 @@ test('rejects NUL before any filesystem operation under Windows semantics', () =
     expect(() => assertValidOutputFilename('page\0.png')).toThrow('must not contain a NUL byte');
 });
 
-test.each(['COM0.png', 'COM10.png', 'LPT0.txt', 'LPT10.txt', 'console.png'])('accepts non-device Windows basenames: %j', (name) => {
-    expect(() => assertValidOutputFilename(name)).not.toThrow();
-});
+test.each(['COM0.png', 'COM10.png', 'COM⁰.png', 'COM⁴.png', 'LPT0.txt', 'LPT10.txt', 'LPT⁰.txt', 'LPT⁴.txt', 'console.png'])(
+    'accepts non-device Windows basenames: %j',
+    (name) => {
+        expect(() => assertValidOutputFilename(name)).not.toThrow();
+    },
+);
 
 test('rejects current and parent directory aliases before filesystem I/O', () => {
     expect(() => assertValidOutputFilename('.')).toThrow('plain filename');

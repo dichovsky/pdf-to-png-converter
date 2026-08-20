@@ -1,11 +1,15 @@
 import fs from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import { HELP_TEXT, getVersion, run } from '../src/cli.js';
-import { pdfToPng } from '../src/pdfToPng.js';
+import { assertValidPdfToPngOptions, pdfToPng } from '../src/pdfToPng.js';
 
 vi.mock('../src/pdfToPng.js', async (importOriginal) => {
     const actual = await importOriginal<typeof import('../src/pdfToPng.js')>();
-    return { ...actual, pdfToPng: vi.fn().mockResolvedValue([]) };
+    return {
+        ...actual,
+        assertValidPdfToPngOptions: vi.fn(actual.assertValidPdfToPngOptions),
+        pdfToPng: vi.fn().mockResolvedValue([]),
+    };
 });
 
 function setArgv(...args: string[]): void {
@@ -23,6 +27,7 @@ describe('CLI', () => {
         exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
         logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
         errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        vi.mocked(assertValidPdfToPngOptions).mockClear();
         vi.mocked(pdfToPng).mockReset().mockResolvedValue([]);
     });
 
@@ -103,7 +108,7 @@ describe('CLI', () => {
         expect(pdfToPng).not.toHaveBeenCalled();
     });
 
-    it('passes raw typed options to the public conversion interface exactly once', async () => {
+    it('passes normalized CLI policy options to the public conversion interface exactly once', async () => {
         setArgv(
             'test.pdf',
             '--output-folder',
@@ -131,6 +136,7 @@ describe('CLI', () => {
         expect(pdfToPng).toHaveBeenCalledTimes(1);
         expect(pdfToPng).toHaveBeenCalledWith('test.pdf', {
             outputFolder: '/out',
+            outputFileMaskFunc: undefined,
             viewportScale: 2,
             useSystemFonts: true,
             disableFontFace: false,
@@ -138,13 +144,22 @@ describe('CLI', () => {
             pdfFilePassword: 'secret',
             pagesToProcess: [1, 2],
             verbosityLevel: 1,
-            returnMetadataOnly: undefined,
+            returnMetadataOnly: false,
             returnPageContent: false,
             processPagesInParallel: true,
             concurrencyLimit: 2,
             renderInWorkerThreads: true,
+            maxInputBytes: 256 * 1024 * 1024,
         });
         expect(logSpy).toHaveBeenCalledWith('Successfully processed 0 page(s).');
+    });
+
+    it('normalizes an omitted metadata flag to file mode before applying CLI policy', async () => {
+        setArgv('test.pdf');
+        await run();
+
+        expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('CLI requires --output-folder'));
+        expect(pdfToPng).not.toHaveBeenCalled();
     });
 
     it('prints file progress before starting conversion', async () => {
@@ -193,12 +208,36 @@ describe('CLI', () => {
         expect(pdfToPng).not.toHaveBeenCalled();
     });
 
+    it('routes semantic validation failures as usage errors even when they have a cause', async () => {
+        vi.mocked(assertValidPdfToPngOptions).mockImplementationOnce(() => {
+            throw new Error('invalid normalized options', { cause: new Error('validation detail') });
+        });
+        setArgv('test.pdf', '--output-folder', '/out');
+        await run();
+
+        expect(errorSpy).toHaveBeenCalledWith('Error: invalid normalized options');
+        expect(errorSpy).not.toHaveBeenCalledWith('Error:');
+        expect(logSpy).not.toHaveBeenCalled();
+        expect(pdfToPng).not.toHaveBeenCalled();
+    });
+
     it('prints non-Error conversion rejections with the same conversion-error shape', async () => {
         vi.mocked(pdfToPng).mockRejectedValueOnce('render failed');
         setArgv('test.pdf', '--output-folder', '/out');
         await run();
         expect(errorSpy).toHaveBeenCalledWith('Error:');
         expect(errorSpy).toHaveBeenCalledWith('render failed');
+        expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+
+    it('does not show usage help when a conversion error matches the missing-path message', async () => {
+        vi.mocked(pdfToPng).mockRejectedValueOnce(new Error('<pdf-file-path> is required.'));
+        setArgv('test.pdf', '--output-folder', '/out');
+        await run();
+
+        expect(errorSpy).toHaveBeenCalledWith('Error:');
+        expect(errorSpy).toHaveBeenCalledWith('<pdf-file-path> is required.');
+        expect(errorSpy).not.toHaveBeenCalledWith(HELP_TEXT);
         expect(exitSpy).toHaveBeenCalledWith(1);
     });
 

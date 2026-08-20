@@ -24,7 +24,12 @@ function toTransferableView(buffer: Buffer, byteLength: number): Uint8Array {
     return Uint8Array.from(buffer.subarray(0, byteLength));
 }
 
-/** Reads one already-open regular file, never allocating or reading more than the configured cap plus a one-byte overflow probe. */
+/**
+ * Reads one already-open regular file without growing the destination buffer beyond the configured
+ * cap; only a one-byte probe is read past the cap to distinguish exact-size EOF from overflow.
+ * `FileHandle.readFile()` is deliberately not used: if the file grows after `fstat()`, it reads and
+ * allocates through the new EOF before a post-read size check can enforce `maxInputBytes`.
+ */
 async function readBoundedFile(fileHandle: FileHandle, reportedSize: number, maxInputBytes: number): Promise<Uint8Array> {
     // allocUnsafeSlow produces a dedicated, full-span ArrayBuffer. That preserves the normal
     // stable-file zero-copy handoff without exposing bytes from Node's shared small-buffer pool.

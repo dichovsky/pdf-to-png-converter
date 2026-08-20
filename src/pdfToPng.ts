@@ -16,7 +16,7 @@ import { getPdfFileBuffer } from './pdfInput.js';
 import { getPdfDocument } from './pdfjsLoader.js';
 import type { PdfToPngOptions, PngPageOutput } from './types.js';
 import { VerbosityLevel } from './types.js';
-import { renderPagesInWorkerPool } from './workerPool.js';
+import { renderPagesInWorkerPool, throwLowestIndexedError } from './workerPool.js';
 import type { WorkerPageTask, WorkerRenderOptions } from './workerPool.js';
 
 interface NormalizedPdfToPngOptions {
@@ -100,14 +100,14 @@ function normalizeOptions(props: PdfToPngOptions | undefined): NormalizedPdfToPn
 }
 
 /**
- * Runs the public option contract without starting input I/O.
+ * Runs the public option contract without starting input I/O and returns its normalized snapshot.
  *
- * @internal Used by the CLI so usage errors are reported before its progress banner. The public
- * conversion still validates defensively at its own boundary because library callers do not pass
- * through the CLI.
+ * @internal Used by the CLI so usage errors are reported before its progress banner and CLI-only
+ * policy consumes the same defaults as conversion. The public conversion still validates
+ * defensively at its own boundary because library callers do not pass through the CLI.
  */
-export function assertValidPdfToPngOptions(props: PdfToPngOptions | undefined): void {
-    normalizeOptions(props);
+export function assertValidPdfToPngOptions(props: PdfToPngOptions | undefined): NormalizedPdfToPngOptions {
+    return normalizeOptions(props);
 }
 
 /** Ordered map with bounded concurrency, deterministic errors, and in-flight draining. */
@@ -129,9 +129,7 @@ async function mapLimitOrdered<T, R>(items: T[], limit: number, map: (item: T, i
     }
 
     await Promise.allSettled(Array.from({ length: Math.min(limit, items.length) }, run));
-    if (errorsByIndex.size > 0) {
-        throw errorsByIndex.get(Math.min(...errorsByIndex.keys()));
-    }
+    throwLowestIndexedError(errorsByIndex);
     return results;
 }
 
@@ -178,26 +176,25 @@ function findDuplicateOutputName(names: string[], pages: number[]): { name: stri
 }
 
 function pageOutput(kind: 'metadata' | 'content', pageNumber: number, name: string, rendered: PageRenderResult): PngPageOutput {
+    const page = {
+        pageNumber,
+        name,
+        width: rendered.width,
+        height: rendered.height,
+        rotation: rendered.rotation,
+    };
     return kind === 'metadata'
         ? {
+              ...page,
               kind,
-              pageNumber,
-              name,
               content: undefined,
               path: '',
-              width: rendered.width,
-              height: rendered.height,
-              rotation: rendered.rotation,
           }
         : {
+              ...page,
               kind,
-              pageNumber,
-              name,
               content: rendered.content,
               path: '',
-              width: rendered.width,
-              height: rendered.height,
-              rotation: rendered.rotation,
           };
 }
 
@@ -231,9 +228,8 @@ async function finalizePage(
 export async function pdfToPng(pdfFile: string | ArrayBufferLike | Uint8Array, props?: PdfToPngOptions): Promise<PngPageOutput[]> {
     const options: NormalizedPdfToPngOptions = normalizeOptions(props);
     const pdfBytes = await getPdfFileBuffer(pdfFile, options.maxInputBytes);
-    const useWorkers: boolean = options.renderInWorkerThreads && !options.returnMetadataOnly;
     // Main pdf.js loading detaches its input; workers need a retained source for their clones.
-    const workerPdfBytes = useWorkers ? Uint8Array.from(pdfBytes) : undefined;
+    const workerPdfBytes = options.renderInWorkerThreads && !options.returnMetadataOnly ? Uint8Array.from(pdfBytes) : undefined;
     const pdfDocument: PDFDocumentProxy = await getPdfDocument(pdfBytes, options);
 
     try {
@@ -259,9 +255,10 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike | Uint8Array, p
             }
         }
 
+        const mainThreadLimit = options.processPagesInParallel ? options.concurrencyLimit : SEQUENTIAL_PIPELINE_WINDOW;
+
         if (options.returnMetadataOnly) {
-            const limit = options.processPagesInParallel ? options.concurrencyLimit : SEQUENTIAL_PIPELINE_WINDOW;
-            return await mapLimitOrdered(pageNumbers, limit, async (pageNumber, index) =>
+            return await mapLimitOrdered(pageNumbers, mainThreadLimit, async (pageNumber, index) =>
                 pageOutput('metadata', pageNumber, names[index], await getPageMetadata(pdfDocument, pageNumber, options.viewportScale)),
             );
         }
@@ -269,7 +266,7 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike | Uint8Array, p
         const folder = resolvedOutputFolder === undefined ? undefined : await prepareOutputFolder(resolvedOutputFolder);
         const materializeContent = folder !== undefined || options.returnPageContent;
 
-        if (useWorkers && workerPdfBytes !== undefined) {
+        if (workerPdfBytes !== undefined) {
             const tasks: WorkerPageTask[] = pageNumbers.map((pageNumber, index) => ({ index, pageNumber }));
             const renderOptions: WorkerRenderOptions = {
                 viewportScale: options.viewportScale,
@@ -293,8 +290,7 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike | Uint8Array, p
             return results;
         }
 
-        const limit = options.processPagesInParallel ? options.concurrencyLimit : SEQUENTIAL_PIPELINE_WINDOW;
-        return await mapLimitOrdered(pageNumbers, limit, async (pageNumber, index) =>
+        return await mapLimitOrdered(pageNumbers, mainThreadLimit, async (pageNumber, index) =>
             finalizePage(
                 pageNumber,
                 names[index],

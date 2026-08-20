@@ -29,9 +29,12 @@ test.skipIf(sep === '\\')('keeps Windows-only spellings valid on POSIX', () => {
         'pipe|name.png',
         'quote"name.png',
         'control\u0001name.png',
+        'control\u001fname.png',
         'CON.png',
         'NUL',
         'LPT9.txt',
+        'COM¹.png',
+        'lpt³.txt',
         'trailing-dot.',
         'trailing-space ',
     ]) {

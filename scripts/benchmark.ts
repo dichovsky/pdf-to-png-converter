@@ -16,7 +16,7 @@
  * Each scenario runs in a fresh child process so peak RSS is a scenario-local high-water mark.
  * Results are printed and saved under the gitignored `bench-results/` directory.
  */
-import { spawn } from 'node:child_process';
+import { fork } from 'node:child_process';
 import { promises as fsPromises } from 'node:fs';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 import { performance } from 'node:perf_hooks';
@@ -27,9 +27,6 @@ const REPO_ROOT = resolve(__dirname, '..');
 const TEST_DATA_ROOT = join(REPO_ROOT, 'test-data');
 const RESULTS_ROOT = join(REPO_ROOT, 'bench-results');
 const TEMP_ROOT = join(RESULTS_ROOT, 'tmp');
-const CHILD_SCENARIO_ENV = 'BENCH_CHILD_SCENARIO';
-const CHILD_RESULT_PREFIX = 'BENCH_RESULT=';
-
 const BENCH_MODES = ['default', 'parallel', 'worker', 'file', 'file-parallel', 'file-worker', 'metadata'] as const;
 type BenchMode = (typeof BENCH_MODES)[number];
 
@@ -227,36 +224,34 @@ async function runScenario(scenario: Scenario): Promise<ScenarioResult> {
 
 function runScenarioInChild(scenario: Scenario): Promise<ScenarioResult> {
     return new Promise((resolveScenario, rejectScenario) => {
-        const child = spawn(process.execPath, ['--require', require.resolve('ts-node/register'), __filename], {
+        const child = fork(__filename, [], {
             cwd: REPO_ROOT,
-            env: { ...process.env, [CHILD_SCENARIO_ENV]: JSON.stringify(scenario) },
-            stdio: ['ignore', 'pipe', 'pipe'],
+            execArgv: ['--require', require.resolve('ts-node/register')],
+            stdio: ['inherit', 'inherit', 'inherit', 'ipc'],
         });
-        let stdout = '';
-        let stderr = '';
+        let result: ScenarioResult | undefined;
 
-        child.stdout.setEncoding('utf8');
-        child.stderr.setEncoding('utf8');
-        child.stdout.on('data', (chunk: string) => {
-            stdout += chunk;
+        child.once('error', rejectScenario);
+        child.once('message', (message: unknown) => {
+            result = message as ScenarioResult;
         });
-        child.stderr.on('data', (chunk: string) => {
-            stderr += chunk;
-        });
-        child.on('error', rejectScenario);
         child.on('close', (code, signal) => {
             if (code !== 0) {
-                rejectScenario(new Error(`Benchmark child failed (${signal ?? `exit ${code}`}):\n${stderr || stdout}`));
+                rejectScenario(new Error(`Benchmark child failed (${signal ?? `exit ${code}`}).`));
                 return;
             }
+            if (result === undefined) {
+                rejectScenario(new Error('Benchmark child returned no result.'));
+                return;
+            }
+            resolveScenario(result);
+        });
 
-            const resultLine = stdout.split(/\r?\n/).find((line) => line.startsWith(CHILD_RESULT_PREFIX));
-            if (resultLine === undefined) {
-                rejectScenario(new Error(`Benchmark child returned no result:\n${stderr || stdout}`));
-                return;
+        child.send(scenario, (error) => {
+            if (error !== null) {
+                child.kill();
+                rejectScenario(error);
             }
-            if (stderr.trim() !== '') process.stderr.write(stderr);
-            resolveScenario(JSON.parse(resultLine.slice(CHILD_RESULT_PREFIX.length)) as ScenarioResult);
         });
     });
 }
@@ -352,10 +347,21 @@ async function runParent(): Promise<void> {
 }
 
 async function main(): Promise<void> {
-    const serializedScenario = process.env[CHILD_SCENARIO_ENV];
-    if (serializedScenario !== undefined) {
-        const result = await runScenario(JSON.parse(serializedScenario) as Scenario);
-        process.stdout.write(`${CHILD_RESULT_PREFIX}${JSON.stringify(result)}\n`);
+    if (process.send !== undefined) {
+        const scenario = await new Promise<Scenario>((resolveMessage, rejectMessage) => {
+            process.once('message', (message: unknown) => {
+                resolveMessage(message as Scenario);
+            });
+            process.once('disconnect', () => rejectMessage(new Error('Benchmark parent disconnected before sending a scenario.')));
+        });
+        const result = await runScenario(scenario);
+        await new Promise<void>((resolveSend, rejectSend) => {
+            process.send?.(result, (error) => {
+                if (error === null) resolveSend();
+                else rejectSend(error);
+            });
+        });
+        process.disconnect?.();
         return;
     }
     await runParent();
@@ -364,4 +370,7 @@ async function main(): Promise<void> {
 main().catch((error: unknown) => {
     console.error(error);
     process.exitCode = 1;
+    // A forked child must release its IPC channel on failure; setting exitCode alone leaves the
+    // channel referenced and makes the parent wait forever for `close`.
+    process.disconnect?.();
 });
