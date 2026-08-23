@@ -2,117 +2,122 @@
 
 ## Overview
 
-`pdf-to-png-converter` is a CJS-only Node.js library and CLI for converting PDF pages into PNG images or page metadata.
+`pdf-to-png-converter` is a Node.js 24+ CommonJS library and CLI. It accepts a PDF path or byte container and returns ordered page metadata, PNG buffers, or PNG files. Rendering uses `pdfjs-dist` with its built-in Node canvas factory backed by `@napi-rs/canvas`.
 
-The codebase is organized around one public library entrypoint (`pdfToPng`) plus a thin CLI adapter. The library normalizes options first, loads the PDF through `pdfjs-dist`, processes pages sequentially or through a sliding-window scheduler, and routes each page according to its `PageMode` — written to disk through a filesystem sink, returned in memory, or reported as metadata only. The CLI is intentionally narrower than the API: it either writes image files to `--output-folder` or prints metadata JSON to stdout with `--return-metadata-only`.
+The source tree deliberately has 11 TypeScript modules. `src/pdfToPng.ts` owns conversion policy and orchestration; the other runtime modules own I/O, pdf.js, rendering, or worker-thread boundaries.
 
 ## Public surfaces
 
-| Surface           | File           | Purpose                                                                         |
-| ----------------- | -------------- | ------------------------------------------------------------------------------- |
-| Library API       | `src/index.ts` | Re-exports `pdfToPng`, `PdfToPngOptions`, `PngPageOutput`, and `VerbosityLevel` |
-| CLI               | `src/cli.ts`   | Parses flags, normalizes options, runs conversions, prints output/errors        |
-| Published package | `package.json` | CJS-only package contract: `main`, `types`, `exports`, and CLI `bin`            |
+| Surface     | File           | Contract                                                                                 |
+| ----------- | -------------- | ---------------------------------------------------------------------------------------- |
+| Library     | `src/index.ts` | Exports `pdfToPng`, `PdfToPngOptions`, `PngPageOutput`, and `VerbosityLevel`             |
+| CLI         | `src/cli.ts`   | Parses arguments, delegates to `pdfToPng`, writes progress or metadata JSON, sets status |
+| npm package | `package.json` | Publishes CommonJS from `out/` and exposes `out/cli.js` as `pdf-to-png-converter`        |
 
-## Runtime flow
+Internal source paths are not package exports.
 
-1. `pdfToPng(pdfFile, props?)` in `src/pdfToPng.ts` calls `normalizePdfToPngOptions()`.
-2. `getPdfFileBuffer()` in `src/pdfInput.ts` loads a file path via `fs.promises.readFile()` or accepts `ArrayBufferLike` / `Uint8Array` input directly.
-3. `getPdfDocument()` in `src/pdfjsLoader.ts` dynamically imports `pdfjs-dist/legacy/build/pdf.mjs`, creates the loading task, and destroys that task on load failure.
-4. `pdfToPng()` resolves `pagesToProcess`, filters page numbers above `pdfDocument.numPages`, prepares the default filename mask, constructs the output sink, and derives the per-page mode:
-    - `FilesystemSink` when `outputFolder` is set; otherwise no sink
-    - `optionsToPageMode()` (`src/pageMode.ts`) maps the normalized options + sink to a `PageMode` (`metadata` | `content` | `file`)
-5. `processAndSavePage()` in `src/pageOrchestrator.ts` switches on the page's `PageMode`:
-    - `metadata`: `getPageMetadata()` (dimensions only)
-    - `content`: `renderPdfPage()`, returned in memory
-    - `file`: `renderPdfPage()` then a sink write, returned as the discriminated `file` output shape
-6. `pageRenderer.ts` obtains the page, computes the viewport, normalizes `rotation`, renders through pdf.js's built-in Node canvas factory (`pdf.canvasFactory`, backed by `@napi-rs/canvas`), and returns an in-memory page result.
-7. `outputWriter.ts` owns the disk seam end to end: `prepareOutputFolder()` resolves the folder, creates it, and captures its `realpath` as an `OutputFolderHandle`; `savePNGfile()` validates filename containment, re-checks the folder realpath against that baseline, writes via `fs.promises.open(..., 'wx')`, and returns the absolute file path.
-8. `pdfToPng()` always calls `pdfDocument.destroy()` in `finally`.
+## Runtime pipeline
 
-## Module map
+Every library conversion enters `pdfToPng()` in `src/pdfToPng.ts`:
 
-| Module                            | Responsibility                                              | Key exports                                                      |
-| --------------------------------- | ----------------------------------------------------------- | ---------------------------------------------------------------- |
-| `src/pdfToPng.ts`                 | Top-level orchestration, sink selection, page scheduling    | `pdfToPng`                                                       |
-| `src/normalizePdfToPngOptions.ts` | Option validation and defaulting                            | `normalizePdfToPngOptions`                                       |
-| `src/pdfInput.ts`                 | Input loading and buffer normalization                      | `getPdfFileBuffer`                                               |
-| `src/pdfjsLoader.ts`              | Dynamic `pdfjs-dist` loading and document lifecycle         | `getPdfDocument`                                                 |
-| `src/pageOrchestrator.ts`         | Per-page naming, `PageMode` branching, sink integration     | `resolvePageName`, `processAndSavePage`                          |
-| `src/pageMode.ts`                 | Per-page render/output mode union + pure mapping            | `PageMode`, `optionsToPageMode`                                  |
-| `src/pageRenderer.ts`             | Page metadata extraction, rendering, rotation normalization | `normalizeRotation`, `getPageMetadata`, `renderPdfPage`          |
-| `src/outputWriter.ts`             | Output-folder preparation, path containment, secure writes  | `prepareOutputFolder`, `OutputFolderHandle`, `savePNGfile`       |
-| `src/flatFilename.ts`             | The shared flat-filename predicate (SEC-001 load-bearing)   | `containsPathSeparator`, `SEPARATOR_DESCRIPTION`                 |
-| `src/filesystemSink.ts`           | Disk-backed sink using `savePNGfile()` (sole `OutputSink`)  | `FilesystemSink`                                                 |
-| `src/propsToPdfDocInitParams.ts`  | Maps library options to `pdfjs-dist` init params            | `propsToPdfDocInitParams`                                        |
-| `src/cli.ts`                      | CLI adapter and reusable CLI helpers                        | `run`, `buildPdfToPngOptions`, `executeConversion`, `getVersion` |
+1. `normalizeOptions()` validates and defaults the public options once. It copies `pagesToProcess`, so later caller mutation cannot change an in-flight conversion.
+2. `getPdfFileBuffer()` in `src/pdfInput.ts` normalizes the input to an owned `Uint8Array` within `maxInputBytes`.
+3. Worker mode retains one copy of those bytes because the main pdf.js loading task may detach its input. `getPdfDocument()` in `src/pdfjsLoader.ts` then creates the main `PDFDocumentProxy`.
+4. `pdfToPng()` filters page numbers above `numPages`, resolves the output folder before user filename callbacks run, resolves all observable page names, and preflights disk names and case-insensitive duplicates before creating a directory.
+5. The selected execution path produces `PageRenderResult` values:
+    - metadata-only: `getPageMetadata()` with no canvas or file output
+    - main thread: `renderPdfPage()` through the ordered bounded scheduler
+    - worker threads: `renderPagesInWorkerPool()`, with each worker calling the same `getPdfDocument()` and `renderPdfPage()` functions
+6. `finalizePage()` in `src/pdfToPng.ts` attaches `kind`, `pageNumber`, `name`, and `path`. File results are written through `savePNGfile()` in `src/outputWriter.ts`; file writes always remain on the main thread.
+7. `pdfDocument.loadingTask.destroy()` runs in `finally`. Document-load failures destroy their loading task inside `getPdfDocument()` before propagating.
+
+The CLI is an adapter over this same public path. It does not bypass validation or call an internal core function.
+
+## Execution modes
+
+| Options                                   | Rendering and finalization                                                                                        |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `returnMetadataOnly: true`                | Metadata scheduler; no canvas, output-folder creation, worker pool, PNG bytes, or file writes                     |
+| default                                   | Main-thread ordered scheduler with window 3, allowing async encode/write work to overlap the next render          |
+| `processPagesInParallel: true`            | Main-thread ordered scheduler with `concurrencyLimit` tasks in flight                                             |
+| `renderInWorkerThreads: true`             | Dynamic worker pool of size `min(concurrencyLimit, selectedPages)`; takes precedence over main-thread parallelism |
+| `processPagesInParallel: true`, limit `1` | Exactly one main-thread page task in flight                                                                       |
+
+All modes preserve result-array order. The bounded main-thread scheduler stops dispatching after an error, drains work already in flight, and throws the failure with the lowest page index. Main-thread and worker schedulers share the same lowest-index error selector. Worker mode also drains main-thread finalizers and terminates every worker before settling; a worker-level fatal error takes precedence over page-level errors.
+
+Each worker receives its own structured-clone copy of the PDF, loads that document lazily once, and renders dynamically assigned pages. PNG bytes are structured-clone copied back to the main thread, then wrapped as a `Buffer` without another copy. Output naming, duplicate detection, and disk security remain main-thread responsibilities.
 
 ## Output model
 
-`PngPageOutput` is a discriminated union:
+`PngPageOutput` in `src/types.ts` is a discriminated union:
 
 | `kind`     | Meaning                          | `content`             | `path`             |
 | ---------- | -------------------------------- | --------------------- | ------------------ |
-| `metadata` | Metadata-only page               | `undefined`           | `''`               |
-| `content`  | Rendered page retained in memory | `Buffer \| undefined` | `''`               |
-| `file`     | Rendered page written to disk    | `Buffer \| undefined` | absolute file path |
+| `metadata` | Renderability-checked dimensions | `undefined`           | `''`               |
+| `content`  | In-memory conversion             | `Buffer \| undefined` | `''`               |
+| `file`     | PNG written to disk              | `Buffer \| undefined` | absolute file path |
 
-Notes:
+Metadata and rendering share pixel-dimension, rotation, zero-dimension, and maximum-canvas-area rules. File mode always materializes PNG bytes for the write, then drops them from the returned object when `returnPageContent` is false. In-memory mode may skip encoding when `returnPageContent` is false.
 
-- `content` may be `undefined` for `kind: 'file'` when `returnPageContent === false`.
-- `returnMetadataOnly: true` bypasses all sink creation and all rendering work.
+Custom names must be non-empty and contain no host path separator in every mode. The remaining host filename rules apply only to disk output; metadata and in-memory results may carry names, such as NUL-containing strings, that are not passed to filesystem APIs.
 
-## Concurrency model
+## Module map
 
-- Default mode is sequential page processing in document order.
-- Parallel mode uses `processPagesWithSlidingWindow()` in `src/pdfToPng.ts`.
-- The scheduler keeps up to `concurrencyLimit` page tasks active and preserves output order by writing results into a fixed array by page index.
+| Module                    | Ownership                                                                                                    |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `src/index.ts`            | Four-item public library export surface                                                                      |
+| `src/types.ts`            | Public options, output union, page rotation, and verbosity enum                                              |
+| `src/const.ts`            | Defaults, input/concurrency/canvas limits, pipeline window, pdf.js asset paths                               |
+| `src/pdfToPng.ts`         | Option normalization, page/name planning, ordered scheduling, mode selection, output finalization, lifecycle |
+| `src/pdfInput.ts`         | Input-shape normalization, ownership, regular-file checks, bounded reads                                     |
+| `src/pdfjsLoader.ts`      | Cached dynamic pdf.js import, init-parameter construction, document-load cleanup                             |
+| `src/pageRenderer.ts`     | Metadata extraction, viewport guards, rotation normalization, canvas render/encode/cleanup                   |
+| `src/outputWriter.ts`     | Flat disk-name validation, folder preparation, realpath checks, exclusive-create writes                      |
+| `src/workerPool.ts`       | Worker protocol types, dynamic task dispatch, ordered error policy, finalization and teardown                |
+| `src/pageRenderWorker.ts` | Compiled worker entry; lazy per-worker document load and page rendering                                      |
+| `src/cli.ts`              | CLI parsing, CLI-only policy, output, version lookup, and process status                                     |
 
-## Security model
+## Security and ownership boundaries
 
-### Option boundary
+### Input
 
-`normalizePdfToPngOptions()` is the single validation boundary for:
+- A path is opened once with `O_RDONLY | O_NONBLOCK`; the same handle is checked with `stat()`, read positionally, and closed in `finally`.
+- Only regular files are accepted. Reads are capped at `maxInputBytes`, including growth after the initial size check through a one-byte overflow probe. The implementation deliberately avoids `FileHandle.readFile()`, which would allocate through a changed EOF before a post-read cap check could reject growth.
+- Path reads use a dedicated full-span allocation where possible, allowing a zero-copy handoff to pdf.js.
+- Caller-owned `Buffer`, `Uint8Array`, `ArrayBuffer`, `SharedArrayBuffer`, cross-realm views, and supported array-likes are copied into unshared owned bytes before pdf.js can detach them.
 
-- `viewportScale`
-- `outputFolder`
-- `verbosityLevel`
-- `pagesToProcess`
-- `concurrencyLimit`
+### Output
 
-### Output containment
+- Relative output folders are resolved at conversion start, before `outputFileMaskFunc` can change the process CWD.
+- Disk names are preflighted before folder creation and revalidated at the write boundary. They must be one flat path segment under the host's separator rules and contain no NUL; disk outputs also reject `"."` and `".."` aliases. Windows additionally rejects invalid filename characters, alternate-data-stream syntax, reserved device basenames, and trailing dots/spaces.
+- Case-insensitive duplicate disk names fail before output I/O.
+- `prepareOutputFolder()` creates the folder and captures its canonical `realpath`. Every write compares a fresh `realpath` with that baseline.
+- `savePNGfile()` opens with `'wx'`, preventing overwrite of an existing target and rejecting a pre-planted final symlink under normal local-filesystem semantics.
 
-`savePNGfile()` enforces:
+The realpath comparison does not atomically bind the write to a directory inode. A hostile user who can replace directory components during the final check/open interval can still race it, so callers must use an output directory that is not writable by untrusted users.
 
-- no absolute output filenames
-- no `..` path escapes
-- realpath containment of the target directory inside the intended output folder
-- a final realpath re-check before writing
-- exclusive-create writes (`'wx'`) so pre-existing targets, including symlinks, fail with `EEXIST`
+### Resource lifecycle
 
-Residual risk remains for directory-component swaps between checks; the library documents this and assumes callers use a private output directory on shared systems.
+- `getPageMetadata()` always calls `page.cleanup()`.
+- `renderPdfPage()` always calls `page.cleanup()` and destroys a successfully created canvas, including render and encode failures.
+- `getPdfDocument()` destroys a failed loading task; `pdfToPng()` destroys a successfully loaded task after all page work.
+- `renderPagesInWorkerPool()` waits for output finalizers and any promise returned by worker termination before returning or throwing. A teardown-only termination failure does not invalidate pages that rendered and finalized successfully.
 
-## CLI architecture
+## CLI policy
 
-`src/cli.ts` is intentionally thin:
+`src/cli.ts` uses Node's `parseArgs()` and builds ordinary `PdfToPngOptions` for `pdfToPng()`.
 
-1. `safeParseArgs()` parses argv.
-2. `buildPdfToPngOptions()` converts CLI values into a normalized `PdfToPngOptions` object and rejects CLI-only dead-end modes before any PDF work starts:
-    - image conversion without `--output-folder`
-    - `--return-page-content` (library API only)
-3. `executeConversion()` delegates to `pdfToPngCore()` and writes either PNG-conversion progress or metadata JSON.
-4. `run()` handles process exit codes and output formatting.
-5. `getVersion()` treats missing/malformed `package.json` as a packaging defect and exits with an error.
+- Image conversion requires `--output-folder`.
+- `--return-metadata-only` prints the ordered result array as JSON and needs no output folder.
+- `--return-page-content` is rejected because the CLI has no consumer for in-memory buffers; callers needing buffers use the library API.
+- `--silent` suppresses progress, not errors.
+- Semantic options receive a fail-fast validation pass through the conversion module before progress is printed; its normalized snapshot drives CLI-only policy and progress decisions. Valid file conversions print their processing banner before input/render work begins. `pdfToPng()` then validates defensively at its public boundary, so CLI calls intentionally perform two pure validation passes instead of coupling to a normalized internal core. Typed usage and conversion errors keep their output routes independent of message text or incidental `cause` values.
+- `getVersion()` treats a missing or malformed `package.json` as a packaging failure.
 
-## Packaging and build
+## Build and validation
 
-- Package format: CommonJS-only (`"type": "commonjs"`).
-- Build output: `out/` via `tsconfig.prod.json`.
-- Normal typecheck: `tsconfig.json` with `skipLibCheck: true`.
-- Strict release-time typecheck: `tsconfig.strict.json` with `skipLibCheck: false`.
-- The strict config includes DOM lib types to satisfy `pdfjs-dist`’s public declarations and keeps a single local suppression for the `pdfjs-dist` / `@napi-rs/canvas` canvas-context mismatch in `src/pageRenderer.ts`.
-
-## Generated indexes
-
-- `CODEMAP.md` is generated by `npm run codemap`.
-- The generator lives in `scripts/generate-codemap.ts` and produces a machine-readable symbol index for coding agents.
+- Runtime requirement: Node.js 24 or newer.
+- Package format: CommonJS, compiled from `.ts` to `out/` with `.js` relative import specifiers.
+- `npm test` runs Vitest with coverage only.
+- `npm run check` is the explicit CI/prepublish gate: clean, normal and strict type-checks, formatting, lint, production-license validation, and tests.
+- `npm run build` performs the publishable production compile after cleaning `out/` and `test-results/`.

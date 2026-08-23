@@ -32,6 +32,7 @@ jobs:
               run: npm run release:precheck
               env:
                   RELEASE_TAG: ${{ github.event.release.tag_name }}
+            # npm publish runs prepublishOnly, which executes the full validation gate and rebuilds out/.
             # No NODE_AUTH_TOKEN: npm authenticates via OIDC trusted publishing and attaches provenance.
             - run: npm publish --provenance
             - name: Post-release checks

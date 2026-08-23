@@ -1,80 +1,112 @@
+import type { FileHandle } from 'node:fs/promises';
 import { afterEach, expect, test, vi } from 'vitest';
 import { getPdfFileBuffer } from '../src/pdfInput';
 
-vi.mock('node:fs', () => ({
-    promises: { stat: vi.fn(), readFile: vi.fn() },
-}));
+vi.mock('node:fs', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('node:fs')>();
+    return {
+        ...actual,
+        promises: { ...actual.promises, open: vi.fn() },
+    };
+});
 
-import { promises as fsPromises } from 'node:fs';
+import { constants as fsConstants, promises as fsPromises } from 'node:fs';
 
-const statMock = vi.mocked(fsPromises.stat);
-const readFileMock = vi.mocked(fsPromises.readFile);
+const openMock = vi.mocked(fsPromises.open);
 
-function mockStat(size: number): void {
-    statMock.mockResolvedValue({ isFile: () => true, size } as never);
+interface MockFile {
+    readonly handle: FileHandle;
+    readonly stat: ReturnType<typeof vi.fn>;
+    readonly read: ReturnType<typeof vi.fn>;
+    readonly close: ReturnType<typeof vi.fn>;
+    firstReadBuffer?: Buffer;
+}
+
+function mockFile(bytes: Buffer, reportedSize = bytes.byteLength): MockFile {
+    const result: MockFile = {
+        handle: undefined as unknown as FileHandle,
+        stat: vi.fn().mockResolvedValue({ isFile: (): boolean => true, size: reportedSize }),
+        read: vi.fn(),
+        close: vi.fn().mockResolvedValue(undefined),
+    };
+    result.read.mockImplementation(async (target: Buffer, offset: number, length: number, position: number) => {
+        result.firstReadBuffer ??= target;
+        const bytesRead = Math.min(length, Math.max(0, bytes.byteLength - position));
+        bytes.copy(target, offset, position, position + bytesRead);
+        return { bytesRead, buffer: target };
+    });
+    Object.assign(result, { handle: { stat: result.stat, read: result.read, close: result.close } as unknown as FileHandle });
+    openMock.mockResolvedValueOnce(result.handle);
+    return result;
 }
 
 afterEach(() => {
     vi.resetAllMocks();
 });
 
-test('file-path input hands the readFile buffer to pdfjs without copying when it spans its ArrayBuffer', async () => {
-    // Buffer.alloc yields a full-span, non-pooled Buffer — the normal readFile shape.
+test('stable file-path input transfers the dedicated read allocation without copying', async () => {
     const raw = Buffer.alloc(8, 7);
-    mockStat(raw.byteLength);
-    readFileMock.mockResolvedValue(raw as never);
+    const file = mockFile(raw);
 
     const result = await getPdfFileBuffer('/fake/file.pdf', 1024);
 
     expect(result).toBeInstanceOf(Uint8Array);
-    // Zero-copy: the returned view shares the readFile buffer's memory.
-    expect((result as Uint8Array).buffer).toBe(raw.buffer);
-    expect(Array.from(result as Uint8Array)).toEqual(Array.from(raw));
+    expect(result.buffer).toBe(file.firstReadBuffer?.buffer);
+    expect(Array.from(result)).toEqual(Array.from(raw));
+    expect(file.close).toHaveBeenCalledOnce();
 });
 
-test('file-path input copies when the readFile buffer starts at offset 0 but does not span its ArrayBuffer', async () => {
-    // Offset 0 but shorter than the backing store: the byteLength half of the guard must catch it.
-    const backing = new ArrayBuffer(32);
-    new Uint8Array(backing).fill(9);
-    const pooled = Buffer.from(backing, 0, 8);
-    pooled.fill(5);
-    mockStat(pooled.byteLength);
-    readFileMock.mockResolvedValue(pooled as never);
+test('file-path input copies an exact-size result when the file shrinks after fstat', async () => {
+    const raw = Buffer.alloc(8, 5);
+    const file = mockFile(raw, 32);
 
     const result = await getPdfFileBuffer('/fake/file.pdf', 1024);
 
-    expect(result).toBeInstanceOf(Uint8Array);
-    expect((result as Uint8Array).buffer).not.toBe(backing);
-    expect((result as Uint8Array).byteLength).toBe(8);
-    expect(Array.from(result as Uint8Array)).toEqual(Array.from(pooled));
+    expect(result.buffer).not.toBe(file.firstReadBuffer?.buffer);
+    expect(result.byteLength).toBe(raw.byteLength);
+    expect(Array.from(result)).toEqual(Array.from(raw));
 });
 
-test('file-path input copies an empty readFile buffer so pdfjs sees a plain empty input', async () => {
-    const empty = Buffer.alloc(0);
-    mockStat(0);
-    readFileMock.mockResolvedValue(empty as never);
+test('empty file-path input returns a plain empty Uint8Array', async () => {
+    mockFile(Buffer.alloc(0), 0);
 
     const result = await getPdfFileBuffer('/fake/file.pdf', 1024);
 
     expect(result).toBeInstanceOf(Uint8Array);
-    expect((result as Uint8Array).byteLength).toBe(0);
-    // Guard requires byteLength > 0 — empty buffers must take the copy path.
-    expect((result as Uint8Array).buffer).not.toBe(empty.buffer);
+    expect(result.byteLength).toBe(0);
+    expect(result.buffer).toBeInstanceOf(ArrayBuffer);
 });
 
-test('file-path input copies when the readFile buffer shares its ArrayBuffer with other data', async () => {
-    // Simulate a pooled allocation: a Buffer view at a non-zero offset of a larger ArrayBuffer.
-    const backing = new ArrayBuffer(32);
-    new Uint8Array(backing).fill(9);
-    const pooled = Buffer.from(backing, 8, 8);
-    pooled.fill(5);
-    mockStat(pooled.byteLength);
-    readFileMock.mockResolvedValue(pooled as never);
+test('path input validates and reads through exactly one opened handle', async () => {
+    const file = mockFile(Buffer.from([1, 2, 3]));
 
-    const result = await getPdfFileBuffer('/fake/file.pdf', 1024);
+    await getPdfFileBuffer('/fake/file.pdf', 1024);
 
-    expect(result).toBeInstanceOf(Uint8Array);
-    // A shared backing store must NOT be handed to pdfjs (which detaches it) — expect a copy.
-    expect((result as Uint8Array).buffer).not.toBe(backing);
-    expect(Array.from(result as Uint8Array)).toEqual(Array.from(pooled));
+    expect(openMock).toHaveBeenCalledOnce();
+    expect(openMock).toHaveBeenCalledWith('/fake/file.pdf', fsConstants.O_RDONLY | fsConstants.O_NONBLOCK);
+    expect(file.stat).toHaveBeenCalledOnce();
+    expect(file.read).toHaveBeenCalled();
+    expect(file.close).toHaveBeenCalledOnce();
+});
+
+test('opened file handle closes when fstat fails', async () => {
+    const close = vi.fn().mockResolvedValue(undefined);
+    const failure = new Error('fstat failed');
+    openMock.mockResolvedValueOnce({ stat: vi.fn().mockRejectedValue(failure), close } as unknown as FileHandle);
+
+    await expect(getPdfFileBuffer('/fake/file.pdf', 1024)).rejects.toBe(failure);
+    expect(close).toHaveBeenCalledOnce();
+});
+
+test('opened file handle closes when a read fails', async () => {
+    const close = vi.fn().mockResolvedValue(undefined);
+    const failure = new Error('read failed');
+    openMock.mockResolvedValueOnce({
+        stat: vi.fn().mockResolvedValue({ isFile: (): boolean => true, size: 8 }),
+        read: vi.fn().mockRejectedValue(failure),
+        close,
+    } as unknown as FileHandle);
+
+    await expect(getPdfFileBuffer('/fake/file.pdf', 1024)).rejects.toBe(failure);
+    expect(close).toHaveBeenCalledOnce();
 });

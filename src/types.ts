@@ -1,5 +1,3 @@
-import type { VerbosityLevel } from '../types/index.js';
-
 /**
  * Options for the `pdfToPng` conversion function.
  *
@@ -52,10 +50,10 @@ export interface PdfToPngOptions {
      * @remarks
      * **Security (TOCTOU):** The write-containment guard rejects filenames that contain path
      * separators (so the target is always a direct child of this folder), resolves symlinks,
-     * checks that the output path stays within this folder, and uses exclusive-create file opens
-     * to avoid overwriting pre-existing files or following a pre-planted target symlink at the
-     * final filename. To reduce exposure on multi-user or shared systems, ensure this directory
-     * is private and not writable by untrusted users.
+     * checks the folder's canonical pathname immediately before each write, and uses exclusive-
+     * create file opens to avoid overwriting pre-existing files or following a pre-planted target
+     * symlink at the final filename. Path checks cannot atomically bind the write to a directory
+     * inode, so this directory must be private and not writable by untrusted users.
      */
     outputFolder?: string;
 
@@ -63,6 +61,10 @@ export interface PdfToPngOptions {
      * Custom naming function for output PNG files.
      * Receives the 1-based page number and must return a full filename string including the `.png` extension
      * (e.g. `(pageNumber) => \`page_${pageNumber}.png\``).
+     * In every mode the value must be non-empty and contain no host path separator. For disk
+     * output it must also be a host-valid filename: NUL and directory aliases are rejected, and
+     * Windows additionally rejects invalid characters, alternate-data-stream syntax, reserved
+     * device basenames, and trailing dots/spaces before output I/O.
      * When omitted, names default to `<pdfBasename>_page_<pageNumber>.png`,
      * or `buffer_page_<pageNumber>.png` when the PDF is supplied as an `ArrayBufferLike`.
      * @since 3.14.0
@@ -128,8 +130,8 @@ export interface PdfToPngOptions {
      * Maximum number of pages rendered simultaneously when `processPagesInParallel` is `true`.
      * Must be a positive integer between `1` and `16` (inclusive); values outside that range throw
      * immediately (before any I/O). The upper bound caps peak in-flight canvas memory at roughly
-     * `16 × MAX_CANVAS_PIXELS × 4 bytes ≈ 6.4 GiB` so a single conversion cannot exhaust container
-     * memory. Higher values increase throughput at the cost of memory. Applies when
+     * `16 × MAX_CANVAS_PIXELS × 4 bytes ≈ 6.4 GiB`; this is a bound, not a guarantee against
+     * container exhaustion. Higher values increase throughput at the cost of memory. Applies when
      * `processPagesInParallel` or `renderInWorkerThreads` is enabled; in worker-thread mode it
      * sets the worker-pool size.
      * Default: `4`.
@@ -156,12 +158,57 @@ export interface PdfToPngOptions {
 
     /**
      * Maximum allowed input PDF size in bytes. Inputs larger than this throw immediately,
-     * before any rendering work is started. Applies to both the file path branch (validated via
-     * `fs.stat()`) and the buffer / `Uint8Array` branch (validated via `byteLength`). The path
-     * branch additionally rejects non-regular files (FIFOs, sockets, character devices such as
-     * `/dev/zero`) to prevent unbounded reads. Must be a positive integer.
+     * before any rendering work is started. Applies to both the file path branch (opened once,
+     * verified and read through one handle with bounded allocation) and buffer / `Uint8Array`
+     * inputs (validated via `byteLength`). Non-regular files such as FIFOs, sockets and devices are
+     * rejected. Must be a positive integer.
      * Default: `256 * 1024 * 1024` (256 MiB).
      * @since 4.1.0
      */
     maxInputBytes?: number;
+}
+
+/** Page rotation reported by pdf.js, normalized to a clockwise quarter turn. */
+export type PageRotation = 0 | 90 | 180 | 270;
+
+interface BasePngPageOutput {
+    pageNumber: number;
+    name: string;
+    /** Image width in pixels, floored to match the rendered bitmap. */
+    width: number;
+    /** Image height in pixels, floored to match the rendered bitmap. */
+    height: number;
+    rotation: PageRotation;
+}
+
+interface MetadataPngPageOutput extends BasePngPageOutput {
+    kind: 'metadata';
+    content: undefined;
+    path: '';
+}
+
+interface InMemoryPngPageOutput extends BasePngPageOutput {
+    kind: 'content';
+    content: Buffer | undefined;
+    path: '';
+}
+
+interface FilePngPageOutput extends BasePngPageOutput {
+    kind: 'file';
+    content: Buffer | undefined;
+    path: string;
+}
+
+/** Observable result variants returned by {@link pdfToPng}. */
+export type PngPageOutput = MetadataPngPageOutput | InMemoryPngPageOutput | FilePngPageOutput;
+
+/**
+ * Verbosity levels for the pdfjs-dist logger.
+ *
+ * The numeric enum shape and values are public compatibility guarantees.
+ */
+export enum VerbosityLevel {
+    ERRORS = 0,
+    WARNINGS = 1,
+    INFOS = 5,
 }

@@ -1,5 +1,3 @@
-import type { DocumentInitParameters } from 'pdfjs-dist/types/src/display/api';
-
 /**
  * Maximum allowed value for `viewportScale`. Values above this limit would produce canvases
  * so large (an A4 page at scale 100 already yields ~5×10⁹ pixels) that they risk OOM crashes
@@ -18,17 +16,17 @@ export const MAX_CANVAS_PIXELS = 100_000_000;
 /**
  * Default upper bound on input PDF size in bytes. 256 MiB is a generous ceiling for legitimate
  * PDFs while keeping a single conversion well below typical service container memory limits.
- * The path branch of `getPdfFileBuffer()` runs `stat()` before `readFile()` so this also blocks
- * unbounded reads from `/dev/zero`, FIFOs, sockets, and other non-regular files.
+ * The path branch of `getPdfFileBuffer()` opens once, verifies that same handle is a regular file,
+ * and reads it with a bounded allocation, so devices, FIFOs, sockets, and unbounded growth cannot
+ * bypass the cap through a pathname race.
  * Callers can override with `PdfToPngOptions.maxInputBytes`.
  */
 export const MAX_INPUT_BYTES = 256 * 1024 * 1024;
 
 /**
- * Upper bound on `concurrencyLimit` when `processPagesInParallel` is `true`. At this cap,
- * peak in-flight canvas memory ≈ `16 × MAX_CANVAS_PIXELS × 4 bytes` ≈ 6.4 GiB, which is a
- * defensible ceiling for typical Node.js service containers while still allowing realistic
- * parallelism. Higher values would let a single conversion exhaust container memory.
+ * Upper bound on `concurrencyLimit` for local parallel and worker rendering. At this cap,
+ * worst-case in-flight canvas memory alone is roughly 6.4 GiB, so the limit bounds rather than
+ * prevents memory exhaustion. Callers should choose a substantially lower value in containers.
  */
 export const MAX_CONCURRENCY_LIMIT = 16;
 
@@ -63,28 +61,12 @@ export const PDF_TO_PNG_OPTIONS_DEFAULTS = {
 
 /**
  * Relative paths to the pdfjs-dist asset directories.
- * Stored as raw strings so they can be resolved against `process.cwd()` at call time
- * (inside `propsToPdfDocInitParams`) rather than at module-load time. This ensures
+ * Stored as raw strings so `pdfjsLoader` can resolve them against `process.cwd()` at call time
+ * rather than at module-load time. This ensures
  * applications that call `process.chdir()` after importing the library still get
  * correct paths.
  */
 export const CMAP_RELATIVE_URL = './node_modules/pdfjs-dist/cmaps/';
 export const STANDARD_FONTS_RELATIVE_URL = './node_modules/pdfjs-dist/standard_fonts/';
-
-/**
- * Default pdfjs `DocumentInitParameters` used when initialising a PDF document.
- * - `cMapUrl` / `cMapPacked`: point to the pre-packed character maps bundled with `pdfjs-dist`,
- *    required for rendering CJK and other non-Latin PDFs correctly.
- * - `standardFontDataUrl`: path to the standard Type 1 / TrueType fonts bundled with `pdfjs-dist`,
- *    used as fallbacks when a PDF does not embed its fonts.
- *
- * Note: these values are raw relative paths. They are resolved to absolute paths at call time
- * by `propsToPdfDocInitParams` via `normalizePath`.
- */
-export const DOCUMENT_INIT_PARAMS_DEFAULTS: DocumentInitParameters = {
-    cMapUrl: CMAP_RELATIVE_URL,
-    cMapPacked: true,
-    standardFontDataUrl: STANDARD_FONTS_RELATIVE_URL,
-};
 
 // Test-only asset lists (STANDARD_FONTS, STANDARD_CMAPS) live in __tests__/test-data-constants.ts

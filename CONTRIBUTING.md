@@ -4,7 +4,7 @@ Thank you for taking the time to contribute!
 
 ## Prerequisites
 
-- **Node.js 22.13+** (use `.nvmrc`: `nvm use`)
+- **Node.js 24+** (use `.nvmrc`: `nvm use`)
 - **npm 10+**
 
 ## Getting Started
@@ -18,7 +18,8 @@ npm ci
 ## Running Tests
 
 ```sh
-npm test              # build + run all tests with coverage
+npm run check         # full validation gate: types, format, lint, licenses, and tests
+npm test              # run tests with coverage only
 npm run lint          # ESLint across the repository using eslint.config.mjs
 npm run build:test    # type-check src/ + __tests__/ (no emit)
 npm run build:strict  # stricter dependency-boundary type-check
@@ -33,11 +34,11 @@ npx vitest run __tests__/<filename>.test.ts
 
 ## Strict type-check
 
-`npm run build:strict` runs `tsc` against `tsconfig.strict.json`, which disables `skipLibCheck` to surface type regressions in `pdfjs-dist` and `@napi-rs/canvas`. This step blocks CI and is part of `pretest`, so it also runs on every local `npm test` and on `prepublishOnly`.
+`npm run build:strict` runs `tsc` against `tsconfig.strict.json`, which disables `skipLibCheck` to surface type regressions in `pdfjs-dist` and `@napi-rs/canvas`. This step blocks CI and is part of the explicit `npm run check` gate used by `prepublishOnly`. A plain `npm test` runs the test suite only.
 
 If `build:strict` fails because of an upstream type, suppress on the line immediately above the failing call or assignment with `// @ts-expect-error <reason> — upstream <pkg>@<range>`. `@ts-expect-error` is self-cleaning: when the upstream typing is fixed, strict reports the unused suppression and you can remove the line.
 
-**Exception — when to use `@ts-ignore` instead.** `@ts-expect-error` fails if no error exists. If the upstream type error is only visible under `build:strict`'s `skipLibCheck: false` (i.e. it disappears when `build:test` runs the same file with `skipLibCheck: true`), `@ts-expect-error` reports as an "unused directive" under `build:test` and breaks the pretest chain. In that case, use `// eslint-disable-next-line @typescript-eslint/ban-ts-comment` + `// @ts-ignore <reason> — upstream <pkg>@<range>` instead. The canonical example is the `page.render(...)` call in `src/pageRenderer.ts`, where the `SKRSContext2D` vs `CanvasRenderingContext2D` mismatch is hidden by `skipLibCheck:true`.
+**Exception — when to use `@ts-ignore` instead.** `@ts-expect-error` fails if no error exists. If the upstream type error is only visible under `build:strict`'s `skipLibCheck: false` (i.e. it disappears when `build:test` runs the same file with `skipLibCheck: true`), `@ts-expect-error` reports as an "unused directive" under `build:test` and breaks the validation gate. In that case, use `// eslint-disable-next-line @typescript-eslint/ban-ts-comment` + `// @ts-ignore <reason> — upstream <pkg>@<range>` instead. The canonical example is the `page.render(...)` call in `src/pageRenderer.ts`, where the `SKRSContext2D` vs `CanvasRenderingContext2D` mismatch is hidden by `skipLibCheck:true`.
 
 Do not work around `build:strict` failures by adding `continue-on-error` to the workflow or `|| true` to the script.
 
@@ -64,9 +65,8 @@ Types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`, `ci`
 
 ## Pull Request Checklist
 
-- [ ] `npm test` passes locally
-- [ ] `npm run lint` reports no errors
-- [ ] New behaviour is covered by tests (coverage thresholds: lines 90%, functions 90%, branches 85%)
+- [ ] `npm run check` passes locally
+- [ ] New behaviour is covered by tests (coverage thresholds: statements, lines, functions, and branches 95%)
 - [ ] `CHANGELOG.md` updated under `## [Unreleased]` (or moved into the release section when cutting a release)
 
 ## Releasing
@@ -79,7 +79,7 @@ Releases are published to npm by `.github/workflows/publish.yml` when a GitHub R
 
 1. On a release branch, bump the version with `npm version <x.y.z> --no-git-tag-version` (updates `package.json` + `package-lock.json`).
 2. Move the `## [Unreleased]` entries in `CHANGELOG.md` into a new `## [x.y.z] — <date>` section.
-3. Run `npm run release:precheck` locally (after `npm run build`) to validate the version is unpublished, the CHANGELOG entry exists, and the tarball ships only `out/`.
+3. Run `npm run check && npm run build`, then `npm run release:precheck`, to validate the repository and confirm the version is unpublished, the CHANGELOG entry exists, and the tarball ships only `out/`.
 4. Merge the branch, then create a GitHub Release tagged `vx.y.z`.
 5. The workflow runs `release:precheck` → `npm publish --provenance` → `release:postcheck` (verifies the published version, the `latest` dist-tag, the provenance attestation, a clean-install smoke test, and a real conversion in worker-thread mode against the installed package).
 

@@ -1,329 +1,376 @@
 /**
- * On-demand performance benchmark for pdf-to-png-converter.
+ * End-to-end benchmark for the published `pdfToPng()` interface.
  *
- * Usage:
- *   npm run bench                 # all scenarios, 5 timed iterations each (1 warmup)
- *   BENCH_ITERATIONS=3 npm run bench
- *   BENCH_LABEL=baseline npm run bench   # label the saved JSON results file
+ * The default run is intentionally small enough for routine local use:
  *
- * Measures two complementary views on the same machine:
- *  1. End-to-end wall-clock of the public `pdfToPng()` call across realistic scenarios
- *     (sequential vs parallel, buffer vs file output, small vs large documents).
- *  2. A per-stage breakdown (document load / getPage / render / PNG encode) obtained by
- *     driving the internal seams (`getPdfFileBuffer`, `getPdfDocument`, `page.render()`,
- *     `canvas.toBuffer`) directly. The breakdown intentionally re-implements the render
- *     loop of `src/pageRenderer.ts` so each stage can be timed in isolation — it is a
- *     measurement harness, not a second production code path. Its encode stage times the
- *     synchronous `toBuffer('image/png')` twin of the async `encode('png')` used in
- *     production — same native encoder and CPU cost; the async form only moves the work
- *     off the JS thread.
+ *   npm run bench
  *
- * Runs against the compiled `out/` build (rebuilt by the npm script) so the numbers reflect
- * exactly what the published package executes. Results are printed as a table and saved as
- * JSON under `bench-results/` (gitignored, survives `npm run clean`) so runs can be diffed.
+ * Configure the content fixture, requested page counts, or execution modes with environment
+ * variables. Relative fixture names without a directory are resolved under `test-data/`.
+ *
+ *   BENCH_FIXTURE=TAMReview.pdf BENCH_PAGES=1,5,20 npm run bench
+ *   BENCH_MODES=default,parallel,worker,file npm run bench
+ *   BENCH_ITERATIONS=5 BENCH_WARMUP=1 BENCH_CONCURRENCY=4 npm run bench
+ *
+ * Modes: default, parallel, worker, file, file-parallel, file-worker, metadata.
+ * Each scenario runs in a fresh child process so peak RSS is a scenario-local high-water mark.
+ * Results are printed and saved under the gitignored `bench-results/` directory.
  */
+import { fork } from 'node:child_process';
 import { promises as fsPromises } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { isAbsolute, join, relative, resolve } from 'node:path';
 import { performance } from 'node:perf_hooks';
-import type { PDFDocumentProxy } from 'pdfjs-dist';
 import type { PdfToPngOptions } from '../out/index.js';
 import { pdfToPng } from '../out/index.js';
-import { PDF_TO_PNG_OPTIONS_DEFAULTS } from '../out/const.js';
-import { normalizePdfToPngOptions } from '../out/normalizePdfToPngOptions.js';
-import { getPdfFileBuffer } from '../out/pdfInput.js';
-import { getPdfDocument } from '../out/pdfjsLoader.js';
 
 const REPO_ROOT = resolve(__dirname, '..');
-const TEST_DATA = join(REPO_ROOT, 'test-data');
-// Everything bench-related lives under bench-results/ (gitignored), NOT test-results/,
-// because `npm run bench` rebuilds via `npm run build` whose clean step wipes test-results.
-const BENCH_OUTPUT_ROOT = join(REPO_ROOT, 'bench-results', 'tmp');
-const RESULTS_DIR = join(REPO_ROOT, 'bench-results');
+const TEST_DATA_ROOT = join(REPO_ROOT, 'test-data');
+const RESULTS_ROOT = join(REPO_ROOT, 'bench-results');
+const TEMP_ROOT = join(RESULTS_ROOT, 'tmp');
+const BENCH_MODES = ['default', 'parallel', 'worker', 'file', 'file-parallel', 'file-worker', 'metadata'] as const;
+type BenchMode = (typeof BENCH_MODES)[number];
 
-const ITERATIONS = readIntEnv('BENCH_ITERATIONS', 5, 1);
-const WARMUP_ITERATIONS = readIntEnv('BENCH_WARMUP', 1, 0);
-const LABEL = process.env.BENCH_LABEL ?? new Date().toISOString().replace(/[:.]/g, '-');
+interface BenchmarkConfig {
+    fixture: string;
+    pageCounts: number[];
+    modes: BenchMode[];
+    iterations: number;
+    warmupIterations: number;
+    concurrencyLimit: number;
+    label: string;
+}
 
 interface Scenario {
-    name: string;
-    pdfFile: string;
-    options: PdfToPngOptions;
+    fixture: string;
+    fixturePages: number;
+    requestedPages: number;
+    mode: BenchMode;
+    iterations: number;
+    warmupIterations: number;
+    concurrencyLimit: number;
+    outputFolder: string;
+}
+
+interface TimingSample {
+    wallMs: number;
+    userCpuMs: number;
+    systemCpuMs: number;
 }
 
 interface ScenarioResult {
-    name: string;
+    mode: BenchMode;
+    requestedPages: number;
     pages: number;
     iterations: number;
-    medianMs: number;
-    minMs: number;
-    meanMs: number;
-    medianMsPerPage: number;
+    medianWallMs: number;
+    minWallMs: number;
+    meanWallMs: number;
+    medianWallMsPerPage: number;
+    medianCpuMs: number;
+    medianUserCpuMs: number;
+    medianSystemCpuMs: number;
+    peakRssMiB: number;
 }
 
-interface StageBreakdown {
-    pdfFile: string;
-    pages: number;
-    iterations: number;
-    docLoadMs: number;
-    getPageMs: number;
-    renderMs: number;
-    encodeMs: number;
-    totalMs: number;
-}
-
-function readIntEnv(name: string, fallback: number, min: number): number {
+function readInteger(name: string, fallback: number, min: number, max = Number.MAX_SAFE_INTEGER): number {
     const raw = process.env[name];
-    if (raw === undefined) {
-        return fallback;
-    }
-    const parsed = Number.parseInt(raw, 10);
-    if (!Number.isInteger(parsed) || parsed < min) {
-        throw new Error(`${name} must be an integer >= ${min}, received: ${raw}`);
+    if (raw === undefined) return fallback;
+
+    const parsed = Number(raw);
+    if (!Number.isInteger(parsed) || parsed < min || parsed > max) {
+        throw new Error(`${name} must be an integer between ${min} and ${max}, received: ${raw}`);
     }
     return parsed;
 }
 
+function readPageCounts(): number[] {
+    const raw = process.env.BENCH_PAGES ?? '1,5';
+    const counts = raw.split(',').map((token) => {
+        const parsed = Number(token.trim());
+        if (!Number.isInteger(parsed) || parsed < 1) {
+            throw new Error(`BENCH_PAGES must contain positive integers, received: ${raw}`);
+        }
+        return parsed;
+    });
+    return [...new Set(counts)];
+}
+
+function isBenchMode(value: string): value is BenchMode {
+    return (BENCH_MODES as readonly string[]).includes(value);
+}
+
+function readModes(): BenchMode[] {
+    const raw = process.env.BENCH_MODES ?? process.env.BENCH_MODE ?? 'default,parallel,worker';
+    const modes = raw.split(',').map((token) => token.trim());
+    if (modes.some((mode) => !isBenchMode(mode))) {
+        throw new Error(`BENCH_MODES must use ${BENCH_MODES.join(', ')}, received: ${raw}`);
+    }
+    return [...new Set(modes)] as BenchMode[];
+}
+
+function resolveFixture(raw: string): string {
+    if (isAbsolute(raw)) return raw;
+    return raw.includes('/') || raw.includes('\\') ? resolve(REPO_ROOT, raw) : join(TEST_DATA_ROOT, raw);
+}
+
+function readLabel(): string {
+    const label = process.env.BENCH_LABEL ?? new Date().toISOString().replace(/[:.]/g, '-');
+    if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(label) || label === '.' || label === '..') {
+        throw new Error(`BENCH_LABEL must be a filename-safe label, received: ${label}`);
+    }
+    return label;
+}
+
+function readConfig(): BenchmarkConfig {
+    return {
+        fixture: resolveFixture(process.env.BENCH_FIXTURE ?? 'large_pdf.pdf'),
+        pageCounts: readPageCounts(),
+        modes: readModes(),
+        iterations: readInteger('BENCH_ITERATIONS', 3, 1),
+        warmupIterations: readInteger('BENCH_WARMUP', 1, 0),
+        concurrencyLimit: readInteger('BENCH_CONCURRENCY', 4, 1, 16),
+        label: readLabel(),
+    };
+}
+
 function median(values: number[]): number {
     const sorted = [...values].sort((a, b) => a - b);
-    const mid = Math.floor(sorted.length / 2);
-    return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+    const middle = Math.floor(sorted.length / 2);
+    return sorted.length % 2 === 0 ? (sorted[middle - 1] + sorted[middle]) / 2 : sorted[middle];
 }
 
 function mean(values: number[]): number {
     return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
-const SCENARIOS: Scenario[] = [
-    {
-        name: 'large_pdf (12p) → buffers, sequential',
-        pdfFile: join(TEST_DATA, 'large_pdf.pdf'),
-        options: { returnPageContent: true },
-    },
-    {
-        name: 'large_pdf (12p) → buffers, parallel(4)',
-        pdfFile: join(TEST_DATA, 'large_pdf.pdf'),
-        options: { returnPageContent: true, processPagesInParallel: true },
-    },
-    {
-        name: 'large_pdf (12p) → files, sequential',
-        pdfFile: join(TEST_DATA, 'large_pdf.pdf'),
-        options: { returnPageContent: false, outputFolder: join(BENCH_OUTPUT_ROOT, 'large-seq') },
-    },
-    {
-        name: 'large_pdf (12p) → files, parallel(4)',
-        pdfFile: join(TEST_DATA, 'large_pdf.pdf'),
-        options: { returnPageContent: false, processPagesInParallel: true, outputFolder: join(BENCH_OUTPUT_ROOT, 'large-par') },
-    },
-    {
-        name: 'large_pdf (12p) → buffers, workers(4)',
-        pdfFile: join(TEST_DATA, 'large_pdf.pdf'),
-        options: { returnPageContent: true, renderInWorkerThreads: true },
-    },
-    {
-        name: 'TAMReview → buffers, workers(4)',
-        pdfFile: join(TEST_DATA, 'TAMReview.pdf'),
-        options: { returnPageContent: true, renderInWorkerThreads: true },
-    },
-    {
-        name: 'sample (2p) → buffers, sequential',
-        pdfFile: join(TEST_DATA, 'sample.pdf'),
-        options: { returnPageContent: true },
-    },
-    {
-        name: 'TAMReview → buffers, sequential',
-        pdfFile: join(TEST_DATA, 'TAMReview.pdf'),
-        options: { returnPageContent: true },
-    },
-];
+function isFileMode(mode: BenchMode): boolean {
+    return mode === 'file' || mode === 'file-parallel' || mode === 'file-worker';
+}
+
+function buildOptions(scenario: Scenario): PdfToPngOptions {
+    let outputSequence = 0;
+    const options: PdfToPngOptions = {
+        pagesToProcess: Array.from({ length: scenario.requestedPages }, (_, index) => (index % scenario.fixturePages) + 1),
+        returnPageContent: true,
+    };
+
+    if (scenario.mode === 'parallel' || scenario.mode === 'file-parallel') {
+        options.processPagesInParallel = true;
+        options.concurrencyLimit = scenario.concurrencyLimit;
+    } else if (scenario.mode === 'worker' || scenario.mode === 'file-worker') {
+        options.renderInWorkerThreads = true;
+        options.concurrencyLimit = scenario.concurrencyLimit;
+    } else if (scenario.mode === 'metadata') {
+        options.returnMetadataOnly = true;
+    }
+
+    if (isFileMode(scenario.mode)) {
+        options.outputFolder = scenario.outputFolder;
+        options.outputFileMaskFunc = (pageNumber) => `page-${++outputSequence}-${pageNumber}.png`;
+        options.returnPageContent = false;
+    }
+
+    return options;
+}
 
 async function runScenario(scenario: Scenario): Promise<ScenarioResult> {
-    const timings: number[] = [];
+    const samples: TimingSample[] = [];
     let pages = 0;
 
-    for (let iteration = 0; iteration < WARMUP_ITERATIONS + ITERATIONS; iteration += 1) {
-        // File-output scenarios use exclusive-create writes, so the target folder must be
-        // reset between iterations. Done outside the timed region.
-        if (scenario.options.outputFolder !== undefined) {
-            await fsPromises.rm(scenario.options.outputFolder, { recursive: true, force: true });
+    for (let iteration = 0; iteration < scenario.warmupIterations + scenario.iterations; iteration += 1) {
+        if (isFileMode(scenario.mode)) {
+            await fsPromises.rm(scenario.outputFolder, { recursive: true, force: true });
         }
 
-        const start = performance.now();
-        const result = await pdfToPng(scenario.pdfFile, scenario.options);
-        const elapsed = performance.now() - start;
-
+        const options = buildOptions(scenario);
+        const cpuStart = process.cpuUsage();
+        const wallStart = performance.now();
+        const result = await pdfToPng(scenario.fixture, options);
+        const wallMs = performance.now() - wallStart;
+        const cpu = process.cpuUsage(cpuStart);
         pages = result.length;
-        if (iteration >= WARMUP_ITERATIONS) {
-            timings.push(elapsed);
+
+        if (iteration >= scenario.warmupIterations) {
+            samples.push({ wallMs, userCpuMs: cpu.user / 1_000, systemCpuMs: cpu.system / 1_000 });
         }
     }
 
+    if (pages !== scenario.requestedPages) {
+        throw new Error(`Expected ${scenario.requestedPages} page result(s), received ${pages}: ${scenario.fixture}`);
+    }
+
+    const wallValues = samples.map((sample) => sample.wallMs);
+    const userCpuValues = samples.map((sample) => sample.userCpuMs);
+    const systemCpuValues = samples.map((sample) => sample.systemCpuMs);
+    const cpuValues = samples.map((sample) => sample.userCpuMs + sample.systemCpuMs);
+    const peakRssKiB = process.resourceUsage().maxRSS;
+    const medianWallMs = median(wallValues);
+
     return {
-        name: scenario.name,
+        mode: scenario.mode,
+        requestedPages: scenario.requestedPages,
         pages,
-        iterations: ITERATIONS,
-        medianMs: median(timings),
-        minMs: Math.min(...timings),
-        meanMs: mean(timings),
-        medianMsPerPage: median(timings) / pages,
+        iterations: scenario.iterations,
+        medianWallMs,
+        minWallMs: Math.min(...wallValues),
+        meanWallMs: mean(wallValues),
+        medianWallMsPerPage: medianWallMs / pages,
+        medianCpuMs: median(cpuValues),
+        medianUserCpuMs: median(userCpuValues),
+        medianSystemCpuMs: median(systemCpuValues),
+        peakRssMiB: peakRssKiB / 1_024,
     };
 }
 
-/** Minimal structural view of pdf.js's Node canvas factory (see src/pageRenderer.ts). */
-interface BenchCanvasFactory {
-    create(
-        width: number,
-        height: number,
-    ): {
-        canvas: { toBuffer(mime: 'image/png'): Buffer } | null;
-        context: unknown;
-    };
-    destroy(canvasAndContext: unknown): void;
-}
+function runScenarioInChild(scenario: Scenario): Promise<ScenarioResult> {
+    return new Promise((resolveScenario, rejectScenario) => {
+        const child = fork(__filename, [], {
+            cwd: REPO_ROOT,
+            execArgv: ['--require', require.resolve('ts-node/register')],
+            stdio: ['inherit', 'inherit', 'inherit', 'ipc'],
+        });
+        let result: ScenarioResult | undefined;
 
-async function runStageBreakdown(pdfFile: string): Promise<StageBreakdown> {
-    const normalized = normalizePdfToPngOptions({ returnPageContent: true });
-    const stageSums = { docLoadMs: 0, getPageMs: 0, renderMs: 0, encodeMs: 0 };
-    let pages = 0;
-
-    for (let iteration = 0; iteration < WARMUP_ITERATIONS + ITERATIONS; iteration += 1) {
-        const timed = iteration >= WARMUP_ITERATIONS;
-        const buffer = await getPdfFileBuffer(pdfFile, PDF_TO_PNG_OPTIONS_DEFAULTS.maxInputBytes);
-
-        const docLoadStart = performance.now();
-        const pdfDocument: PDFDocumentProxy = await getPdfDocument(buffer, normalized);
-        if (timed) {
-            stageSums.docLoadMs += performance.now() - docLoadStart;
-        }
-
-        try {
-            pages = pdfDocument.numPages;
-            const canvasFactory = pdfDocument.canvasFactory as unknown as BenchCanvasFactory;
-
-            for (let pageNumber = 1; pageNumber <= pdfDocument.numPages; pageNumber += 1) {
-                const getPageStart = performance.now();
-                const page = await pdfDocument.getPage(pageNumber);
-                const viewport = page.getViewport({ scale: normalized.viewportScale });
-                if (timed) {
-                    stageSums.getPageMs += performance.now() - getPageStart;
-                }
-
-                const canvasAndContext = canvasFactory.create(Math.floor(viewport.width), Math.floor(viewport.height));
-                try {
-                    const renderStart = performance.now();
-                    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                    // @ts-ignore — same DOM-vs-SKRS context mismatch as src/pageRenderer.ts
-                    await page.render({ canvasContext: canvasAndContext.context, viewport, canvas: canvasAndContext.canvas }).promise;
-                    if (timed) {
-                        stageSums.renderMs += performance.now() - renderStart;
-                    }
-
-                    const encodeStart = performance.now();
-                    canvasAndContext.canvas?.toBuffer('image/png');
-                    if (timed) {
-                        stageSums.encodeMs += performance.now() - encodeStart;
-                    }
-                } finally {
-                    page.cleanup();
-                    canvasFactory.destroy(canvasAndContext);
-                }
+        child.once('error', rejectScenario);
+        child.once('message', (message: unknown) => {
+            result = message as ScenarioResult;
+        });
+        child.on('close', (code, signal) => {
+            if (code !== 0) {
+                rejectScenario(new Error(`Benchmark child failed (${signal ?? `exit ${code}`}).`));
+                return;
             }
-        } finally {
-            await pdfDocument.loadingTask.destroy();
-        }
-    }
+            if (result === undefined) {
+                rejectScenario(new Error('Benchmark child returned no result.'));
+                return;
+            }
+            resolveScenario(result);
+        });
 
-    const totalMs = stageSums.docLoadMs + stageSums.getPageMs + stageSums.renderMs + stageSums.encodeMs;
-    return {
-        pdfFile,
-        pages,
-        iterations: ITERATIONS,
-        docLoadMs: stageSums.docLoadMs / ITERATIONS,
-        getPageMs: stageSums.getPageMs / ITERATIONS,
-        renderMs: stageSums.renderMs / ITERATIONS,
-        encodeMs: stageSums.encodeMs / ITERATIONS,
-        totalMs: totalMs / ITERATIONS,
-    };
+        child.send(scenario, (error) => {
+            if (error !== null) {
+                child.kill();
+                rejectScenario(error);
+            }
+        });
+    });
 }
 
 function formatMs(value: number): string {
     return `${value.toFixed(1)} ms`;
 }
 
-function printScenarioTable(results: ScenarioResult[]): void {
-    console.log('\n=== End-to-end pdfToPng() ===');
-    const header = ['scenario', 'pages', 'median', 'min', 'mean', 'median/page'];
+function formatMiB(value: number): string {
+    return `${value.toFixed(1)} MiB`;
+}
+
+function printTable(results: ScenarioResult[]): void {
+    const header = ['mode', 'requested', 'actual', 'wall median', 'wall/page', 'CPU median', 'process peak RSS'];
     const rows = results.map((result) => [
-        result.name,
+        result.mode,
+        String(result.requestedPages),
         String(result.pages),
-        formatMs(result.medianMs),
-        formatMs(result.minMs),
-        formatMs(result.meanMs),
-        formatMs(result.medianMsPerPage),
+        formatMs(result.medianWallMs),
+        formatMs(result.medianWallMsPerPage),
+        formatMs(result.medianCpuMs),
+        formatMiB(result.peakRssMiB),
     ]);
     const widths = header.map((title, column) => Math.max(title.length, ...rows.map((row) => row[column].length)));
+
+    console.log('\n=== End-to-end pdfToPng() ===');
     console.log(header.map((title, column) => title.padEnd(widths[column])).join('  '));
     for (const row of rows) {
         console.log(row.map((cell, column) => cell.padEnd(widths[column])).join('  '));
     }
 }
 
-function printStageBreakdown(breakdown: StageBreakdown): void {
-    console.log(`\n=== Stage breakdown: ${breakdown.pdfFile} (${breakdown.pages} pages, mean per conversion) ===`);
-    const stages: Array<[string, number]> = [
-        ['document load', breakdown.docLoadMs],
-        ['getPage+viewport', breakdown.getPageMs],
-        ['render', breakdown.renderMs],
-        ['PNG encode', breakdown.encodeMs],
-    ];
-    for (const [stage, ms] of stages) {
-        const share = breakdown.totalMs > 0 ? ((ms / breakdown.totalMs) * 100).toFixed(1) : '0.0';
-        console.log(`${stage.padEnd(18)} ${formatMs(ms).padStart(11)}  (${share}%)`);
+async function runParent(): Promise<void> {
+    const config = readConfig();
+    await fsPromises.access(config.fixture);
+    await fsPromises.rm(TEMP_ROOT, { recursive: true, force: true });
+    const fixturePages = (await pdfToPng(config.fixture, { returnMetadataOnly: true })).length;
+    if (fixturePages === 0) {
+        throw new Error(`Fixture contains no pages: ${config.fixture}`);
     }
-    console.log(`${'total'.padEnd(18)} ${formatMs(breakdown.totalMs).padStart(11)}`);
-}
 
-async function main(): Promise<void> {
-    console.log(`pdf-to-png-converter benchmark — ${ITERATIONS} iterations (+${WARMUP_ITERATIONS} warmup), label: ${LABEL}`);
+    console.log(`pdf-to-png-converter benchmark — ${config.iterations} iterations (+${config.warmupIterations} warmup)`);
     console.log(`node ${process.version}, ${process.platform}/${process.arch}`);
+    console.log(`fixture: ${relative(REPO_ROOT, config.fixture) || config.fixture} (${fixturePages} page(s), cycled as needed)`);
+    console.log(`pages: ${config.pageCounts.join(', ')}; modes: ${config.modes.join(', ')}; concurrency: ${config.concurrencyLimit}`);
 
-    const scenarioResults: ScenarioResult[] = [];
-    for (const scenario of SCENARIOS) {
-        scenarioResults.push(await runScenario(scenario));
-        console.log(`done: ${scenario.name}`);
+    const scenarios: Scenario[] = config.pageCounts.flatMap((requestedPages) =>
+        config.modes.map((mode) => ({
+            fixture: config.fixture,
+            fixturePages,
+            requestedPages,
+            mode,
+            iterations: config.iterations,
+            warmupIterations: config.warmupIterations,
+            concurrencyLimit: config.concurrencyLimit,
+            outputFolder: join(TEMP_ROOT, `${mode}-${requestedPages}`),
+        })),
+    );
+
+    const results: ScenarioResult[] = [];
+    for (const scenario of scenarios) {
+        const result = await runScenarioInChild(scenario);
+        results.push(result);
+        console.log(`done: ${result.mode}, ${result.pages} page task(s)`);
     }
 
-    const breakdowns: StageBreakdown[] = [];
-    for (const pdfName of ['large_pdf.pdf', 'TAMReview.pdf', 'sample.pdf']) {
-        breakdowns.push(await runStageBreakdown(join(TEST_DATA, pdfName)));
-    }
-
-    printScenarioTable(scenarioResults);
-    for (const breakdown of breakdowns) {
-        printStageBreakdown(breakdown);
-    }
-
-    await fsPromises.mkdir(RESULTS_DIR, { recursive: true });
-    const resultsPath = join(RESULTS_DIR, `${LABEL}.json`);
+    printTable(results);
+    await fsPromises.mkdir(RESULTS_ROOT, { recursive: true });
+    const resultsPath = join(RESULTS_ROOT, `${config.label}.json`);
     await fsPromises.writeFile(
         resultsPath,
         JSON.stringify(
             {
-                label: LABEL,
+                label: config.label,
+                generatedAt: new Date().toISOString(),
                 node: process.version,
                 platform: `${process.platform}/${process.arch}`,
-                iterations: ITERATIONS,
-                warmupIterations: WARMUP_ITERATIONS,
-                scenarios: scenarioResults,
-                stageBreakdowns: breakdowns,
+                fixture: relative(REPO_ROOT, config.fixture) || config.fixture,
+                pageCounts: config.pageCounts,
+                modes: config.modes,
+                iterations: config.iterations,
+                warmupIterations: config.warmupIterations,
+                concurrencyLimit: config.concurrencyLimit,
+                results,
             },
             null,
             2,
         ),
+        'utf8',
     );
+    await fsPromises.rm(TEMP_ROOT, { recursive: true, force: true });
     console.log(`\nresults saved: ${resultsPath}`);
+}
+
+async function main(): Promise<void> {
+    if (process.send !== undefined) {
+        const scenario = await new Promise<Scenario>((resolveMessage, rejectMessage) => {
+            process.once('message', (message: unknown) => {
+                resolveMessage(message as Scenario);
+            });
+            process.once('disconnect', () => rejectMessage(new Error('Benchmark parent disconnected before sending a scenario.')));
+        });
+        const result = await runScenario(scenario);
+        await new Promise<void>((resolveSend, rejectSend) => {
+            process.send?.(result, (error) => {
+                if (error === null) resolveSend();
+                else rejectSend(error);
+            });
+        });
+        process.disconnect?.();
+        return;
+    }
+    await runParent();
 }
 
 main().catch((error: unknown) => {
     console.error(error);
     process.exitCode = 1;
+    // A forked child must release its IPC channel on failure; setting exitCode alone leaves the
+    // channel referenced and makes the parent wait forever for `close`.
+    process.disconnect?.();
 });
