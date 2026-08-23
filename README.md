@@ -63,7 +63,7 @@ npm install pdf-to-png-converter
 yarn add pdf-to-png-converter
 ```
 
-> **Node.js Requirement:** Node.js 24 or higher is required.
+> **Node.js Requirement:** Node.js 22.13 or higher is required.
 
 ---
 
@@ -94,7 +94,7 @@ const pngPages: PngPageOutput[] = await pdfToPng('document.pdf', {
 });
 ```
 
-> **Existing files are not overwritten.** Disk writes use exclusive-create mode. Re-running a conversion with the same output filenames throws `EEXIST`; clear the target directory or generate unique filenames between runs.
+> **Existing files are not overwritten.** Disk writes use exclusive-create mode, so a pre-existing target causes `EEXIST`. Names within one disk-output request must also be unique case-insensitively; collisions are rejected before the output folder is created.
 
 ---
 
@@ -108,26 +108,26 @@ npx pdf-to-png-converter my-document.pdf --output-folder ./output
 
 **Options:**
 
-- `--output-folder <dir>`: Directory to save PNG files. Required for image conversion. Existing files are not overwritten; duplicate output filenames throw `EEXIST`.
-- `--viewport-scale <number>`: Scale factor applied to each page viewport.
+- `--output-folder <dir>`: Directory to save PNG files. Required for image conversion. Existing targets are not overwritten; a pre-existing target causes `EEXIST`.
+- `--viewport-scale <number>`: Scale factor applied to each page viewport (default: `1`, maximum: `100`).
 - `--use-system-fonts`: Attempt to use fonts installed on the host system.
-- `--disable-font-face <true|false>`: Do not load embedded fonts.
-- `--enable-xfa <true|false>`: Process XFA form data.
+- `--disable-font-face <true|false|1|0>`: Do not load embedded fonts.
+- `--enable-xfa <true|false|1|0>`: Process XFA form data.
 - `--pdf-file-password <pwd>`: Password for encrypted PDFs.
 - `--pages-to-process <n,m,...>`: Comma-separated list of 1-based page numbers.
 - `--verbosity-level <number>`: pdfjs verbosity level (0=errors, 1=warnings, 5=infos).
 - `--return-metadata-only`: Return page metadata without rendering images. This prints JSON to stdout and does not require `--output-folder`.
 - `--process-pages-in-parallel`: Process pages concurrently.
-- `--concurrency-limit <number>`: Maximum number of in-flight pages, or worker-pool size with worker-thread rendering.
+- `--concurrency-limit <number>`: Maximum number of in-flight pages, or worker-pool size with worker-thread rendering (default: `4`, range when enabled: `1..16`).
 - `--render-in-worker-threads`: Rasterize pages across worker threads for true multi-core rendering.
-- `--silent`: Suppress normal output messages unless there is an error.
+- `--silent`: Suppress progress and success messages. Metadata JSON and errors are still printed.
 - `--version`: Show package version.
 - `--help`: Show help text.
 
 The CLI has two output modes:
 
 - image conversion: writes PNG files to `--output-folder`
-- metadata inspection: prints JSON metadata to stdout with `--return-metadata-only`
+- metadata inspection: prints JSON metadata to stdout with `--return-metadata-only`, including when `--silent` is set
 
 If you need in-memory PNG buffers, use the library API (`returnPageContent`) rather than the CLI.
 

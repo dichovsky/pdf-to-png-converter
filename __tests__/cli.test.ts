@@ -221,6 +221,18 @@ describe('CLI', () => {
         expect(pdfToPng).not.toHaveBeenCalled();
     });
 
+    it('normalizes non-Error validation failures as usage errors', async () => {
+        vi.mocked(assertValidPdfToPngOptions).mockImplementationOnce(() => {
+            throw 'invalid options from an external validator';
+        });
+        setArgv('test.pdf', '--output-folder', '/out');
+        await run();
+
+        expect(errorSpy).toHaveBeenCalledWith('Error: invalid options from an external validator');
+        expect(logSpy).not.toHaveBeenCalled();
+        expect(pdfToPng).not.toHaveBeenCalled();
+    });
+
     it('prints non-Error conversion rejections with the same conversion-error shape', async () => {
         vi.mocked(pdfToPng).mockRejectedValueOnce('render failed');
         setArgv('test.pdf', '--output-folder', '/out');

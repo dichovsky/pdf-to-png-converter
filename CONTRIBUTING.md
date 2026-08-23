@@ -4,8 +4,8 @@ Thank you for taking the time to contribute!
 
 ## Prerequisites
 
-- **Node.js 24+** (use `.nvmrc`: `nvm use`)
-- **npm 10+**
+- **Node.js 24+** for the contributor toolchain (`.nvmrc`: `nvm use`); the published runtime supports Node.js 22.13+
+- **npm 11+** for development (the publish workflow pins npm 12.0.2)
 
 ## Getting Started
 
@@ -20,6 +20,7 @@ npm ci
 ```sh
 npm run check         # full validation gate: types, format, lint, licenses, and tests
 npm test              # run tests with coverage only
+npm run test:fast     # fast Vitest loop without coverage
 npm run lint          # ESLint across the repository using eslint.config.mjs
 npm run build:test    # type-check src/ + __tests__/ (no emit)
 npm run build:strict  # stricter dependency-boundary type-check
@@ -66,12 +67,12 @@ Types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`, `ci`
 ## Pull Request Checklist
 
 - [ ] `npm run check` passes locally
-- [ ] New behaviour is covered by tests (coverage thresholds: statements, lines, functions, and branches 95%)
+- [ ] New behaviour is covered by tests (coverage thresholds: statements, lines, functions, and branches 98%)
 - [ ] `CHANGELOG.md` updated under `## [Unreleased]` (or moved into the release section when cutting a release)
 
 ## Releasing
 
-Releases are published to npm by `.github/workflows/publish.yml` when a GitHub Release is **published**. Publishing uses npm **Trusted Publishing (OIDC)** — there is no long-lived `NPM_TOKEN`; the workflow mints a short-lived token and attaches build [provenance](https://docs.npmjs.com/generating-provenance-statements) automatically.
+Releases are published to npm by `.github/workflows/publish.yml` when a non-prerelease GitHub Release is **published**. The workflow pins npm 12.0.2 and uses npm **Trusted Publishing (OIDC)** — there is no long-lived `NPM_TOKEN`; the workflow mints a short-lived token and attaches build [provenance](https://docs.npmjs.com/generating-provenance-statements) automatically.
 
 **One-time setup (maintainer):** on npmjs.com, configure the package's _Trusted Publisher_ to GitHub Actions for `dichovsky/pdf-to-png-converter`, workflow `publish.yml` (leave _Environment_ blank).
 
@@ -79,8 +80,8 @@ Releases are published to npm by `.github/workflows/publish.yml` when a GitHub R
 
 1. On a release branch, bump the version with `npm version <x.y.z> --no-git-tag-version` (updates `package.json` + `package-lock.json`).
 2. Move the `## [Unreleased]` entries in `CHANGELOG.md` into a new `## [x.y.z] — <date>` section.
-3. Run `npm run check && npm run build`, then `npm run release:precheck`, to validate the repository and confirm the version is unpublished, the CHANGELOG entry exists, and the tarball ships only `out/`.
-4. Merge the branch, then create a GitHub Release tagged `vx.y.z`.
+3. Run `npm run check && npm run build`, then `RELEASE_TAG=vx.y.z npm run release:precheck`. The precheck confirms the tag/version match, version availability, versioned changelog entry, empty `[Unreleased]` section, required compiled artifacts, and absence of source, tests, or build metadata from the tarball.
+4. Merge the branch, then create a non-prerelease GitHub Release tagged exactly `vx.y.z`.
 5. The workflow runs `release:precheck` → `npm publish --provenance` → `release:postcheck` (verifies the published version, the `latest` dist-tag, the provenance attestation, a clean-install smoke test, and a real conversion in worker-thread mode against the installed package).
 
 ## Reporting Bugs / Security Issues

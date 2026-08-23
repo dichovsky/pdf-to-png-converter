@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { parseSingleNpmJsonResult } from './npm-json';
 
 // Detective release verification. Run by `publish.yml` immediately after `npm publish`
 // to confirm the publish actually landed with provenance and is consumable. The publish
@@ -67,7 +68,8 @@ async function retry<T>(label: string, fn: () => T | null): Promise<T> {
 function fetchPublishedVersion(name: string, version: string): string | null {
     try {
         const out = runNpm(['view', `${name}@${version}`, 'version', '--json']).trim();
-        return out.length > 0 ? (JSON.parse(out) as string) : null;
+        const parsed = parseSingleNpmJsonResult(out);
+        return typeof parsed === 'string' ? parsed : null;
     } catch {
         return null;
     }
@@ -77,7 +79,8 @@ function fetchPublishedVersion(name: string, version: string): string | null {
 function fetchLatestDistTag(name: string): string | null {
     try {
         const out = runNpm(['view', name, 'dist-tags.latest', '--json']).trim();
-        return out.length > 0 ? (JSON.parse(out) as string) : null;
+        const parsed = parseSingleNpmJsonResult(out);
+        return typeof parsed === 'string' ? parsed : null;
     } catch {
         return null;
     }
@@ -90,7 +93,11 @@ function fetchAttestations(name: string, version: string): Attestations | null {
         if (out.length === 0) {
             return null;
         }
-        const packument = JSON.parse(out) as PackumentVersion;
+        const parsed = parseSingleNpmJsonResult(out);
+        if (parsed === null || typeof parsed !== 'object') {
+            return null;
+        }
+        const packument = parsed as PackumentVersion;
         return packument.dist?.attestations ?? null;
     } catch {
         return null;

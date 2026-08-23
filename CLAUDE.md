@@ -20,7 +20,7 @@ npm run build                              # Clean production compile to out/
 
 ## Architecture
 
-This is a Node.js 24+ CommonJS library and CLI. `src/index.ts` exports only `pdfToPng`, `PdfToPngOptions`, `PngPageOutput`, and `VerbosityLevel`. Rendering uses `pdfjs-dist` and its built-in Node canvas factory backed by `@napi-rs/canvas`.
+This is a Node.js 22.13+ CommonJS library and CLI; `.nvmrc` uses Node.js 24 and CI tests Node.js 22.13 and 24. `src/index.ts` exports only `pdfToPng`, `PdfToPngOptions`, `PngPageOutput`, and `VerbosityLevel`. Rendering uses `pdfjs-dist` and its built-in Node canvas factory backed by `@napi-rs/canvas`.
 
 The current source tree has 11 modules:
 
@@ -91,7 +91,7 @@ Hard limits are also centralized in `src/const.ts`:
 
 ## Testing
 
-Vitest uses a 180-second timeout and enforces 95% V8 coverage for statements, lines, functions, and branches. `src/pageRenderWorker.ts` is exercised both through real-worker integration and in-process protocol tests so its branches remain part of the aggregate gate.
+Vitest uses a 180-second timeout and enforces 98% V8 coverage for statements, lines, functions, and branches. `src/pageRenderWorker.ts` is exercised both through real-worker integration and in-process protocol tests so its branches remain part of the aggregate gate.
 
 Fixtures live in `test-data/`; generated output and coverage live in `test-results/`. Worker integration tests compile `out/pageRenderWorker.js` directly before spawning real workers.
 

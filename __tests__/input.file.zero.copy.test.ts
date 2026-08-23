@@ -77,6 +77,16 @@ test('empty file-path input returns a plain empty Uint8Array', async () => {
     expect(result.buffer).toBeInstanceOf(ArrayBuffer);
 });
 
+test('grows an initially empty read buffer when the file grows after fstat', async () => {
+    const file = mockFile(Buffer.from([9]), 0);
+
+    const result = await getPdfFileBuffer('/fake/growing.pdf', 1024);
+
+    expect(Array.from(result)).toEqual([9]);
+    expect(file.read).toHaveBeenCalledTimes(2);
+    expect(file.close).toHaveBeenCalledOnce();
+});
+
 test('path input validates and reads through exactly one opened handle', async () => {
     const file = mockFile(Buffer.from([1, 2, 3]));
 
