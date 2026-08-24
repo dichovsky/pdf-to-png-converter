@@ -24,8 +24,10 @@ All items are release blockers:
 - `npm run build` passes and produces the required CommonJS library, declarations, CLI, and worker entry in `out/`.
 - `npm run release:precheck` passes after the version/changelog cut, including the registry-version and tarball-content checks.
 - A normal render, metadata-only conversion, file output, CLI invocation, and worker-thread render remain covered by the automated suite.
-- The Node.js 22.13 and 24 CI matrix passes on the release commit, confirming the patch preserves the published runtime floor. Because `@napi-rs/canvas` is native and the publish job runs on Linux, retain the local macOS render result and obtain a Windows smoke result before publishing if a Windows runner is available.
+- The Node.js 22.13 and 24 CI matrix passes on the release commit, confirming the patch preserves the published runtime floor. Retain the local macOS render result because `@napi-rs/canvas` is native and the publish job runs on Linux.
 - Review confirms that `[Unreleased]` contains no breaking public API change. If one is found, stop and choose the appropriate SemVer version before tagging.
+
+The Node.js 24 Windows smoke is informational. Windows support is best-effort, so its result does not block merge or publication.
 
 ## Cut sequence
 

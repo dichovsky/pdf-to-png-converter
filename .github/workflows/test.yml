@@ -1,6 +1,7 @@
 name: Tests on push
 on:
     push:
+        branches: [main]
     pull_request:
 permissions:
     contents: read
@@ -33,8 +34,34 @@ jobs:
                   name: coverage-node-${{ matrix.node-version }}
                   path: test-results/coverage/
                   if-no-files-found: warn
+    windows:
+        name: windows (24)
+        runs-on: windows-latest
+        timeout-minutes: 30
+        steps:
+            - name: Checkout
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - name: Setup Node.js
+              uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+              with:
+                  node-version: '24'
+                  cache: 'npm'
+            # An unforced install of the runtime tree fails EBADPLATFORM/EBADENGINE exactly like a
+            # consumer's `npm install pdf-to-png-converter` would, preserving the platform guard
+            # that the forced development install below has to bypass. --ignore-scripts skips this
+            # repo's husky `prepare` hook (a dev dependency consumers never run).
+            - name: Validate production dependency platform support
+              run: npm ci --omit=dev --ignore-scripts
+            # png-visual-compare is a pure-JavaScript test helper whose package metadata limits
+            # installation to Darwin/Linux. Override that development-only platform guard so the
+            # real Windows native dependency and render paths can be exercised by the suite.
+            - name: Install dependencies
+              run: npm ci --force
+            - name: Validate native Windows install and rendering
+              run: npm run test:fast
     # Keep the stable status context required by main's branch-protection rule while the test
-    # matrix exposes each supported Node.js line separately.
+    # matrix exposes each supported Node.js line separately. The Windows smoke publishes its own
+    # non-required status: Windows support is best-effort and must not block merges.
     ubuntu:
         if: ${{ always() }}
         needs: test

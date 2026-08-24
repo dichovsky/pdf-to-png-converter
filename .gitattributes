@@ -1,0 +1,6 @@
+# eol=lf normalizes anything git's heuristic classifies as text. Add a `binary` line for any
+# new fixture format git might misdetect as text (mostly-ASCII content, e.g. *.pdf below).
+* text=auto eol=lf
+
+*.pdf binary
+*.png binary
