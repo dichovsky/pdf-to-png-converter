@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Main-thread and worker schedulers now call one shared lowest-index error selector, keeping their deterministic page-error policy aligned. Main-thread limit selection and worker-mode selection each have one source of truth.
 - Release prechecks now require the worker-thread entry and root type declarations in the dry-run tarball, catching incomplete packages before publication.
 - Release prechecks and postchecks now accept both npm 11's direct `npm view --json` values and npm 12's one-element array envelope. This prevents the precheck from misclassifying an already-published version as new and keeps post-publish version, dist-tag, and provenance verification working under the pinned npm 12 toolchain.
+- Vitest discovery is now anchored to the root `__tests__/` directory. Hidden nested worktrees created by local review tools are no longer collected as a second copy of the suite, preventing concurrent integration tests from deleting or exclusively creating the same files under `test-results/`.
 
 ### Security
 
