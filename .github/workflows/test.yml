@@ -59,17 +59,15 @@ jobs:
               run: npm ci --force
             - name: Validate native Windows install and rendering
               run: npm run test:fast
-    # Keep the stable status context required by main's branch-protection rule while the platform
-    # jobs expose each supported Node.js line and the native Windows smoke separately.
+    # Keep the stable status context required by main's branch-protection rule while the test
+    # matrix exposes each supported Node.js line separately. The Windows smoke publishes its own
+    # non-required status: Windows support is best-effort and must not block merges.
     ubuntu:
         if: ${{ always() }}
-        needs: [test, windows]
+        needs: test
         runs-on: ubuntu-latest
         steps:
-            - name: Require successful platform checks
+            - name: Require successful test matrix
               env:
                   MATRIX_RESULT: ${{ needs.test.result }}
-                  WINDOWS_RESULT: ${{ needs.windows.result }}
-              run: |
-                  test "$MATRIX_RESULT" = success
-                  test "$WINDOWS_RESULT" = success
+              run: test "$MATRIX_RESULT" = success
