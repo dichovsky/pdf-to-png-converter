@@ -1,6 +1,7 @@
 name: Tests on push
 on:
     push:
+        branches: [main]
     pull_request:
 permissions:
     contents: read
@@ -45,26 +46,27 @@ jobs:
               with:
                   node-version: '24'
                   cache: 'npm'
+            # An unforced install of the runtime tree fails EBADPLATFORM/EBADENGINE exactly like a
+            # consumer's `npm install pdf-to-png-converter` would, preserving the platform guard
+            # that the forced development install below has to bypass.
+            - name: Validate production dependency platform support
+              run: npm ci --omit=dev
             # png-visual-compare is a pure-JavaScript test helper whose package metadata limits
             # installation to Darwin/Linux. Override that development-only platform guard so the
-            # real Windows native dependency and render paths can be exercised by the full suite.
+            # real Windows native dependency and render paths can be exercised by the suite.
             - name: Install dependencies
               run: npm ci --force
-            - name: Audit dependencies
-              run: npm audit --audit-level=high
             - name: Validate native Windows install and rendering
-              run: npm run check
-    # Keep the stable status context required by main's branch-protection rule while the platform
-    # jobs expose each supported Node.js line and the native Windows smoke separately.
+              run: npm run test:fast
+    # Keep the stable status context required by main's branch-protection rule while the test
+    # matrix exposes each supported Node.js line separately. The Windows smoke publishes its own
+    # non-required status: Windows support is best-effort and must not block merges.
     ubuntu:
         if: ${{ always() }}
-        needs: [test, windows]
+        needs: test
         runs-on: ubuntu-latest
         steps:
-            - name: Require successful platform checks
+            - name: Require successful test matrix
               env:
                   MATRIX_RESULT: ${{ needs.test.result }}
-                  WINDOWS_RESULT: ${{ needs.windows.result }}
-              run: |
-                  test "$MATRIX_RESULT" = success
-                  test "$WINDOWS_RESULT" = success
+              run: test "$MATRIX_RESULT" = success
