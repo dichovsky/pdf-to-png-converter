@@ -45,8 +45,11 @@ jobs:
               with:
                   node-version: '24'
                   cache: 'npm'
+            # png-visual-compare is a pure-JavaScript test helper whose package metadata limits
+            # installation to Darwin/Linux. Override that development-only platform guard so the
+            # real Windows native dependency and render paths can be exercised by the full suite.
             - name: Install dependencies
-              run: npm ci
+              run: npm ci --force
             - name: Audit dependencies
               run: npm audit --audit-level=high
             - name: Validate native Windows install and rendering
