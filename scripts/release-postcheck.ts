@@ -90,9 +90,6 @@ function fetchLatestDistTag(name: string): string | null {
 function fetchAttestations(name: string, version: string): Attestations | null {
     try {
         const out = runNpm(['view', `${name}@${version}`, '--json']).trim();
-        if (out.length === 0) {
-            return null;
-        }
         const parsed = parseSingleNpmJsonResult(out);
         if (parsed === null || typeof parsed !== 'object') {
             return null;

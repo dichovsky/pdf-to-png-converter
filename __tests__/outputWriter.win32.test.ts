@@ -1,11 +1,17 @@
 import { expect, test, vi } from 'vitest';
-import { assertValidOutputFilename } from '../src/outputWriter.js';
+import { assertValidOutputFilename, savePNGfile } from '../src/outputWriter.js';
+
+const pathHarness = vi.hoisted(() => ({ forceEscapingRelativePath: false }));
 
 // CI commonly runs on POSIX. Bind node:path to win32 so the output boundary's host-specific
 // separator contract is exercised on every platform.
 vi.mock('node:path', async (importOriginal) => {
     const actual = await importOriginal<typeof import('node:path')>();
-    return { ...actual.win32, default: actual.win32 };
+    return {
+        ...actual.win32,
+        default: actual.win32,
+        relative: (...paths: [string, string]): string => (pathHarness.forceEscapingRelativePath ? '..' : actual.win32.relative(...paths)),
+    };
 });
 
 test('rejects both path separators under Windows semantics', () => {
@@ -78,4 +84,15 @@ test.each(['COM0.png', 'COM10.png', 'COM⁰.png', 'COM⁴.png', 'LPT0.txt', 'LPT
 test('rejects current and parent directory aliases before filesystem I/O', () => {
     expect(() => assertValidOutputFilename('.')).toThrow('plain filename');
     expect(() => assertValidOutputFilename('..')).toThrow('escapes the output folder');
+});
+
+test('savePNGfile rejects a joined target when the final relative-path guard detects an escape', async () => {
+    pathHarness.forceEscapingRelativePath = true;
+    const folder = { resolvedOutputFolder: 'C:\\output', realOutputFolder: 'C:\\output' };
+
+    try {
+        await expect(savePNGfile('page.png', Buffer.alloc(0), folder)).rejects.toThrow('escapes the output folder');
+    } finally {
+        pathHarness.forceEscapingRelativePath = false;
+    }
 });

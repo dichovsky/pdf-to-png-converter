@@ -5,7 +5,8 @@ on:
 permissions:
     contents: read
 jobs:
-    ubuntu:
+    test:
+        name: ubuntu (${{ matrix.node-version }})
         runs-on: ubuntu-latest
         timeout-minutes: 30
         strategy:
@@ -32,3 +33,14 @@ jobs:
                   name: coverage-node-${{ matrix.node-version }}
                   path: test-results/coverage/
                   if-no-files-found: warn
+    # Keep the stable status context required by main's branch-protection rule while the test
+    # matrix exposes each supported Node.js line separately.
+    ubuntu:
+        if: ${{ always() }}
+        needs: test
+        runs-on: ubuntu-latest
+        steps:
+            - name: Require successful test matrix
+              env:
+                  MATRIX_RESULT: ${{ needs.test.result }}
+              run: test "$MATRIX_RESULT" = success
