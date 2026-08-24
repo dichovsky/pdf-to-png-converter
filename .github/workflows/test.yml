@@ -48,9 +48,10 @@ jobs:
                   cache: 'npm'
             # An unforced install of the runtime tree fails EBADPLATFORM/EBADENGINE exactly like a
             # consumer's `npm install pdf-to-png-converter` would, preserving the platform guard
-            # that the forced development install below has to bypass.
+            # that the forced development install below has to bypass. --ignore-scripts skips this
+            # repo's husky `prepare` hook (a dev dependency consumers never run).
             - name: Validate production dependency platform support
-              run: npm ci --omit=dev
+              run: npm ci --omit=dev --ignore-scripts
             # png-visual-compare is a pure-JavaScript test helper whose package metadata limits
             # installation to Darwin/Linux. Override that development-only platform guard so the
             # real Windows native dependency and render paths can be exercised by the suite.
