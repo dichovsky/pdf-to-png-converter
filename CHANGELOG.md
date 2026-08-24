@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.2.1] — 2026-08-24
+
 ### Changed
 
 - Consolidated conversion into one canonical `pdfToPng()` path. Option normalization, page planning, bounded main-thread scheduling, mode selection, output finalization, and document teardown now live together; the CLI delegates to that public API instead of a normalized internal core. The public package exports and option/result behavior are unchanged.
@@ -19,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Expanded regression coverage for worker startup, dispatch, fatal ordering, queued and malformed responses, growing file inputs, non-`Error` CLI failures, portable pdf.js factory URLs, Windows output-path escape detection, and missing renderer content in file mode. The clean suite reaches 99.78% statements, 99.68% branches, 100% functions, and 99.77% lines.
 - Refreshed dependency ranges, including `@napi-rs/canvas` from `~1.0.3` to `~1.0.8`, Vitest and `@vitest/coverage-v8` from `^4.1.10` to `^4.1.11`, ESLint from `^10.8.0` to `^10.9.1`, and `@types/node` from `^26.1.2` to `^26.3.0`, plus compatible typescript-eslint, lint-staged, and visual-comparison tooling updates. The publish workflow now pins npm 12.0.2.
 - Removed the obsolete `brace-expansion` override after refreshing the audited lockfile, moved the publisher's npm pin from package metadata to the workflow, and recorded the permitted `fsevents@2.3.3` lifecycle script in `allowScripts`.
-- CI now validates the supported Node.js floor (22.13) as well as the Node.js 24 development and publishing line.
+- CI now validates the supported Node.js floor (22.13) as well as the Node.js 24 development and publishing line, including a Node.js 24 Windows native smoke run.
 
 ### Fixed
 
@@ -236,7 +238,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - File path and `ArrayBuffer` input support
 - `outputFolder`, `viewportScale`, `pdfFilePassword`, `disableFontFace`, `useSystemFonts`, `enableXfa` options
 
-[Unreleased]: https://github.com/dichovsky/pdf-to-png-converter/compare/v4.2.0...HEAD
+[Unreleased]: https://github.com/dichovsky/pdf-to-png-converter/compare/v4.2.1...HEAD
+[4.2.1]: https://github.com/dichovsky/pdf-to-png-converter/compare/v4.2.0...v4.2.1
 [4.2.0]: https://github.com/dichovsky/pdf-to-png-converter/compare/v4.1.1...v4.2.0
 [4.1.1]: https://github.com/dichovsky/pdf-to-png-converter/compare/v4.1.0...v4.1.1
 [4.1.0]: https://github.com/dichovsky/pdf-to-png-converter/compare/8368a905c5c7c8ab71c8d04be8745da51cd4db05...v4.1.0

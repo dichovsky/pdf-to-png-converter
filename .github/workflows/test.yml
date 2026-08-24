@@ -33,14 +33,35 @@ jobs:
                   name: coverage-node-${{ matrix.node-version }}
                   path: test-results/coverage/
                   if-no-files-found: warn
-    # Keep the stable status context required by main's branch-protection rule while the test
-    # matrix exposes each supported Node.js line separately.
+    windows:
+        name: windows (24)
+        runs-on: windows-latest
+        timeout-minutes: 30
+        steps:
+            - name: Checkout
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - name: Setup Node.js
+              uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+              with:
+                  node-version: '24'
+                  cache: 'npm'
+            - name: Install dependencies
+              run: npm ci
+            - name: Audit dependencies
+              run: npm audit --audit-level=high
+            - name: Validate native Windows install and rendering
+              run: npm run check
+    # Keep the stable status context required by main's branch-protection rule while the platform
+    # jobs expose each supported Node.js line and the native Windows smoke separately.
     ubuntu:
         if: ${{ always() }}
-        needs: test
+        needs: [test, windows]
         runs-on: ubuntu-latest
         steps:
-            - name: Require successful test matrix
+            - name: Require successful platform checks
               env:
                   MATRIX_RESULT: ${{ needs.test.result }}
-              run: test "$MATRIX_RESULT" = success
+                  WINDOWS_RESULT: ${{ needs.windows.result }}
+              run: |
+                  test "$MATRIX_RESULT" = success
+                  test "$WINDOWS_RESULT" = success
