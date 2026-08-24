@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import { afterEach, expect, test, vi } from 'vitest';
 import type { PageRenderResult } from '../src/pageRenderer';
 import { VerbosityLevel } from '../src/types';
@@ -23,6 +24,9 @@ const harness = vi.hoisted(() => {
             public entryPath: string,
             public options: unknown,
         ) {
+            if (harness.constructorError !== undefined) {
+                throw harness.constructorError;
+            }
             harness.instances.push(this);
         }
 
@@ -34,6 +38,11 @@ const harness = vi.hoisted(() => {
         }
 
         public postMessage(message: unknown): void {
+            if (harness.postMessageError !== undefined) {
+                const error = harness.postMessageError;
+                harness.postMessageError = undefined;
+                throw error;
+            }
             this.posted.push(message);
         }
 
@@ -52,14 +61,24 @@ const harness = vi.hoisted(() => {
         }
     }
 
-    const harness = { FakeWorker, instances: [] as InstanceType<typeof FakeWorker>[] };
+    const harness = {
+        FakeWorker,
+        instances: [] as InstanceType<typeof FakeWorker>[],
+        compiledEntryExists: false,
+        constructorError: undefined as unknown,
+        postMessageError: undefined as unknown,
+    };
     return harness;
 });
 
+vi.mock('node:fs', () => ({ existsSync: (): boolean => harness.compiledEntryExists }));
 vi.mock('node:worker_threads', () => ({ Worker: harness.FakeWorker }));
 
 afterEach(() => {
     harness.instances.length = 0;
+    harness.compiledEntryExists = false;
+    harness.constructorError = undefined;
+    harness.postMessageError = undefined;
 });
 
 function makeTasks(count: number): WorkerPageTask[] {
@@ -96,6 +115,42 @@ test('returns without creating workers when no pages are selected', async () => 
 
     expect(harness.instances).toHaveLength(0);
     expect(onPageRendered).not.toHaveBeenCalled();
+});
+
+test('uses the colocated compiled worker entry when it is present', async () => {
+    harness.compiledEntryExists = true;
+    const poolPromise = renderPagesInWorkerPool(new Uint8Array([1]), RENDER_OPTIONS, true, makeTasks(1), 1, async () => undefined);
+    await vi.waitFor(() => {
+        expect(harness.instances).toHaveLength(1);
+    });
+
+    const [worker] = harness.instances;
+    expect(worker.entryPath).toBe(join(__dirname, '..', 'src', 'pageRenderWorker.js'));
+    worker.emit('message', resultMessage(0));
+
+    await poolPromise;
+});
+
+test('treats a synchronous worker-constructor failure as fatal', async () => {
+    const failure = new Error('worker construction failed');
+    harness.constructorError = failure;
+
+    await expect(renderPagesInWorkerPool(new Uint8Array([1]), RENDER_OPTIONS, true, makeTasks(1), 1, async () => undefined)).rejects.toBe(
+        failure,
+    );
+    expect(harness.instances).toHaveLength(0);
+});
+
+test('treats a synchronous task-dispatch failure as fatal and terminates the worker', async () => {
+    const failure = new Error('postMessage failed');
+    harness.postMessageError = failure;
+
+    const poolPromise = renderPagesInWorkerPool(new Uint8Array([1]), RENDER_OPTIONS, true, makeTasks(1), 1, async () => undefined);
+
+    await expect(poolPromise).rejects.toBe(failure);
+    expect(harness.instances).toHaveLength(1);
+    expect(harness.instances[0].posted).toHaveLength(0);
+    expect(harness.instances[0].terminated).toBe(true);
 });
 
 test('dispatches one task per worker, then the next task as each result arrives', async () => {
@@ -202,6 +257,20 @@ test('a worker crash is fatal and wins over a LOWER-index page error (no page at
     await expect(poolPromise).rejects.toThrow('segfault-ish');
 });
 
+test('preserves the first fatal error when sibling workers fail concurrently', async () => {
+    const firstFailure = new Error('first worker failed');
+    const poolPromise = renderPagesInWorkerPool(new Uint8Array([1]), RENDER_OPTIONS, true, makeTasks(2), 2, async () => undefined);
+    await vi.waitFor(() => {
+        expect(harness.instances).toHaveLength(2);
+    });
+    const [workerA, workerB] = harness.instances;
+
+    workerA.emit('error', firstFailure);
+    workerB.emit('error', new Error('second worker failed'));
+
+    await expect(poolPromise).rejects.toBe(firstFailure);
+});
+
 test('an unexpected worker exit (no error event) rejects instead of hanging the pool', async () => {
     const poolPromise = renderPagesInWorkerPool(new Uint8Array([1]), RENDER_OPTIONS, true, makeTasks(2), 2, async () => undefined);
     await vi.waitFor(() => {
@@ -231,6 +300,34 @@ test('a message arriving after the worker settled is ignored', async () => {
     // Late duplicate after finish() — must not re-run finalization.
     workerA.emit('message', resultMessage(0));
     expect(rendered).toEqual([0]);
+});
+
+test('ignores a response that was queued before a fatal response settled the worker', async () => {
+    const failure = new Error('document load failed');
+    const onPageRendered = vi.fn(async () => undefined);
+    const poolPromise = renderPagesInWorkerPool(new Uint8Array([1]), RENDER_OPTIONS, true, makeTasks(1), 1, onPageRendered);
+    await vi.waitFor(() => {
+        expect(harness.instances).toHaveLength(1);
+    });
+    const [worker] = harness.instances;
+
+    worker.emit('message', { type: 'fatal', error: failure } satisfies WorkerResponse);
+    worker.emit('message', resultMessage(0));
+
+    await expect(poolPromise).rejects.toBe(failure);
+    expect(onPageRendered).not.toHaveBeenCalled();
+});
+
+test('routes an unexpected worker response through the fatal message-chain guard', async () => {
+    const poolPromise = renderPagesInWorkerPool(new Uint8Array([1]), RENDER_OPTIONS, true, makeTasks(1), 1, async () => undefined);
+    await vi.waitFor(() => {
+        expect(harness.instances).toHaveLength(1);
+    });
+
+    harness.instances[0].emit('message', undefined);
+
+    await expect(poolPromise).rejects.toBeInstanceOf(TypeError);
+    expect(harness.instances[0].terminated).toBe(true);
 });
 
 test('does not settle until pending output finalization and worker termination both resolve', async () => {

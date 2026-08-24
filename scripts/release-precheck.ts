@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { parseSingleNpmJsonResult } from './npm-json';
 
 // Preventive release gate. Run by `publish.yml` immediately before `npm publish`
 // (and locally as a pre-flight) to block a release whose version, changelog, or
@@ -65,7 +66,11 @@ function checkNotAlreadyPublished(name: string, version: string, failures: strin
     let published: string | null = null;
     try {
         const out = runNpm(['view', `${name}@${version}`, 'version', '--json']).trim();
-        published = out.length > 0 ? (JSON.parse(out) as string) : null;
+        const parsed = parseSingleNpmJsonResult(out);
+        if (parsed !== null && typeof parsed !== 'string') {
+            throw new Error(`npm returned a non-string version: ${JSON.stringify(parsed)}`);
+        }
+        published = parsed;
     } catch (err) {
         const text = err instanceof Error ? err.message : String(err);
         if (!text.includes('E404')) {
@@ -100,8 +105,8 @@ function checkTarballContents(failures: string[]): void {
         // npm <= 11 prints a JSON ARRAY of pack results; npm >= 12 prints an OBJECT keyed by
         // package name. Anchoring on the first "[" parsed the nested "files" array and then
         // choked on the trailing keys, so P4 reported "could not inspect the tarball" and blocked
-        // the release. Accept both shapes — publish.yml currently pins npm@11.13.0, so this is
-        // latent there but active for anyone running the precheck locally on npm 12.
+        // the release. Accept both shapes so the check works with older local npm releases and
+        // with the npm 12 release pinned by publish.yml.
         const start = out.search(/[[{]/);
         if (start === -1) {
             throw new Error('no JSON in "npm pack" output');

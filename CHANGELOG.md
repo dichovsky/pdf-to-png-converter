@@ -15,7 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Colocated one-consumer implementation details with their owners: pdf.js parameter mapping and portable asset URLs with the loader, page identity with main-thread finalization, worker protocol types with the pool, and public declarations in `src/types.ts`. The source tree is reduced from 27 to 11 TypeScript modules without removing execution modes.
 - Reworked `npm run bench` around fresh child processes, structured Node IPC, and the published interface. It now records wall time, CPU time, and process peak RSS for configurable page counts and default, parallel, worker, file, and metadata modes without presenting lifetime high-water deltas as conversion memory growth.
 - Added an explicit `npm run check` CI/publish gate for both type-checks, formatting, lint, production licenses, and coverage tests. A plain `npm test` now runs the coverage suite without an implicit build/tooling chain.
-- Raised the enforced V8 coverage floor to 95% for statements, lines, functions, and branches, including the production worker entry through in-process protocol coverage.
+- Raised the enforced V8 coverage floor to 98% for statements, lines, functions, and branches, including the production worker entry through in-process protocol coverage.
+- Expanded regression coverage for worker startup, dispatch, fatal ordering, queued and malformed responses, growing file inputs, non-`Error` CLI failures, portable pdf.js factory URLs, Windows output-path escape detection, and missing renderer content in file mode. The clean suite reaches 99.78% statements, 99.68% branches, 100% functions, and 99.77% lines.
+- Refreshed dependency ranges, including `@napi-rs/canvas` from `~1.0.3` to `~1.0.8`, Vitest and `@vitest/coverage-v8` from `^4.1.10` to `^4.1.11`, ESLint from `^10.8.0` to `^10.9.1`, and `@types/node` from `^26.1.2` to `^26.3.0`, plus compatible typescript-eslint, lint-staged, and visual-comparison tooling updates. The publish workflow now pins npm 12.0.2.
+- Removed the obsolete `brace-expansion` override after refreshing the audited lockfile, moved the publisher's npm pin from package metadata to the workflow, and recorded the permitted `fsevents@2.3.3` lifecycle script in `allowScripts`.
+- CI now validates the supported Node.js floor (22.13) as well as the Node.js 24 development and publishing line.
 
 ### Fixed
 
@@ -24,6 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The CLI again validates semantic options before printing progress, then emits its processing and output-folder banners before conversion work starts. Its fail-fast pass returns the normalized snapshot used for CLI-only policy, and typed usage/conversion errors replace message and `cause` sniffing. `pdfToPng()` still revalidates at the public boundary; the small duplicate pass replaces the former normalized internal-core coupling.
 - Main-thread and worker schedulers now call one shared lowest-index error selector, keeping their deterministic page-error policy aligned. Main-thread limit selection and worker-mode selection each have one source of truth.
 - Release prechecks now require the worker-thread entry and root type declarations in the dry-run tarball, catching incomplete packages before publication.
+- Release prechecks and postchecks now accept both npm 11's direct `npm view --json` values and npm 12's one-element array envelope. This prevents the precheck from misclassifying an already-published version as new and keeps post-publish version, dist-tag, and provenance verification working under the pinned npm 12 toolchain.
+- Vitest discovery is now anchored to the root `__tests__/` directory. Hidden nested worktrees created by local review tools are no longer collected as a second copy of the suite, preventing concurrent integration tests from deleting or exclusively creating the same files under `test-results/`.
+- The Node.js test matrix now feeds a stable aggregate `ubuntu` status check, preserving the context required by `main` branch protection while retaining separate Node.js 22.13 and 24 results.
 
 ### Security
 
@@ -229,8 +236,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - File path and `ArrayBuffer` input support
 - `outputFolder`, `viewportScale`, `pdfFilePassword`, `disableFontFace`, `useSystemFonts`, `enableXfa` options
 
-[Unreleased]: https://github.com/dichovsky/pdf-to-png-converter/compare/v4.0.0...HEAD
-[4.0.0]: https://github.com/dichovsky/pdf-to-png-converter/compare/v3.15.0...v4.0.0
+[Unreleased]: https://github.com/dichovsky/pdf-to-png-converter/compare/v4.2.0...HEAD
+[4.2.0]: https://github.com/dichovsky/pdf-to-png-converter/compare/v4.1.1...v4.2.0
+[4.1.1]: https://github.com/dichovsky/pdf-to-png-converter/compare/v4.1.0...v4.1.1
+[4.1.0]: https://github.com/dichovsky/pdf-to-png-converter/compare/8368a905c5c7c8ab71c8d04be8745da51cd4db05...v4.1.0
+[4.0.0]: https://github.com/dichovsky/pdf-to-png-converter/compare/v3.16.0...8368a905c5c7c8ab71c8d04be8745da51cd4db05
 [3.15.0]: https://github.com/dichovsky/pdf-to-png-converter/compare/release/v3.14.0...v3.15.0
 [3.14.0]: https://github.com/dichovsky/pdf-to-png-converter/compare/release/v3.7.0...release/v3.14.0
 [3.7.0]: https://github.com/dichovsky/pdf-to-png-converter/compare/release/v3.3.0...release/v3.7.0

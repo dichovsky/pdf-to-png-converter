@@ -19,7 +19,7 @@ npm run bench                              # Public-interface benchmark
 
 ## Product boundary
 
-This repository publishes a Node.js 24+ CommonJS library and CLI. It converts PDF paths or byte containers into ordered page metadata, PNG buffers, or PNG files. `pdfjs-dist` renders through its built-in Node canvas factory backed by `@napi-rs/canvas`.
+This repository publishes a Node.js 22.13+ CommonJS library and CLI; `.nvmrc` uses Node.js 24 and CI tests Node.js 22.13 and 24. It converts PDF paths or byte containers into ordered page metadata, PNG buffers, or PNG files. `pdfjs-dist` renders through its built-in Node canvas factory backed by `@napi-rs/canvas`.
 
 The package root exports only:
 
@@ -125,7 +125,7 @@ Use `??`, not `||`, for optional values where `false` or `0` are meaningful. Kee
 
 ## Tests
 
-Vitest has a 180-second timeout. V8 coverage thresholds are 95% for statements, lines, functions, and branches. Worker integration compiles `out/pageRenderWorker.js` before starting real workers; do not call `npm run build` from a running test because its clean hook removes shared output directories.
+Vitest has a 180-second timeout. V8 coverage thresholds are 98% for statements, lines, functions, and branches. Worker integration compiles `out/pageRenderWorker.js` before starting real workers; do not call `npm run build` from a running test because its clean hook removes shared output directories.
 
 Fixtures live in `test-data/`; generated output and coverage live in `test-results/`. Prefer focused tests while iterating, then run `npm run check`.
 

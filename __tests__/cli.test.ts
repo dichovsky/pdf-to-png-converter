@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import { HELP_TEXT, getVersion, run } from '../src/cli.js';
 import { assertValidPdfToPngOptions, pdfToPng } from '../src/pdfToPng.js';
@@ -51,6 +52,18 @@ describe('CLI', () => {
         expect(exitSpy).toHaveBeenCalledWith(0);
     });
 
+    it('stringifies a non-Error failure while printing the package version', async () => {
+        logSpy.mockImplementationOnce(() => {
+            throw 'stdout failed';
+        });
+        setArgv('--version');
+
+        await run();
+
+        expect(errorSpy).toHaveBeenCalledWith('stdout failed');
+        expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+
     it('reports a package-version lookup failure through the CLI', async () => {
         vi.spyOn(fs, 'readFileSync').mockImplementation(() => {
             throw new Error('ENOENT');
@@ -92,6 +105,30 @@ describe('CLI', () => {
         expect(errorSpy).toHaveBeenCalledWith(HELP_TEXT);
         expect(exitSpy).toHaveBeenCalledWith(1);
         expect(pdfToPng).not.toHaveBeenCalled();
+    });
+
+    it('stringifies a non-Error argument-parser failure', async () => {
+        vi.doMock('node:util', () => ({
+            parseArgs: (): never => {
+                throw 'argument parsing failed';
+            },
+        }));
+        vi.resetModules();
+
+        try {
+            const { run: runWithFailingParser } = await import('../src/cli.js');
+            setArgv('test.pdf');
+
+            await runWithFailingParser();
+
+            expect(errorSpy).toHaveBeenCalledWith('argument parsing failed');
+            expect(errorSpy).toHaveBeenCalledWith(HELP_TEXT);
+            expect(exitSpy).toHaveBeenCalledWith(1);
+            expect(pdfToPng).not.toHaveBeenCalled();
+        } finally {
+            vi.doUnmock('node:util');
+            vi.resetModules();
+        }
     });
 
     it.each([
@@ -221,6 +258,40 @@ describe('CLI', () => {
         expect(pdfToPng).not.toHaveBeenCalled();
     });
 
+    it('normalizes non-Error validation failures as usage errors', async () => {
+        vi.mocked(assertValidPdfToPngOptions).mockImplementationOnce(() => {
+            throw 'invalid options from an external validator';
+        });
+        setArgv('test.pdf', '--output-folder', '/out');
+        await run();
+
+        expect(errorSpy).toHaveBeenCalledWith('Error: invalid options from an external validator');
+        expect(logSpy).not.toHaveBeenCalled();
+        expect(pdfToPng).not.toHaveBeenCalled();
+    });
+
+    it('stringifies a non-Error failure from the CLI policy boundary', async () => {
+        const normalizedOptions = vi.mocked(assertValidPdfToPngOptions)({ outputFolder: '/out' });
+        vi.mocked(assertValidPdfToPngOptions)
+            .mockClear()
+            .mockImplementationOnce(
+                () =>
+                    new Proxy(normalizedOptions, {
+                        get(target, property, receiver) {
+                            if (property === 'returnMetadataOnly') throw 'CLI policy failed';
+                            return Reflect.get(target, property, receiver) as unknown;
+                        },
+                    }),
+            );
+        setArgv('test.pdf', '--output-folder', '/out');
+
+        await run();
+
+        expect(errorSpy).toHaveBeenCalledWith('Error: CLI policy failed');
+        expect(exitSpy).toHaveBeenCalledWith(1);
+        expect(pdfToPng).not.toHaveBeenCalled();
+    });
+
     it('prints non-Error conversion rejections with the same conversion-error shape', async () => {
         vi.mocked(pdfToPng).mockRejectedValueOnce('render failed');
         setArgv('test.pdf', '--output-folder', '/out');
@@ -246,5 +317,20 @@ describe('CLI', () => {
         await run();
         expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('--return-page-content is not supported'));
         expect(pdfToPng).not.toHaveBeenCalled();
+    });
+
+    it('runs automatically when the module is loaded as the CLI entry point', async () => {
+        vi.resetModules();
+        process.argv = ['node', resolve(__dirname, '../src/cli.ts'), '--help'];
+
+        try {
+            await import('../src/cli.js');
+
+            expect(logSpy).toHaveBeenCalledWith(HELP_TEXT);
+            expect(exitSpy).toHaveBeenCalledWith(0);
+            expect(pdfToPng).not.toHaveBeenCalled();
+        } finally {
+            vi.resetModules();
+        }
     });
 });

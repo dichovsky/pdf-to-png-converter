@@ -2,7 +2,7 @@
 
 ## Overview
 
-`pdf-to-png-converter` is a Node.js 24+ CommonJS library and CLI. It accepts a PDF path or byte container and returns ordered page metadata, PNG buffers, or PNG files. Rendering uses `pdfjs-dist` with its built-in Node canvas factory backed by `@napi-rs/canvas`.
+`pdf-to-png-converter` is a Node.js 22.13+ CommonJS library and CLI. It accepts a PDF path or byte container and returns ordered page metadata, PNG buffers, or PNG files. Rendering uses `pdfjs-dist` with its built-in Node canvas factory backed by `@napi-rs/canvas`.
 
 The source tree deliberately has 11 TypeScript modules. `src/pdfToPng.ts` owns conversion policy and orchestration; the other runtime modules own I/O, pdf.js, rendering, or worker-thread boundaries.
 
@@ -116,8 +116,8 @@ The realpath comparison does not atomically bind the write to a directory inode.
 
 ## Build and validation
 
-- Runtime requirement: Node.js 24 or newer.
+- Runtime requirement: Node.js 22.13 or newer; `.nvmrc` uses Node.js 24 and CI tests Node.js 22.13 and 24.
 - Package format: CommonJS, compiled from `.ts` to `out/` with `.js` relative import specifiers.
-- `npm test` runs Vitest with coverage only.
+- `npm test` runs Vitest with coverage only and enforces 98% thresholds for statements, lines, functions, and branches across all production modules.
 - `npm run check` is the explicit CI/prepublish gate: clean, normal and strict type-checks, formatting, lint, production-license validation, and tests.
 - `npm run build` performs the publishable production compile after cleaning `out/` and `test-results/`.
