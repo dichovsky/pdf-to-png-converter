@@ -39,7 +39,7 @@ The source tree contains 11 TypeScript modules:
 | ------------------------- | ----------------------------------------------------------------------------------------- |
 | `src/index.ts`            | Public re-exports only                                                                    |
 | `src/types.ts`            | Public options, output union, rotation, and verbosity                                     |
-| `src/const.ts`            | Defaults and input/concurrency/canvas limits                                              |
+| `src/const.ts`            | Defaults, input/concurrency/canvas limits, pipeline window, pdf.js asset paths            |
 | `src/pdfToPng.ts`         | Validation, planning, scheduling, mode selection, output finalization, document lifecycle |
 | `src/pdfInput.ts`         | Input normalization, ownership, one-handle bounded file reads                             |
 | `src/pdfjsLoader.ts`      | Cached dynamic pdf.js import, init parameters, load cleanup                               |
@@ -129,6 +129,8 @@ Vitest has a 180-second timeout. V8 coverage thresholds are 98% for statements, 
 
 Fixtures live in `test-data/`; generated output and coverage live in `test-results/`. Prefer focused tests while iterating, then run `npm run check`.
 
+`__tests__/pdfjs.assets.test.ts` exact-checks the installed `cmaps` and `standard_fonts` layout against `__tests__/test-data-constants.ts`. For `pdfjs-dist` upgrades, review asset-list changes explicitly, do not auto-refresh golden PNGs, and run the real-worker parity suite.
+
 High-value regression areas:
 
 - caller-buffer ownership and cross-realm input shapes
@@ -137,6 +139,7 @@ High-value regression areas:
 - metadata/render dimension parity and cleanup on every failure hop
 - result order and deterministic failures in default, parallel, and worker modes
 - worker document reuse, crashes, output-finalizer failures, and complete termination
+- pdf.js import/type compatibility, installed asset layout, golden rendering, and main/worker byte parity
 - CLI metadata JSON, required output-folder policy, silent behavior, and packaging/version errors
 
 ## Benchmark

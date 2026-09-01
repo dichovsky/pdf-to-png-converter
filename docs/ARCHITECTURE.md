@@ -119,5 +119,7 @@ The realpath comparison does not atomically bind the write to a directory inode.
 - Runtime requirement: Node.js 22.13 or newer; `.nvmrc` uses Node.js 24 and CI tests Node.js 22.13 and 24.
 - Package format: CommonJS, compiled from `.ts` to `out/` with `.js` relative import specifiers.
 - `npm test` runs Vitest with coverage only and enforces 98% thresholds for statements, lines, functions, and branches across all production modules.
+- `npm run build:strict` checks the upstream `pdfjs-dist` / `@napi-rs/canvas` declaration boundary with `skipLibCheck: false`.
+- `__tests__/pdfjs.assets.test.ts` exact-checks the installed pdf.js CMap and standard-font layout; golden-image and real-worker tests cover rendered output and main/worker parity.
 - `npm run check` is the explicit CI/prepublish gate: clean, normal and strict type-checks, formatting, lint, production-license validation, and tests.
 - `npm run build` performs the publishable production compile after cleaning `out/` and `test-results/`.

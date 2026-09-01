@@ -43,6 +43,16 @@ If `build:strict` fails because of an upstream type, suppress on the line immedi
 
 Do not work around `build:strict` failures by adding `continue-on-error` to the workflow or `|| true` to the script.
 
+## pdf.js dependency upgrades
+
+`pdfjs-dist` is both a type boundary and the rendering engine, so an upgrade must pass more than the package-manager checks:
+
+- `__tests__/pdfjs.assets.test.ts` exact-checks the installed `cmaps` and `standard_fonts` directory contents against `__tests__/test-data-constants.ts`. Update those lists only after reviewing the upstream package-layout diff; added files are deliberately review-gated rather than accepted as a subset.
+- Run the visual-comparison suites against the existing reference PNGs and inspect `git status --short -- test-data` afterward. Do not create or refresh golden files merely to make an upgrade pass.
+- Run the real worker-thread integration tests so the CommonJS-to-legacy-ESM import and per-worker pdf.js lifecycle stay covered.
+- Finish from a clean install with `npm run check`, `npm run build`, `npm audit --audit-level=high`,
+  `npm audit --omit=dev --audit-level=high`, and `npm pack --dry-run --ignore-scripts --json`.
+
 ## Coding Conventions
 
 - **Language:** TypeScript (strict mode). All source lives under `src/`.

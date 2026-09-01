@@ -33,7 +33,7 @@ The current source tree has 11 modules:
 - `src/pageRenderWorker.ts` — compiled worker entry; lazy document load and page rendering inside each worker.
 - `src/cli.ts` — CLI parsing and policy; delegates to the public `pdfToPng` function.
 - `src/types.ts` — public option and output types plus `VerbosityLevel`.
-- `src/const.ts` — defaults and resource/concurrency limits.
+- `src/const.ts` — defaults, resource/concurrency limits, pipeline window, and pdf.js asset paths.
 - `src/index.ts` — public re-exports only.
 
 Keep this consolidated ownership. Split out another seam only when a new independent implementation or lifecycle boundary actually needs it. See `docs/ARCHITECTURE.md` for the full runtime and ownership model.
@@ -94,6 +94,8 @@ Hard limits are also centralized in `src/const.ts`:
 Vitest uses a 180-second timeout and enforces 98% V8 coverage for statements, lines, functions, and branches. `src/pageRenderWorker.ts` is exercised both through real-worker integration and in-process protocol tests so its branches remain part of the aggregate gate.
 
 Fixtures live in `test-data/`; generated output and coverage live in `test-results/`. Worker integration tests compile `out/pageRenderWorker.js` directly before spawning real workers.
+
+`__tests__/pdfjs.assets.test.ts` exact-checks the installed `cmaps` and `standard_fonts` layout against `__tests__/test-data-constants.ts`. For `pdfjs-dist` upgrades, review asset-list changes explicitly, keep existing golden PNGs unchanged unless a rendering change is understood and intentional, and run the real-worker parity suite.
 
 Prefer focused tests while iterating, then run `npm run check`. Do not use `npm run build` inside a running test suite because its `prebuild` hook deletes `test-results/` and `out/`.
 

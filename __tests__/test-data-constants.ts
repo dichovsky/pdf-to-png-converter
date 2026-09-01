@@ -1,6 +1,6 @@
 /**
  * Filenames of the standard font files shipped with `pdfjs-dist` (Foxit and Liberation fonts).
- * Used by tests to verify that the expected font assets are present after installation.
+ * Exact-checked by pdfjs.assets.test.ts so dependency upgrades require an explicit layout review.
  */
 export const STANDARD_FONTS = [
     'FoxitDingbats.pfb',
@@ -25,7 +25,7 @@ export const STANDARD_FONTS = [
  * Filenames of the pre-packed character map (CMap) files shipped with `pdfjs-dist`.
  * CMaps are required for correct text extraction and rendering of CJK (Chinese, Japanese, Korean)
  * and other multi-byte character encodings in PDFs.
- * Used by tests to verify that the expected CMap assets are present after installation.
+ * Exact-checked by pdfjs.assets.test.ts so dependency upgrades require an explicit layout review.
  */
 export const STANDARD_CMAPS = [
     '78-EUC-H.bcmap',

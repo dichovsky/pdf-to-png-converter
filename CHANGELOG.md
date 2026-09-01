@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Upgraded `pdfjs-dist` from `~6.2.108` to `~6.3.289`. The project's public API, defaults, `legacy/build/pdf.mjs` import, worker integration, and `cmaps` / `standard_fonts` asset paths are unchanged. Upstream 6.3 includes rendering changes affecting fonts, annotations, XFA, and JPEG handling, plus updates to the bundled Liberation-font and pdf.js qcms license files. Rendered PNG output for the existing fixtures is unchanged — the visual-comparison suites pass against the existing reference images.
+- Added an exact package-layout regression for the CMaps and standard fonts consumed from `pdfjs-dist`, so future dependency updates must explicitly review asset additions, removals, and renames.
+- Refreshed the development-only `@types/node` range from `^26.3.0` to `^26.4.0` and `lint-staged` from `^17.3.0` to `^17.4.1`.
+
 ## [4.2.1] — 2026-08-25
 
 ### Changed
