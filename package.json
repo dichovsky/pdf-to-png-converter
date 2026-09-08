@@ -85,7 +85,7 @@
         "@typescript-eslint/eslint-plugin": "^8.68.0",
         "@typescript-eslint/parser": "^8.68.0",
         "@typescript/native": "npm:typescript@~7.0.2",
-        "@vitest/coverage-v8": "^4.1.11",
+        "@vitest/coverage-v8": "^5.0.0",
         "eslint": "^10.9.1",
         "husky": "^9.1.7",
         "license-checker-rseidelsohn": "^5.0.1",
