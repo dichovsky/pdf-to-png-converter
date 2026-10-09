@@ -18,6 +18,7 @@ vi.mock('node:path', async (importOriginal) => {
 vi.mock('pdfjs-dist/legacy/build/pdf.mjs', () => ({ getDocument }));
 
 test('pdf.js factory URLs retain forward slashes under Windows path semantics', async () => {
+    pathHarness.returnRoot = false;
     const document = {} as PDFDocumentProxy;
     getDocument.mockReturnValueOnce({ promise: Promise.resolve(document) } as PDFDocumentLoadingTask);
     const { getPdfDocument } = await import('../src/pdfjsLoader.js');
@@ -32,11 +33,16 @@ test('pdf.js factory URLs retain forward slashes under Windows path semantics', 
         }),
     ).resolves.toBe(document);
 
-    const parameters = getDocument.mock.calls[0][0];
-    for (const url of [parameters.cMapUrl, parameters.standardFontDataUrl]) {
+    const parameters = getDocument.mock.calls.at(-1)?.[0];
+    if (parameters === undefined) throw new Error('getDocument was not called');
+    for (const url of [parameters.cMapUrl, parameters.standardFontDataUrl, parameters.wasmUrl]) {
         expect(url).toMatch(/\/$/);
         expect(url).not.toContain('\\');
     }
+    // Each URL points at its own asset folder inside the package (issue #278 added wasmUrl).
+    expect(parameters.cMapUrl).toMatch(/\/cmaps\/$/);
+    expect(parameters.standardFontDataUrl).toMatch(/\/standard_fonts\/$/);
+    expect(parameters.wasmUrl).toMatch(/\/wasm\/$/);
 });
 
 test('pdf.js factory URLs preserve an existing portable trailing slash', async () => {
@@ -58,4 +64,5 @@ test('pdf.js factory URLs preserve an existing portable trailing slash', async (
     const parameters = getDocument.mock.calls.at(-1)?.[0];
     expect(parameters?.cMapUrl).toBe('C:/');
     expect(parameters?.standardFontDataUrl).toBe('C:/');
+    expect(parameters?.wasmUrl).toBe('C:/');
 });

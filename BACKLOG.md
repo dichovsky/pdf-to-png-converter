@@ -11,3 +11,9 @@
 ## ⚙️ ARCH / Core
 
 _No open ARCH items._
+
+## 🛡️ SEC / QA
+
+- [ ] 🟡 🐛 SEC-004 Sec: bound declared image size (pdf.js `maxImageSize`)
+    - the wasm decoders now run (issue #278): about 8 bytes per declared pixel per rendering thread, and an image of about 537 Mpx or more rejects the whole conversion with `Create skia surface failed`
+    - `maxImageSize` drops an oversized image before decoding, but it does not cover SMask images or JPX/JBIG2 files whose header size differs from the dictionary, and a 100 Mpx limit would silently blank 1200 dpi A4 scans. Choose a limit or option and make drops visible

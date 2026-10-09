@@ -26,14 +26,14 @@ The current source tree has 11 modules:
 
 - `src/pdfToPng.ts` — the sole conversion entrypoint and orchestration boundary: option validation/defaulting, page and name planning, bounded scheduling, execution-mode selection, output finalization, and document teardown.
 - `src/pdfInput.ts` — supported input shapes, owned `Uint8Array` normalization, bounded one-handle file reads, and input-size enforcement.
-- `src/pdfjsLoader.ts` — cached dynamic pdf.js import, init parameters, and failed-load cleanup.
+- `src/pdfjsLoader.ts` — cached dynamic pdf.js import, init parameters, installed-package asset-folder location (`cmaps`, `standard_fonts`, `wasm`), the once-per-process wasm-decoder warning, and failed-load cleanup.
 - `src/pageRenderer.ts` — page metadata, pixel/rotation guards, canvas rendering, PNG encoding, and page/canvas cleanup.
 - `src/outputWriter.ts` — disk filename validation, output-folder preparation, realpath checks, and exclusive-create writes.
 - `src/workerPool.ts` — worker protocol types, dynamic dispatch, error policy, main-thread finalizers, and worker teardown.
 - `src/pageRenderWorker.ts` — compiled worker entry; lazy document load and page rendering inside each worker.
 - `src/cli.ts` — CLI parsing and policy; delegates to the public `pdfToPng` function.
 - `src/types.ts` — public option and output types plus `VerbosityLevel`.
-- `src/const.ts` — defaults, resource/concurrency limits, pipeline window, and pdf.js asset paths.
+- `src/const.ts` — defaults, resource/concurrency limits, pipeline window, and pdf.js asset-directory and wasm-decoder file names.
 - `src/index.ts` — public re-exports only.
 
 Keep this consolidated ownership. Split out another seam only when a new independent implementation or lifecycle boundary actually needs it. See `docs/ARCHITECTURE.md` for the full runtime and ownership model.
@@ -48,6 +48,8 @@ Keep this consolidated ownership. Split out another seam only when a new indepen
 6. File writes always run on the main thread through `outputWriter`, including worker rendering mode.
 7. Result arrays stay in requested page order in every mode.
 8. `pdfDocument.loadingTask.destroy()` runs in `finally`; pages, canvases, loading failures, finalizers, and workers have matching cleanup paths.
+9. pdf.js asset folders (`cmaps`, `standard_fonts`, `wasm`) come from the installed `pdfjs-dist` package location through `pdfjsAssetDirectory()`, never from the working directory, and there is no working-directory fallback. `getPdfDocument()` passes all three as `cMapUrl`, `standardFontDataUrl`, and `wasmUrl`. Without `wasmUrl`, CCITT, JBIG2, and JPEG 2000 images render blank with no error (issue #278).
+10. `warnIfWasmDecodersMissing()` runs at most once per thread (the library runs the check on the main thread only, so normally once per process), after the metadata-only return and before the output folder is prepared. It emits process warning `PDF_TO_PNG_WASM_MISSING` when `jbig2.wasm` or `openjpeg.wasm` is missing; it cannot detect decode errors.
 
 `pagesToProcess` must contain positive integers. Entries above the document page count are silently filtered; duplicates remain separate tasks and are allowed unless disk output makes their resolved filenames collide.
 
@@ -95,7 +97,9 @@ Vitest uses a 180-second timeout and enforces 98% V8 coverage for statements, li
 
 Fixtures live in `test-data/`; generated output and coverage live in `test-results/`. Worker integration tests compile `out/pageRenderWorker.js` directly before spawning real workers.
 
-`__tests__/pdfjs.assets.test.ts` exact-checks the installed `cmaps` and `standard_fonts` layout against `__tests__/test-data-constants.ts`. For `pdfjs-dist` upgrades, review asset-list changes explicitly, keep existing golden PNGs unchanged unless a rendering change is understood and intentional, and run the real-worker parity suite.
+`__tests__/pdfjs.assets.test.ts` exact-checks the installed `cmaps`, `standard_fonts`, and `wasm` layouts and the set of top-level `pdfjs-dist` directories against `__tests__/test-data-constants.ts`. For `pdfjs-dist` upgrades, review asset-list changes explicitly, review every top-level asset folder in the package and not only the known ones (`cmaps`, `standard_fonts`, `wasm`) because a missed folder caused issue #278, keep existing golden PNGs unchanged unless a rendering change is understood and intentional, and run the real-worker parity suite.
+
+CCITT and JBIG2 regression PDFs live in `test-data/wasm/` and are produced by `scripts/generate-wasm-fixtures.ts`.
 
 Prefer focused tests while iterating, then run `npm run check`. Do not use `npm run build` inside a running test suite because its `prebuild` hook deletes `test-results/` and `out/`.
 
