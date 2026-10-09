@@ -60,13 +60,16 @@ export const PDF_TO_PNG_OPTIONS_DEFAULTS = {
 };
 
 /**
- * Relative paths to the pdfjs-dist asset directories.
- * Stored as raw strings so `pdfjsLoader` can resolve them against `process.cwd()` at call time
- * rather than at module-load time. This ensures
- * applications that call `process.chdir()` after importing the library still get
- * correct paths.
+ * Names of the asset directories shipped inside the installed pdfjs-dist package. `pdfjsLoader`
+ * resolves them against the package location (not the process working directory) at first use.
  */
-export const CMAP_RELATIVE_URL = './node_modules/pdfjs-dist/cmaps/';
-export const STANDARD_FONTS_RELATIVE_URL = './node_modules/pdfjs-dist/standard_fonts/';
+export const PDFJS_ASSET_DIRECTORIES = {
+    cmaps: 'cmaps',
+    standardFonts: 'standard_fonts',
+    wasm: 'wasm',
+} as const;
 
-// Test-only asset lists (STANDARD_FONTS, STANDARD_CMAPS) live in __tests__/test-data-constants.ts
+/** Decoder binaries inside the pdfjs-dist wasm directory that image rendering depends on (CCITT/JBIG2 and JPEG 2000). */
+export const PDFJS_WASM_DECODER_FILES = ['jbig2.wasm', 'openjpeg.wasm'] as const;
+
+// Test-only asset lists (STANDARD_FONTS, STANDARD_CMAPS, STANDARD_WASM) live in __tests__/test-data-constants.ts

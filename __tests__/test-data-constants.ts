@@ -22,6 +22,42 @@ export const STANDARD_FONTS = [
 ];
 
 /**
+ * Filenames shipped in `pdfjs-dist/wasm/`: the JBIG2 and CCITT decoder (`jbig2.wasm`), the OpenJPEG (JPEG 2000) decoder
+ * (`openjpeg.wasm`), the QCMS color-management module, the QuickJS scripting engine, their JavaScript fallbacks and licenses.
+ * pdf.js loads them only through the `wasmUrl` document parameter, and without `jbig2.wasm` / `openjpeg.wasm` CCITT,
+ * JBIG2 and JPEG 2000 images render blank (issue #278).
+ * Exact-checked by pdfjs.assets.test.ts so dependency upgrades require an explicit layout review.
+ */
+export const STANDARD_WASM = [
+    'LICENSE_JBIG2',
+    'LICENSE_OPENJPEG',
+    'LICENSE_PDFJS_JBIG2',
+    'LICENSE_PDFJS_OPENJPEG',
+    'LICENSE_PDFJS_QCMS',
+    'LICENSE_QCMS',
+    'jbig2.wasm',
+    'jbig2_nowasm_fallback.js',
+    'openjpeg.wasm',
+    'openjpeg_nowasm_fallback.js',
+    'qcms_bg.wasm',
+    'quickjs-eval.js',
+    'quickjs-eval.wasm',
+];
+
+/**
+ * Top-level folders of the installed `pdfjs-dist` package (directories only, files such as `package.json` excluded).
+ * Exact-checked by pdfjs.assets.test.ts: a folder pdf.js can read assets from needs a matching loader parameter
+ * (`cMapUrl`, `standardFontDataUrl`, `wasmUrl`), so every new upstream folder must be reviewed (issue #278).
+ *
+ * - `cmaps`, `standard_fonts`, `wasm`: asset folders the loader passes to pdf.js.
+ * - `build`, `legacy`, `web`, `types`: JavaScript bundles, viewer and type declarations; not read through a URL parameter.
+ * - `image_decoders`: a separately importable image-decoder bundle; not read through a URL parameter.
+ * - `iccs`: the CMYK ICC profile pdf.js reads through its `iccUrl` parameter. The loader does not pass `iccUrl` today,
+ *   so pdf.js warns (verbosity 1 and above) and converts CMYK without the profile. Recorded here, not decided.
+ */
+export const PDFJS_PACKAGE_DIRECTORIES = ['build', 'cmaps', 'iccs', 'image_decoders', 'legacy', 'standard_fonts', 'types', 'wasm', 'web'];
+
+/**
  * Filenames of the pre-packed character map (CMap) files shipped with `pdfjs-dist`.
  * CMaps are required for correct text extraction and rendering of CJK (Chinese, Japanese, Korean)
  * and other multi-byte character encodings in PDFs.

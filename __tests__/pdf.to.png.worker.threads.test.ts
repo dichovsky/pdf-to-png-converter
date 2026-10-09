@@ -1,8 +1,34 @@
-import { execSync } from 'node:child_process';
-import { promises as fsPromises } from 'node:fs';
-import { join, resolve } from 'node:path';
-import { beforeAll, expect, test } from 'vitest';
+import { execSync, spawnSync } from 'node:child_process';
+import {
+    cpSync,
+    existsSync,
+    mkdirSync,
+    mkdtempSync,
+    promises as fsPromises,
+    readdirSync,
+    readFileSync,
+    rmSync,
+    writeFileSync,
+} from 'node:fs';
+import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+import { afterEach, beforeAll, describe, expect, test } from 'vitest';
 import { pdfToPng } from '../src/pdfToPng';
+import {
+    blankPagePng,
+    codecPdf,
+    controlPdf,
+    countNonWhite,
+    decodePng,
+    expectCodecPageMatchesControl,
+    expectFlatMidGray,
+    expectPageShowsPicture,
+    JPX_FLAT_GRAY_PDF,
+    MIXED_PAIR_NAME,
+    PAIRS,
+    STANDARD_FONT_TEXT_PDF,
+} from './wasmFixtures';
 
 /**
  * Integration tests for renderInWorkerThreads mode with REAL worker threads.
@@ -12,6 +38,11 @@ import { pdfToPng } from '../src/pdfToPng';
  * src/workerPool.ts). Build `out/` first so the worker artifact matches the current sources —
  * `tsc` directly, NOT `npm run build`, whose clean step would delete `test-results/` while
  * other vitest workers are writing into it.
+ *
+ * The same compiled `out/` also serves the issue #278 tests at the end of this file: the real CLI run from an
+ * empty working directory, and a child process whose pdfjs-dist has no wasm folder. They share this single
+ * compile on purpose. Vitest runs test files in parallel and the tests inside one file one after another, so a
+ * second file that rebuilt `out/` could overwrite `pageRenderWorker.js` while a worker thread here is loading it.
  */
 beforeAll(() => {
     try {
@@ -157,4 +188,173 @@ test('worker mode is ignored for metadata-only conversions', async () => {
         expect(page.content).toBeUndefined();
         expect(page.width).toBeGreaterThan(0);
     }
+});
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Issue #278: CCITT, JBIG2 and JPEG 2000 images need the pdf.js wasm decoders (see __tests__/wasmFixtures.ts).
+// ---------------------------------------------------------------------------------------------------------------------
+
+describe.each(PAIRS)('wasm decoder fixture $name in worker threads', (pair) => {
+    test('renders byte-identical to its Flate control rendered on the main thread', async () => {
+        const control = await pdfToPng(controlPdf(pair.name));
+        const codec = await pdfToPng(codecPdf(pair.name), { renderInWorkerThreads: true, concurrencyLimit: 4 });
+
+        expect(codec).toHaveLength(pair.pages.length);
+        for (const [index, page] of pair.pages.entries()) {
+            expect(codec[index].pageNumber).toBe(index + 1);
+            await expectCodecPageMatchesControl(codec[index].content as Buffer, control[index].content as Buffer, page, pair.name);
+        }
+    });
+});
+
+test('one worker decodes every codec page of a mixed document and reuses its decoders (pool of 1, 8 pages)', async () => {
+    const pair = PAIRS.find((candidate) => candidate.name === MIXED_PAIR_NAME);
+    expect(pair?.pages).toHaveLength(8);
+
+    const control = await pdfToPng(controlPdf(MIXED_PAIR_NAME));
+    const codec = await pdfToPng(codecPdf(MIXED_PAIR_NAME), { renderInWorkerThreads: true, concurrencyLimit: 1 });
+
+    expect(codec.map((page) => page.pageNumber)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    for (const [index, page] of (pair?.pages ?? []).entries()) {
+        await expectCodecPageMatchesControl(codec[index].content as Buffer, control[index].content as Buffer, page, MIXED_PAIR_NAME);
+    }
+});
+
+test('worker threads decode a JPEG 2000 image through openjpeg.wasm', async () => {
+    const [page] = await pdfToPng(JPX_FLAT_GRAY_PDF, { renderInWorkerThreads: true });
+
+    await expectFlatMidGray(page.content as Buffer);
+});
+
+/** A child's environment without anything that could change warning output or write coverage files. */
+function childEnvironment(): typeof process.env {
+    const environment = { ...process.env };
+    for (const name of ['NODE_OPTIONS', 'NODE_V8_COVERAGE', 'NODE_NO_WARNINGS']) {
+        delete environment[name];
+    }
+    return environment;
+}
+
+describe('compiled library from a fresh process', () => {
+    const repositoryRoot = resolve(__dirname, '..');
+    const compiledDirectory = join(repositoryRoot, 'out');
+    const temporaryDirectories: string[] = [];
+
+    function makeTemporaryDirectory(): string {
+        const directory = mkdtempSync(join(tmpdir(), 'pdf-to-png-wasm-'));
+        temporaryDirectories.push(directory);
+        return directory;
+    }
+
+    afterEach(() => {
+        // Plain directories and copies only (no junctions), so a recursive delete cannot reach node_modules.
+        for (const directory of temporaryDirectories.splice(0)) {
+            rmSync(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+        }
+    });
+
+    /** Runs the compiled CLI on one PDF with an empty temporary folder as its working directory. */
+    function runCliFromEmptyDirectory(pdfPath: string, extraArguments: string[] = []): { emptyDirectory: string; outputFolder: string } {
+        const emptyDirectory = makeTemporaryDirectory();
+        const outputFolder = join(makeTemporaryDirectory(), 'png');
+        expect(readdirSync(emptyDirectory)).toEqual([]);
+
+        const result = spawnSync(
+            process.execPath,
+            [join(compiledDirectory, 'cli.js'), pdfPath, '--output-folder', outputFolder, '--silent', ...extraArguments],
+            { cwd: emptyDirectory, env: childEnvironment(), encoding: 'utf8', timeout: 120_000 },
+        );
+
+        expect(result.status, result.stderr).toBe(0);
+        // Present decoders mean no process warning.
+        expect(result.stderr).not.toContain('PDF_TO_PNG_WASM_MISSING');
+        return { emptyDirectory, outputFolder };
+    }
+
+    // Strict proof of working-directory independence for the wasm decoders: a new process has an empty pdf.js
+    // wasm cache, and its working directory has no node_modules, so only the package-relative lookup can work.
+    test.each([
+        ['ccitt-g4', 'CCITT Group 4'],
+        ['jbig2-mmr', 'JBIG2'],
+    ])(
+        'the compiled CLI renders %s (%s) from an empty working directory',
+        async (name) => {
+            const pair = PAIRS.find((candidate) => candidate.name === name);
+            expect(pair).toBeDefined();
+
+            const { emptyDirectory, outputFolder } = runCliFromEmptyDirectory(codecPdf(name));
+
+            const files = readdirSync(outputFolder);
+            expect(files).toHaveLength(1);
+            const written = readFileSync(join(outputFolder, files[0]));
+            const [control] = await pdfToPng(controlPdf(name));
+            await expectCodecPageMatchesControl(written, control.content as Buffer, (pair?.pages ?? [])[0], name);
+            // The child must not have created anything in its working directory either.
+            expect(readdirSync(emptyDirectory)).toEqual([]);
+        },
+        180_000,
+    );
+
+    test('the compiled CLI finds the standard fonts from an empty working directory', async () => {
+        const { outputFolder } = runCliFromEmptyDirectory(STANDARD_FONT_TEXT_PDF, ['--pages-to-process', '1']);
+
+        const files = readdirSync(outputFolder);
+        expect(files).toHaveLength(1);
+        const [reference] = await pdfToPng(STANDARD_FONT_TEXT_PDF, { pagesToProcess: [1] });
+        expect(Buffer.compare(readFileSync(join(outputFolder, files[0])), reference.content as Buffer)).toBe(0);
+    }, 180_000);
+
+    test('without the wasm folder a CCITT page renders blank and exactly one process warning is emitted', async () => {
+        const root = makeTemporaryDirectory();
+        const realPdfjsRoot = dirname(createRequire(__filename).resolve('pdfjs-dist/package.json'));
+        const fakeRoot = join(root, 'pdfjs-dist-without-wasm');
+        const resultDirectory = join(root, 'result');
+        mkdirSync(fakeRoot);
+        mkdirSync(resultDirectory);
+        writeFileSync(join(fakeRoot, 'package.json'), JSON.stringify({ name: 'pdfjs-dist', version: '0.0.0-fake' }));
+        for (const folder of ['cmaps', 'standard_fonts']) {
+            cpSync(join(realPdfjsRoot, folder), join(fakeRoot, folder), { recursive: true });
+        }
+        expect(existsSync(join(fakeRoot, 'wasm'))).toBe(false);
+
+        const result = spawnSync(
+            process.execPath,
+            [
+                join(__dirname, 'wasmMissingChild.cjs'),
+                compiledDirectory,
+                fakeRoot,
+                resultDirectory,
+                codecPdf('ccitt-g4'),
+                controlPdf('ccitt-g4'),
+            ],
+            { cwd: root, env: childEnvironment(), encoding: 'utf8', timeout: 150_000 },
+        );
+
+        expect(result.status, result.stderr).toBe(0);
+        // The wrapper took effect: the compiled loader looked for wasm in the fake root, which has none.
+        const report = JSON.parse(result.stdout.trim().split('\n').at(-1) ?? '{}') as {
+            wasmDirectory: string;
+            warnings: { name: string; code: string; message: string }[];
+        };
+        expect(report.wasmDirectory.replaceAll('\\', '/')).toBe(join(fakeRoot, 'wasm').replaceAll('\\', '/'));
+
+        // Missing decoders leave the page blank and silent below verbosity 1, but the library warns once per process.
+        expect(result.stderr.match(/\[PDF_TO_PNG_WASM_MISSING\]/g)).toHaveLength(1);
+        expect(report.warnings).toHaveLength(1);
+        expect(report.warnings[0].code).toBe('PDF_TO_PNG_WASM_MISSING');
+        expect(report.warnings[0].message).toContain('jbig2.wasm, openjpeg.wasm');
+
+        const pair = PAIRS.find((candidate) => candidate.name === 'ccitt-g4');
+        const page = (pair?.pages ?? [])[0];
+        const codecPng = readFileSync(join(resultDirectory, 'codec.png'));
+        const codecAgainPng = readFileSync(join(resultDirectory, 'codec-again.png'));
+        const controlPng = readFileSync(join(resultDirectory, 'control.png'));
+        // The Flate control never needs wasm, so the same process still draws the picture.
+        await expectPageShowsPicture(controlPng, page, 'ccitt-g4');
+        for (const png of [codecPng, codecAgainPng]) {
+            expect(countNonWhite(await decodePng(png))).toBe(0);
+            expect(Buffer.compare(png, await blankPagePng(page.pixelWidth, page.pixelHeight))).toBe(0);
+            expect(Buffer.compare(png, controlPng)).not.toBe(0);
+        }
+    }, 180_000);
 });
