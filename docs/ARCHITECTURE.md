@@ -22,8 +22,8 @@ Every library conversion enters `pdfToPng()` in `src/pdfToPng.ts`:
 
 1. `normalizeOptions()` validates and defaults the public options once. It copies `pagesToProcess`, so later caller mutation cannot change an in-flight conversion.
 2. `getPdfFileBuffer()` in `src/pdfInput.ts` normalizes the input to an owned `Uint8Array` within `maxInputBytes`.
-3. Worker mode retains one copy of those bytes because the main pdf.js loading task may detach its input. `getPdfDocument()` in `src/pdfjsLoader.ts` then creates the main `PDFDocumentProxy`.
-4. `pdfToPng()` filters page numbers above `numPages`, resolves the output folder before user filename callbacks run, resolves all observable page names, and preflights disk names and case-insensitive duplicates before creating a directory.
+3. Worker mode retains one copy of those bytes because the main pdf.js loading task may detach its input. `getPdfDocument()` in `src/pdfjsLoader.ts` then creates the main `PDFDocumentProxy`. It resolves the installed `pdfjs-dist` package root once and passes pdf.js `cMapUrl`, `standardFontDataUrl`, and `wasmUrl` built from that location (see [pdf.js assets](#pdfjs-assets)).
+4. `pdfToPng()` filters page numbers above `numPages`, resolves the output folder before user filename callbacks run, resolves all observable page names, and preflights disk names and case-insensitive duplicates before creating a directory. Metadata-only requests return from this point. Every other request then calls `warnIfWasmDecodersMissing()`, which checks the wasm decoder files once per process on the main thread, before `prepareOutputFolder()` creates the directory.
 5. The selected execution path produces `PageRenderResult` values:
     - metadata-only: `getPageMetadata()` with no canvas or file output
     - main thread: `renderPdfPage()` through the ordered bounded scheduler
@@ -67,10 +67,10 @@ Custom names must be non-empty and contain no host path separator in every mode.
 | ------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | `src/index.ts`            | Four-item public library export surface                                                                      |
 | `src/types.ts`            | Public options, output union, page rotation, and verbosity enum                                              |
-| `src/const.ts`            | Defaults, input/concurrency/canvas limits, pipeline window, pdf.js asset paths                               |
+| `src/const.ts`            | Defaults, input/concurrency/canvas limits, pipeline window, pdf.js asset-directory and wasm-decoder names    |
 | `src/pdfToPng.ts`         | Option normalization, page/name planning, ordered scheduling, mode selection, output finalization, lifecycle |
 | `src/pdfInput.ts`         | Input-shape normalization, ownership, regular-file checks, bounded reads                                     |
-| `src/pdfjsLoader.ts`      | Cached dynamic pdf.js import, init-parameter construction, document-load cleanup                             |
+| `src/pdfjsLoader.ts`      | Cached dynamic pdf.js import, package asset-folder location, init parameters, wasm warning, load cleanup     |
 | `src/pageRenderer.ts`     | Metadata extraction, viewport guards, rotation normalization, canvas render/encode/cleanup                   |
 | `src/outputWriter.ts`     | Flat disk-name validation, folder preparation, realpath checks, exclusive-create writes                      |
 | `src/workerPool.ts`       | Worker protocol types, dynamic task dispatch, ordered error policy, finalization and teardown                |
@@ -96,6 +96,13 @@ Custom names must be non-empty and contain no host path separator in every mode.
 
 The realpath comparison does not atomically bind the write to a directory inode. A hostile user who can replace directory components during the final check/open interval can still race it, so callers must use an output directory that is not writable by untrusted users.
 
+### pdf.js assets
+
+- `pdfjsAssetDirectory()` locates the installed `pdfjs-dist` package once (`createRequire(__filename).resolve('pdfjs-dist/package.json')`, memoised) and joins the directory names from `PDFJS_ASSET_DIRECTORIES` (`cmaps`, `standard_fonts`, `wasm`). The working directory is never consulted and there is no fallback: a `node_modules` folder under `process.cwd()` is not necessarily the copy pdf.js was imported from. If resolution fails, conversion throws an error that names `pdfjs-dist` and the path searched from, with the original error as `cause`.
+- `getPdfDocument()` passes `cMapUrl`, `standardFontDataUrl`, and `wasmUrl` as absolute directory URLs with forward slashes and a trailing `/`. Worker threads load the same module, so main-thread and worker documents use the same asset folders.
+- The `wasm` folder holds the CCITT/JBIG2 (`jbig2.wasm`) and JPEG 2000 (`openjpeg.wasm`) decoders. Without `wasmUrl`, pdf.js swallows the decode failure and renders those images blank, logging only at verbosity `WARNINGS` or higher (issue #278). `warnIfWasmDecodersMissing()` checks that both files in `PDFJS_WASM_DECODER_FILES` exist and emits process warning `PDF_TO_PNG_WASM_MISSING` once per process, from the main thread only. It cannot detect decode errors.
+- Decoding scanned images costs memory: about 8 bytes per declared image pixel on each thread that renders a page (the main thread, or each worker), and up to 2 GiB of wasm heap per JPEG 2000 decode. Neither `maxInputBytes` nor `MAX_CANVAS_PIXELS` bounds a declared image size, so untrusted-PDF deployments need container memory limits, per-job time limits, and a low `concurrencyLimit`.
+
 ### Resource lifecycle
 
 - `getPageMetadata()` always calls `page.cleanup()`.
@@ -120,6 +127,6 @@ The realpath comparison does not atomically bind the write to a directory inode.
 - Package format: CommonJS, compiled from `.ts` to `out/` with `.js` relative import specifiers.
 - `npm test` runs Vitest with coverage only and enforces 98% thresholds for statements, lines, functions, and branches across all production modules.
 - `npm run build:strict` checks the upstream `pdfjs-dist` / `@napi-rs/canvas` declaration boundary with `skipLibCheck: false`.
-- `__tests__/pdfjs.assets.test.ts` exact-checks the installed pdf.js CMap and standard-font layout; golden-image and real-worker tests cover rendered output and main/worker parity.
+- `__tests__/pdfjs.assets.test.ts` exact-checks the installed pdf.js `cmaps`, `standard_fonts`, and `wasm` layouts and the set of top-level `pdfjs-dist` directories, so an upgrade must review every asset folder in the package; CCITT and JBIG2 regression PDFs in `test-data/wasm/` (produced by `scripts/generate-wasm-fixtures.ts`) cover the wasm decoders; golden-image and real-worker tests cover rendered output and main/worker parity.
 - `npm run check` is the explicit CI/prepublish gate: clean, normal and strict type-checks, formatting, lint, production-license validation, and tests.
 - `npm run build` performs the publishable production compile after cleaning `out/` and `test-results/`.

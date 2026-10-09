@@ -39,10 +39,10 @@ The source tree contains 11 TypeScript modules:
 | ------------------------- | ----------------------------------------------------------------------------------------- |
 | `src/index.ts`            | Public re-exports only                                                                    |
 | `src/types.ts`            | Public options, output union, rotation, and verbosity                                     |
-| `src/const.ts`            | Defaults, input/concurrency/canvas limits, pipeline window, pdf.js asset paths            |
+| `src/const.ts`            | Defaults, input/concurrency/canvas limits, pipeline window, pdf.js asset-directory names  |
 | `src/pdfToPng.ts`         | Validation, planning, scheduling, mode selection, output finalization, document lifecycle |
 | `src/pdfInput.ts`         | Input normalization, ownership, one-handle bounded file reads                             |
-| `src/pdfjsLoader.ts`      | Cached dynamic pdf.js import, init parameters, load cleanup                               |
+| `src/pdfjsLoader.ts`      | Cached pdf.js import, init parameters, package asset folders, wasm warning, load cleanup  |
 | `src/pageRenderer.ts`     | Metadata, pixel/rotation guards, canvas render/encode/cleanup                             |
 | `src/outputWriter.ts`     | Disk filename validation, folder preparation, realpath defense, exclusive-create writes   |
 | `src/workerPool.ts`       | Worker protocol, dynamic scheduling, main-thread finalization, error/teardown policy      |
@@ -55,8 +55,8 @@ Keep this consolidated ownership. Add another seam only when a new independent i
 
 1. `pdfToPng()` calls its private `normalizeOptions()` once and snapshots `pagesToProcess`.
 2. `getPdfFileBuffer()` returns owned, unshared `Uint8Array` bytes under `maxInputBytes`.
-3. Worker mode retains one byte copy; `getPdfDocument()` loads the main document and maps the already validated pdf.js fields.
-4. Page selection, output-folder resolution, page naming, disk-name validation, and case-insensitive duplicate checks happen before output-folder creation.
+3. Worker mode retains one byte copy; `getPdfDocument()` loads the main document, maps the already validated pdf.js fields, and passes `cMapUrl`, `standardFontDataUrl`, and `wasmUrl` built from the installed `pdfjs-dist` package location (never the working directory).
+4. Page selection, output-folder resolution, page naming, disk-name validation, and case-insensitive duplicate checks happen before output-folder creation. After the metadata-only return and before the folder is prepared, `warnIfWasmDecodersMissing()` runs once per process on the main thread.
 5. Metadata calls `getPageMetadata()`. Main-thread rendering calls `renderPdfPage()` through `mapLimitOrdered()`. Worker rendering calls `renderPagesInWorkerPool()` and uses the same loader/renderer in each worker.
 6. `finalizePage()` attaches the public identity fields. Disk output goes through `savePNGfile()` on the main thread in every rendering mode.
 7. The main loading task is destroyed in `finally`; pages, canvases, failed loads, worker finalizers, and workers have paired cleanup paths.
@@ -129,7 +129,7 @@ Vitest has a 180-second timeout. V8 coverage thresholds are 98% for statements, 
 
 Fixtures live in `test-data/`; generated output and coverage live in `test-results/`. Prefer focused tests while iterating, then run `npm run check`.
 
-`__tests__/pdfjs.assets.test.ts` exact-checks the installed `cmaps` and `standard_fonts` layout against `__tests__/test-data-constants.ts`. For `pdfjs-dist` upgrades, review asset-list changes explicitly, do not auto-refresh golden PNGs, and run the real-worker parity suite.
+`__tests__/pdfjs.assets.test.ts` exact-checks the installed `cmaps`, `standard_fonts`, and `wasm` layouts and the set of top-level `pdfjs-dist` directories against `__tests__/test-data-constants.ts`. For `pdfjs-dist` upgrades, review asset-list changes explicitly, review every top-level asset folder in the package and not only the known ones (`cmaps`, `standard_fonts`, `wasm`) because a missed folder caused issue #278, do not auto-refresh golden PNGs, and run the real-worker parity suite. CCITT and JBIG2 regression PDFs live in `test-data/wasm/` and are produced by `scripts/generate-wasm-fixtures.ts`.
 
 High-value regression areas:
 
