@@ -2,7 +2,7 @@ import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
-import { checkFixtureDirectory, FIXTURE_DIRECTORY } from '../scripts/generate-wasm-fixtures';
+import { checkFixtureDirectory, FIXTURE_DIRECTORY, runSelfTest } from '../scripts/generate-wasm-fixtures';
 import { pdfToPng } from '../src';
 import {
     blankPagePng,
@@ -33,6 +33,14 @@ describe('harness guards', () => {
     test('the committed fixtures are exactly what scripts/generate-wasm-fixtures.ts produces', () => {
         expect(FIXTURE_DIRECTORY).toBe(WASM_FIXTURE_DIR);
         expect(checkFixtureDirectory(FIXTURE_DIRECTORY)).toEqual([]);
+    });
+
+    // The generator's `--self-test` (randomized encoder/decoder round trips, code-table and mode coverage, determinism)
+    // throws on any failure. Running it here keeps the hand-written encoders honest in CI, not only for the committed files.
+    test('the generator self-test passes', () => {
+        const report = runSelfTest();
+
+        expect(report.length).toBeGreaterThan(0);
     });
 
     test('an empty page renders all white, so a missed decode cannot look like a picture', async () => {

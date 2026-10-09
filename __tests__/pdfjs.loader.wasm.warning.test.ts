@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, test, vi, type MockInstance } from 'vite
 
 /**
  * pdf.js swallows a failed wasm load and paints CCITT, JBIG2 and JPEG 2000 images blank, so a damaged install is
- * silent below verbosity 1 (issue #278). The loader checks once per process that the decoder files exist and
+ * silent below verbosity 1 (issue #278). The loader checks once per module instance (once per thread; the library calls it on the main thread only) that the decoder files exist and
  * otherwise emits PDF_TO_PNG_WASM_MISSING. Everything here uses a fake pdfjs-dist root and a mocked
  * process.emitWarning. No wasm-coded PDF is rendered in this process: pdf.js caches wasm bytes process-wide.
  */
@@ -52,7 +52,7 @@ function loadLoader(): Promise<typeof import('../src/pdfjsLoader.js')> {
     return import('../src/pdfjsLoader.js');
 }
 
-test('warns exactly once per process when no wasm decoder exists, with a code and the missing file names', async () => {
+test('warns exactly once per module instance when no wasm decoder exists, with a code and the missing file names', async () => {
     const root = fakePdfjsRoot(undefined);
     resolveLoaderFrom(root);
     const { warnIfWasmDecodersMissing } = await loadLoader();

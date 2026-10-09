@@ -56,7 +56,7 @@ Keep this consolidated ownership. Add another seam only when a new independent i
 1. `pdfToPng()` calls its private `normalizeOptions()` once and snapshots `pagesToProcess`.
 2. `getPdfFileBuffer()` returns owned, unshared `Uint8Array` bytes under `maxInputBytes`.
 3. Worker mode retains one byte copy; `getPdfDocument()` loads the main document, maps the already validated pdf.js fields, and passes `cMapUrl`, `standardFontDataUrl`, and `wasmUrl` built from the installed `pdfjs-dist` package location (never the working directory).
-4. Page selection, output-folder resolution, page naming, disk-name validation, and case-insensitive duplicate checks happen before output-folder creation. After the metadata-only return and before the folder is prepared, `warnIfWasmDecodersMissing()` runs once per process on the main thread.
+4. Page selection, output-folder resolution, page naming, disk-name validation, and case-insensitive duplicate checks happen before output-folder creation. After the metadata-only return and before the folder is prepared, `warnIfWasmDecodersMissing()` runs at most once per thread (the library runs the check on the main thread only, so normally once per process).
 5. Metadata calls `getPageMetadata()`. Main-thread rendering calls `renderPdfPage()` through `mapLimitOrdered()`. Worker rendering calls `renderPagesInWorkerPool()` and uses the same loader/renderer in each worker.
 6. `finalizePage()` attaches the public identity fields. Disk output goes through `savePNGfile()` on the main thread in every rendering mode.
 7. The main loading task is destroyed in `finally`; pages, canvases, failed loads, worker finalizers, and workers have paired cleanup paths.

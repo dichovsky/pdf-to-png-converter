@@ -21,14 +21,16 @@ test.each(ASSET_DIRECTORIES)('pdfjs-dist ships the expected $label assets', ({ d
 });
 
 // Exact on purpose, not a subset check. pdf.js reads each asset folder through a location the loader must hand it
-// (cMapUrl, standardFontDataUrl, wasmUrl; pdf.js also has iccUrl for `iccs`, which the loader does not pass today).
+// (cMapUrl, standardFontDataUrl, wasmUrl; pdf.js also has iccUrl for `iccs`, which the loader does not pass: in Node
+// pdf.js turns ICC wasm off, so `iccs` is not used there).
 // A folder nobody reviewed is a folder nobody wired: the missing `wasmUrl` left CCITT and JBIG2 images blank without
 // any error (issue #278). When pdfjs-dist adds, renames or removes a top-level folder, review what it is for, decide
 // whether the loader needs a new parameter, then update PDFJS_PACKAGE_DIRECTORIES. CONTRIBUTING.md describes this
 // review-gated principle: added files and folders are deliberately not accepted as a subset.
 test('pdfjs-dist ships exactly the reviewed set of top-level folders', () => {
     const actualDirectories = readdirSync(PDFJS_PACKAGE_ROOT, { withFileTypes: true })
-        .filter((entry) => entry.isDirectory())
+        // A nested `node_modules` (for example a version-conflicting dependency of pdfjs-dist) is not an asset folder.
+        .filter((entry) => entry.isDirectory() && entry.name !== 'node_modules')
         .map((entry) => entry.name)
         .sort();
     expect(actualDirectories).toEqual([...PDFJS_PACKAGE_DIRECTORIES].sort());

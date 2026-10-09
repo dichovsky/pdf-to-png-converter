@@ -52,8 +52,9 @@ export const STANDARD_WASM = [
  * - `cmaps`, `standard_fonts`, `wasm`: asset folders the loader passes to pdf.js.
  * - `build`, `legacy`, `web`, `types`: JavaScript bundles, viewer and type declarations; not read through a URL parameter.
  * - `image_decoders`: a separately importable image-decoder bundle; not read through a URL parameter.
- * - `iccs`: the CMYK ICC profile pdf.js reads through its `iccUrl` parameter. The loader does not pass `iccUrl` today,
- *   so pdf.js warns (verbosity 1 and above) and converts CMYK without the profile. Recorded here, not decided.
+ * - `iccs`: the CMYK ICC profile pdf.js reads through its `iccUrl` parameter. The loader does not pass `iccUrl`. In Node
+ *   pdf.js sets `useWorkerFetch` to false, which turns ICC wasm off (`IccColorSpace.setOptions`), so the ICC code,
+ *   including the `iccUrl` check, never runs and ICC-tagged colours use the device colour space. Recorded here, not wired.
  */
 export const PDFJS_PACKAGE_DIRECTORIES = ['build', 'cmaps', 'iccs', 'image_decoders', 'legacy', 'standard_fonts', 'types', 'wasm', 'web'];
 

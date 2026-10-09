@@ -5,6 +5,7 @@ import type { PDFDocumentLoadingTask, PDFDocumentProxy } from 'pdfjs-dist';
 import type * as PdfjsModule from 'pdfjs-dist/legacy/build/pdf.mjs';
 import type { DocumentInitParameters } from 'pdfjs-dist/types/src/display/api';
 import { PDFJS_ASSET_DIRECTORIES, PDFJS_WASM_DECODER_FILES } from './const.js';
+import type { PdfjsAssetDirectory } from './const.js';
 import type { VerbosityLevel } from './types.js';
 
 /** The validated document-loading options consumed by pdf.js. */
@@ -43,13 +44,15 @@ function locatePdfjsPackageRoot(): string {
  * The package root is located once, so asset lookup does not depend on the process working directory
  * or on `node_modules` sitting in `process.cwd()`.
  */
-export function pdfjsAssetDirectory(directory: string): string {
+export function pdfjsAssetDirectory(directory: PdfjsAssetDirectory): string {
     pdfjsPackageRoot ??= locatePdfjsPackageRoot();
     return join(pdfjsPackageRoot, directory);
 }
 
 /**
- * Emits one process warning (per process, main thread only) when the pdf.js wasm decoders are absent.
+ * Emits one process warning when the pdf.js wasm decoders are absent. The "already checked" state is module-level,
+ * so a thread warns at most once; the library calls this on the main thread only, which makes it once per process
+ * unless the caller runs `pdfToPng()` in its own worker threads (each has its own module instance and warns once).
  * pdf.js swallows the resulting decode failure and renders the image blank, so without this a damaged
  * install is silent below verbosity 1. It checks that the files exist; it cannot detect decode errors.
  */

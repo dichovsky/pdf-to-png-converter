@@ -69,6 +69,9 @@ export const PDFJS_ASSET_DIRECTORIES = {
     wasm: 'wasm',
 } as const;
 
+/** One of the asset directory names above; the only values `pdfjsAssetDirectory()` accepts. */
+export type PdfjsAssetDirectory = (typeof PDFJS_ASSET_DIRECTORIES)[keyof typeof PDFJS_ASSET_DIRECTORIES];
+
 /** Decoder binaries inside the pdfjs-dist wasm directory that image rendering depends on (CCITT/JBIG2 and JPEG 2000). */
 export const PDFJS_WASM_DECODER_FILES = ['jbig2.wasm', 'openjpeg.wasm'] as const;
 

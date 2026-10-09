@@ -295,6 +295,29 @@ describe('compiled library from a fresh process', () => {
         180_000,
     );
 
+    // Fresh process + worker threads + empty working directory together: every worker resolves the package root itself,
+    // and the 8 mixed G4/G3/JBIG2 pages must match the Flate control page for page.
+    test('the compiled CLI renders the mixed CCITT/JBIG2 pages in worker threads from an empty working directory', async () => {
+        const pair = PAIRS.find((candidate) => candidate.name === 'mixed-pages');
+        expect(pair).toBeDefined();
+        const pages = pair?.pages ?? [];
+        expect(pages.length).toBeGreaterThanOrEqual(6);
+
+        const { emptyDirectory, outputFolder } = runCliFromEmptyDirectory(codecPdf('mixed-pages'), [
+            '--render-in-worker-threads',
+            '--concurrency-limit',
+            '3',
+        ]);
+
+        const control = await pdfToPng(controlPdf('mixed-pages'));
+        expect(readdirSync(outputFolder)).toHaveLength(pages.length);
+        for (const [index, page] of pages.entries()) {
+            const written = readFileSync(join(outputFolder, `mixed-pages_page_${index + 1}.png`));
+            await expectCodecPageMatchesControl(written, control[index].content as Buffer, page, `mixed-pages page ${index + 1}`);
+        }
+        expect(readdirSync(emptyDirectory)).toEqual([]);
+    }, 180_000);
+
     test('the compiled CLI finds the standard fonts from an empty working directory', async () => {
         const { outputFolder } = runCliFromEmptyDirectory(STANDARD_FONT_TEXT_PDF, ['--pages-to-process', '1']);
 
@@ -338,11 +361,12 @@ describe('compiled library from a fresh process', () => {
         };
         expect(report.wasmDirectory.replaceAll('\\', '/')).toBe(join(fakeRoot, 'wasm').replaceAll('\\', '/'));
 
-        // Missing decoders leave the page blank and silent below verbosity 1, but the library warns once per process.
+        // Missing decoders leave the page blank and silent below verbosity 1, but the library warns once on the main thread.
+        // Count only this library's warning: an unrelated Node or dependency warning in the child must not fail the test.
         expect(result.stderr.match(/\[PDF_TO_PNG_WASM_MISSING\]/g)).toHaveLength(1);
-        expect(report.warnings).toHaveLength(1);
-        expect(report.warnings[0].code).toBe('PDF_TO_PNG_WASM_MISSING');
-        expect(report.warnings[0].message).toContain('jbig2.wasm, openjpeg.wasm');
+        const wasmWarnings = report.warnings.filter((warning) => warning.code === 'PDF_TO_PNG_WASM_MISSING');
+        expect(wasmWarnings).toHaveLength(1);
+        expect(wasmWarnings[0].message).toContain('jbig2.wasm, openjpeg.wasm');
 
         const pair = PAIRS.find((candidate) => candidate.name === 'ccitt-g4');
         const page = (pair?.pages ?? [])[0];
