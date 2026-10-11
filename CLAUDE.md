@@ -26,7 +26,7 @@ The current source tree has 11 modules:
 
 - `src/pdfToPng.ts` — the sole conversion entrypoint and orchestration boundary: option validation/defaulting, page and name planning, bounded scheduling, execution-mode selection, output finalization, and document teardown.
 - `src/pdfInput.ts` — supported input shapes, owned `Uint8Array` normalization, bounded one-handle file reads, and input-size enforcement.
-- `src/pdfjsLoader.ts` — cached dynamic pdf.js import, init parameters, installed-package asset-folder location (`cmaps`, `standard_fonts`, `wasm`), the once-per-process wasm-decoder warning, and failed-load cleanup.
+- `src/pdfjsLoader.ts` — cached dynamic pdf.js import, init parameters, installed-package asset-folder location (`cmaps`, `standard_fonts`, `wasm`), the once-per-thread wasm-decoder warning, and failed-load cleanup.
 - `src/pageRenderer.ts` — page metadata, pixel/rotation guards, canvas rendering, PNG encoding, and page/canvas cleanup.
 - `src/outputWriter.ts` — disk filename validation, output-folder preparation, realpath checks, and exclusive-create writes.
 - `src/workerPool.ts` — worker protocol types, dynamic dispatch, error policy, main-thread finalizers, and worker teardown.

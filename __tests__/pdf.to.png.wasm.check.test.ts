@@ -12,7 +12,7 @@ vi.mock('../src/pdfjsLoader.js', async (importOriginal) => {
 });
 
 /**
- * pdfToPng() runs the once-per-process wasm decoder check on the main thread after the metadata-only early return
+ * pdfToPng() runs the once-per-thread wasm decoder check on the main thread after the metadata-only early return
  * and before any output folder is prepared (issue #278). The check itself is tested in pdfjs.loader.wasm.warning.test.ts.
  */
 

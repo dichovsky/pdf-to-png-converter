@@ -31,9 +31,10 @@ function locatePdfjsPackageRoot(): string {
         return dirname(createRequire(__filename).resolve('pdfjs-dist/package.json'));
     } catch (error) {
         throw new Error(
-            `Cannot locate the installed "pdfjs-dist" package from "${__filename}". ` +
-                'pdf-to-png-converter reads the pdf.js cmaps, standard_fonts and wasm folders from that package, ' +
-                'so install pdfjs-dist where this library can resolve it.',
+            `Cannot resolve "pdfjs-dist/package.json" from "${__filename}". ` +
+                'pdf-to-png-converter reads the pdf.js cmaps, standard_fonts and wasm folders from the installed pdfjs-dist package, ' +
+                'so that package must be resolvable from this file. Check for a bundler that inlines pdfjs-dist, ' +
+                'a pdfjs-dist "exports" map without "./package.json", or an incomplete install.',
             { cause: error },
         );
     }
