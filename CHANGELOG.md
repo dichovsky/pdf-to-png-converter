@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added an exact package-layout regression for the CMaps and standard fonts consumed from `pdfjs-dist`, so future dependency updates must explicitly review asset additions, removals, and renames.
 - Refreshed the development-only `@types/node` range from `^26.3.0` to `^26.4.0` and `lint-staged` from `^17.3.0` to `^17.4.1`.
 
+### Security
+
+- Refreshed `package-lock.json` (lockfile only; `package.json` ranges are unchanged) so `npm audit --audit-level=high` and `npm audit --omit=dev --audit-level=high` pass again, restoring the `Audit dependencies` CI step. The advisories were all in transitive, development-only dependencies of the build and test toolchain, so neither the published package nor its runtime dependencies (`pdfjs-dist`, `@napi-rs/canvas`) were affected. Within their existing ranges, `brace-expansion` moved from 5.0.9 to 5.0.12, `http-cache-semantics` from 4.2.0 to 4.3.0, `ip-address` from 10.5.0 to 10.7.4, `postcss-selector-parser` from 7.1.5 to 7.1.6, `source-map-js` from 1.2.1 to 1.2.2, and `undici` from 6.28.0 to 6.29.1.
+
 ## [4.2.1] — 2026-08-25
 
 ### Changed
