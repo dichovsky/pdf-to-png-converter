@@ -2,6 +2,7 @@ import type { PDFDocumentLoadingTask } from 'pdfjs-dist';
 import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { VerbosityLevel } from '../src/types.js';
+import { interceptPdfjsPackageLookup } from './pdfjsPackageLookup';
 
 /**
  * The loader finds the installed pdfjs-dist package once, from its own location, and has no working-directory
@@ -9,8 +10,8 @@ import { VerbosityLevel } from '../src/types.js';
  * from, and pdf.js can import JavaScript from the asset URL it is given. These tests make that lookup fail.
  */
 
-const resolvePackage = vi.fn<(request: string) => string>();
-const createRequire = vi.fn<(from: string) => { resolve: typeof resolvePackage }>(() => ({ resolve: resolvePackage }));
+/** Receives the filename of the module that asked, and returns or throws for the package lookup. */
+const resolvePackage = vi.fn<(searchedFrom: string) => string>();
 const getDocument = vi.fn<() => PDFDocumentLoadingTask>();
 
 const documentOptions = {
@@ -24,17 +25,12 @@ const documentOptions = {
 beforeEach(() => {
     vi.resetModules();
     resolvePackage.mockReset();
-    createRequire.mockClear();
     getDocument.mockReset();
-    vi.doMock('node:module', async (importOriginal) => {
-        const actual = await importOriginal<typeof import('node:module')>();
-        return { ...actual, default: actual, createRequire };
-    });
+    interceptPdfjsPackageLookup(resolvePackage);
     vi.doMock('pdfjs-dist/legacy/build/pdf.mjs', () => ({ getDocument }));
 });
 
 afterEach(() => {
-    vi.doUnmock('node:module');
     vi.doUnmock('pdfjs-dist/legacy/build/pdf.mjs');
     vi.resetModules();
     vi.restoreAllMocks();
@@ -64,11 +60,10 @@ test('pdfjsAssetDirectory names pdfjs-dist, the path it searched from, and keeps
 
     expect(error).toBeInstanceOf(Error);
     expect(error.message).toContain('pdfjs-dist');
-    const searchedFrom = createRequire.mock.calls[0][0];
+    const searchedFrom = resolvePackage.mock.calls[0][0];
     expect(searchedFrom.replaceAll('\\', '/')).toMatch(/\/src\/pdfjsLoader\.ts$/);
     expect(error.message).toContain(searchedFrom);
     expect(error.cause).toBe(original);
-    expect(resolvePackage).toHaveBeenCalledWith('pdfjs-dist/package.json');
 });
 
 test('getPdfDocument rejects with the same descriptive error and never calls pdf.js', async () => {
@@ -81,7 +76,7 @@ test('getPdfDocument rejects with the same descriptive error and never calls pdf
     const rejection = getPdfDocument(new Uint8Array([1]), documentOptions);
 
     await expect(rejection).rejects.toMatchObject({ message: expect.stringContaining('pdfjs-dist'), cause: original });
-    await expect(rejection).rejects.toMatchObject({ message: expect.stringContaining(createRequire.mock.calls[0][0]) });
+    await expect(rejection).rejects.toMatchObject({ message: expect.stringContaining(resolvePackage.mock.calls[0][0]) });
     expect(getDocument).not.toHaveBeenCalled();
 });
 
@@ -95,7 +90,7 @@ test('a failed lookup is not remembered: the next call searches again and succee
     resolvePackage.mockReturnValue(join('/fake', 'pdfjs-dist', 'package.json'));
 
     expect(pdfjsAssetDirectory('wasm')).toBe(join('/fake', 'pdfjs-dist', 'wasm'));
-    expect(createRequire).toHaveBeenCalledTimes(2);
+    expect(resolvePackage).toHaveBeenCalledTimes(2);
 });
 
 test('a found package root is remembered, so asset lookup resolves it once and stays independent of the working directory', async () => {
@@ -108,7 +103,6 @@ test('a found package root is remembered, so asset lookup resolves it once and s
     expect(pdfjsAssetDirectory('standard_fonts')).toBe(join(dirname(packageJson), 'standard_fonts'));
     expect(pdfjsAssetDirectory('wasm')).toBe(join(dirname(packageJson), 'wasm'));
 
-    expect(createRequire).toHaveBeenCalledTimes(1);
     expect(resolvePackage).toHaveBeenCalledTimes(1);
     expect(cwdSpy).not.toHaveBeenCalled();
 });

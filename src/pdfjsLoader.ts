@@ -1,5 +1,4 @@
 import { existsSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import { dirname, join, resolve, sep } from 'node:path';
 import type { PDFDocumentLoadingTask, PDFDocumentProxy } from 'pdfjs-dist';
 import type * as PdfjsModule from 'pdfjs-dist/legacy/build/pdf.mjs';
@@ -25,13 +24,17 @@ let wasmDecodersChecked = false;
  * Locates the installed pdfjs-dist package from this module's own location. There is deliberately no
  * working-directory fallback: a `node_modules` folder in `process.cwd()` is not necessarily the copy that
  * pdf.js was imported from, and pdf.js can import JavaScript from the asset URL it is given.
+ *
+ * Use the module's own `require.resolve`, not `createRequire(__filename)`: ESM bundlers shim `require` but leave
+ * `__filename` undefined, so the error message reads it only behind a `typeof` guard.
  */
 function locatePdfjsPackageRoot(): string {
     try {
-        return dirname(createRequire(__filename).resolve('pdfjs-dist/package.json'));
+        return dirname(require.resolve('pdfjs-dist/package.json'));
     } catch (error) {
+        const searchedFrom = typeof __filename === 'string' ? __filename : 'pdf-to-png-converter';
         throw new Error(
-            `Cannot resolve "pdfjs-dist/package.json" from "${__filename}". ` +
+            `Cannot resolve "pdfjs-dist/package.json" from "${searchedFrom}". ` +
                 'pdf-to-png-converter reads the pdf.js cmaps, standard_fonts and wasm folders from the installed pdfjs-dist package, ' +
                 'so that package must be resolvable from this file. Check for a bundler that inlines pdfjs-dist, ' +
                 'a pdfjs-dist "exports" map without "./package.json", or an incomplete install.',

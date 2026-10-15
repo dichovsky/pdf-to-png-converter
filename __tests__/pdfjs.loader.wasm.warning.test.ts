@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, expect, test, vi, type MockInstance } from 'vitest';
+import { interceptPdfjsPackageLookup } from './pdfjsPackageLookup';
 
 /**
  * pdf.js swallows a failed wasm load and paints CCITT, JBIG2 and JPEG 2000 images blank, so a damaged install is
@@ -19,7 +20,6 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-    vi.doUnmock('node:module');
     vi.resetModules();
     vi.restoreAllMocks();
     for (const root of temporaryRoots.splice(0)) {
@@ -42,10 +42,7 @@ function fakePdfjsRoot(wasmFiles: readonly string[] | undefined): string {
 }
 
 function resolveLoaderFrom(root: string): void {
-    vi.doMock('node:module', async (importOriginal) => {
-        const actual = await importOriginal<typeof import('node:module')>();
-        return { ...actual, default: actual, createRequire: () => ({ resolve: () => join(root, 'package.json') }) };
-    });
+    interceptPdfjsPackageLookup(() => join(root, 'package.json'));
 }
 
 function loadLoader(): Promise<typeof import('../src/pdfjsLoader.js')> {
@@ -100,17 +97,12 @@ test('does not warn with the installed pdfjs-dist', async () => {
 
 test('a package lookup failure propagates and is retried, so a later call can still warn', async () => {
     const root = fakePdfjsRoot(undefined);
-    const createRequire = vi.fn();
-    createRequire.mockImplementationOnce(() => ({
-        resolve: () => {
-            throw new Error('lookup failed');
-        },
-    }));
-    createRequire.mockImplementation(() => ({ resolve: () => join(root, 'package.json') }));
-    vi.doMock('node:module', async (importOriginal) => {
-        const actual = await importOriginal<typeof import('node:module')>();
-        return { ...actual, default: actual, createRequire };
+    const lookup = vi.fn<(searchedFrom: string) => string>();
+    lookup.mockImplementationOnce(() => {
+        throw new Error('lookup failed');
     });
+    lookup.mockImplementation(() => join(root, 'package.json'));
+    interceptPdfjsPackageLookup(lookup);
     const { warnIfWasmDecodersMissing } = await loadLoader();
 
     expect(() => warnIfWasmDecodersMissing()).toThrow(/pdfjs-dist/);

@@ -21,6 +21,8 @@ export default [
                 Buffer: 'readonly',
                 __dirname: 'readonly',
                 __filename: 'readonly',
+                // For `require.resolve` only; `require()` imports are still rejected by the typescript-eslint rules.
+                require: 'readonly',
                 process: 'readonly',
                 global: 'readonly',
                 console: 'readonly',

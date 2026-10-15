@@ -13,6 +13,7 @@ import {
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
+import { runInThisContext } from 'node:vm';
 import { afterEach, beforeAll, describe, expect, test } from 'vitest';
 import { pdfToPng } from '../src/pdfToPng';
 import {
@@ -381,4 +382,48 @@ describe('compiled library from a fresh process', () => {
             expect(Buffer.compare(png, controlPng)).not.toBe(0);
         }
     }, 180_000);
+});
+
+// An ESM bundle that inlines this library shims `require` (as `createRequire(import.meta.url)`) but leaves
+// `__filename` and `__dirname` undefined. The compiled loader is evaluated the same way here, so any unguarded
+// `__filename` read throws a ReferenceError.
+describe('compiled loader without __filename, as in an ESM bundle', () => {
+    const loaderPath = resolve(__dirname, '..', 'out', 'pdfjsLoader.js');
+    type LoaderRequire = ReturnType<typeof createRequire>;
+
+    function loadWithoutFilename(loaderRequire: LoaderRequire): typeof import('../src/pdfjsLoader.js') {
+        expect(runInThisContext('typeof __filename')).toBe('undefined');
+        const loaderModule = { exports: {} };
+        const wrapper = runInThisContext(`(function (exports, require, module) {\n${readFileSync(loaderPath, 'utf8')}\n})`, {
+            filename: loaderPath,
+        }) as (exports: object, require: LoaderRequire, module: object) => void;
+        wrapper(loaderModule.exports, loaderRequire, loaderModule);
+        return loaderModule.exports as typeof import('../src/pdfjsLoader.js');
+    }
+
+    test('finds the installed pdfjs-dist package', () => {
+        const { pdfjsAssetDirectory } = loadWithoutFilename(createRequire(loaderPath));
+
+        const pdfjsRoot = dirname(createRequire(__filename).resolve('pdfjs-dist/package.json'));
+        expect(pdfjsAssetDirectory('wasm')).toBe(join(pdfjsRoot, 'wasm'));
+    });
+
+    test('reports an unresolvable pdfjs-dist with the descriptive error, not a ReferenceError', () => {
+        const realRequire = createRequire(loaderPath);
+        const notFound = new Error("Cannot find module 'pdfjs-dist/package.json'");
+        const failingRequire = Object.assign((id: string): unknown => realRequire(id), {
+            resolve: (): never => {
+                throw notFound;
+            },
+        });
+        const { pdfjsAssetDirectory } = loadWithoutFilename(failingRequire as unknown as LoaderRequire);
+
+        let thrown: unknown;
+        try {
+            pdfjsAssetDirectory('wasm');
+        } catch (error) {
+            thrown = error;
+        }
+        expect(thrown).toMatchObject({ message: expect.stringContaining('from "pdf-to-png-converter"'), cause: notFound });
+    });
 });
