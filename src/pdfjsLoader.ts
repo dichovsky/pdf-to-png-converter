@@ -84,10 +84,13 @@ export function warnIfWasmDecodersMissing(): void {
  * the value with "must include trailing slash" and breaks every conversion (issue #173).
  *
  * Known, accepted limit (issue #278): pdf.js reads the wasm decoders with `fs.readFile(url + name)`, which
- * accepts this plain `C:/...` form, but its JavaScript fallback (`jbig2_nowasm_fallback.js`) uses `import()`,
- * which rejects `C:/...` on Windows. The fallback only runs after the wasm read has already failed.
- * A `file:///` URL would flip the two. A custom `BinaryDataFactory` could serve both, but pdf.js does not
- * export it, so it stays out of scope.
+ * accepts this plain path form, but its JavaScript fallback (`*_nowasm_fallback.js`) loads through `import()`,
+ * which rejects `C:/...` on Windows and also fails on POSIX install paths that contain `#`, `?` or `%`. The
+ * `fs.readFile` of the `.wasm` files is unaffected, so this matters only when the wasm load itself fails (for
+ * example under `node --jitless`). A `file:///` URL would flip the two. A duck-typed `BinaryDataFactory` could fix
+ * both: it is a public `getDocument` option, and pdf.js only calls `new Factory({ cMapUrl, standardFontDataUrl,
+ * wasmUrl })` and `factory.fetch({ kind, filename })` on it, so it could read the files from disk while the URLs
+ * are `file://` URLs for the fallback `import()`. That is deferred as a follow-up (`BACKLOG.md` ARCH-017).
  */
 function factoryUrl(path: string): string {
     const absolute = resolve(path).split(sep).join('/');
