@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- A process warning with code `PDF_TO_PNG_WASM_MISSING`, emitted at most once per thread (the library runs the check on the main thread only, so normally once per process) when `jbig2.wasm` or `openjpeg.wasm` is missing from the `wasm` folder of the installed `pdfjs-dist` package, for example after a damaged or pruned install. Without those files, images that use CCITT, JBIG2, or JPEG 2000 compression render blank. The check only detects missing files, not decode errors, and it can be silenced with Node's `--no-warnings`. Metadata-only requests skip it.
+- A process warning with code `PDF_TO_PNG_WASM_MISSING`, emitted at most once per thread (the library runs the check on the main thread only, so normally once per process) when `jbig2.wasm` or `openjpeg.wasm` is missing from the `wasm` folder of the installed `pdfjs-dist` package, for example after a damaged or pruned install. Without those files, images that use CCITT, JBIG2, or JPEG 2000 compression may render blank, or decode more slowly through the pdf.js JavaScript fallback where it is available. The check only detects missing files, not decode errors. To silence only this warning, run Node with `--disable-warning=PDF_TO_PNG_WASM_MISSING` or add that flag to `NODE_OPTIONS`; `--no-warnings` would hide every process warning. Metadata-only requests skip it.
 - Regression fixtures for CCITT and JBIG2 images (`test-data/wasm/`, produced by `scripts/generate-wasm-fixtures.ts`), and `__tests__/pdfjs.assets.test.ts` exact-checks the `wasm` folder and the set of top-level `pdfjs-dist` directories as well as the CMaps and standard fonts, so a new asset folder fails the test until it is reviewed.
 
 ### Changed

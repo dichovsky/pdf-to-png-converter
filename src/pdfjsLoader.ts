@@ -57,8 +57,9 @@ export function pdfjsAssetDirectory(directory: PdfjsAssetDirectory): string {
  * Emits one process warning when the pdf.js wasm decoders are absent. The "already checked" state is module-level,
  * so a thread warns at most once; the library calls this on the main thread only, which makes it once per process
  * unless the caller runs `pdfToPng()` in its own worker threads (each has its own module instance and warns once).
- * pdf.js swallows the resulting decode failure and renders the image blank, so without this a damaged
- * install is silent below verbosity 1. It checks that the files exist; it cannot detect decode errors.
+ * Without a decoder file pdf.js tries its slower JavaScript fallback where that is available, and otherwise swallows the
+ * decode failure and renders the image blank, so without this a damaged install is silent below verbosity 1.
+ * It checks that the files exist; it cannot detect decode errors.
  */
 export function warnIfWasmDecodersMissing(): void {
     if (wasmDecodersChecked) {
@@ -70,7 +71,8 @@ export function warnIfWasmDecodersMissing(): void {
     if (missing.length > 0) {
         process.emitWarning(
             `pdfjs-dist decoder files missing in ${directory}: ${missing.join(', ')}. ` +
-                'Images that use CCITT or JBIG2 (jbig2.wasm) or JPEG 2000 (openjpeg.wasm) compression render blank without them.',
+                'Images that use CCITT or JBIG2 (jbig2.wasm) or JPEG 2000 (openjpeg.wasm) compression may render blank, ' +
+                'or decode more slowly through the pdf.js JavaScript fallback where it is available.',
             { code: 'PDF_TO_PNG_WASM_MISSING' },
         );
     }
