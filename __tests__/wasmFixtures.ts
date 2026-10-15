@@ -32,7 +32,8 @@ export const JPX_FLAT_GRAY_PDF = join(WASM_FIXTURE_DIR, 'jpx-flat-gray.pdf');
 
 /**
  * A text PDF whose non-embedded fonts come from the pdf.js standard_fonts folder (rendered differently without it).
- * Used to show that the cmaps and standard_fonts lookups also no longer depend on the working directory.
+ * Used to show that the standard_fonts lookup also no longer depends on the working directory. It loads no CMap,
+ * so it cannot cover the cmaps folder; `predefinedCMapTextPdf()` does.
  */
 export const STANDARD_FONT_TEXT_PDF = resolve(__dirname, '..', 'test-data', 'sample.pdf');
 
@@ -83,11 +84,33 @@ export const countMaskPaint = (image: DecodedPng): number =>
  * Rendered through the same pipeline it gives the exact PNG a page whose images silently failed to decode would give.
  */
 export function blankPdf(width: number, height: number): Uint8Array {
-    const objects = [
+    return pdfFromObjects([
         '<< /Type /Catalog /Pages 2 0 R >>',
         '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
         `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${width} ${height}] >>`,
-    ];
+    ]);
+}
+
+/**
+ * A one-page PDF whose text needs a predefined CMap: a non-embedded Type0 font (glyphs from the standard_fonts
+ * Helvetica substitute) with `/Encoding /UniJIS-UCS2-H`, which pdf.js loads as `UniJIS-UCS2-H.bcmap` from `cMapUrl`.
+ * If that fetch fails, pdf.js swaps in an ErrorFont and the page renders blank.
+ */
+export function predefinedCMapTextPdf(): Uint8Array {
+    const content = 'BT /F1 36 Tf 10 20 Td <0041004200430044> Tj ET';
+    return pdfFromObjects([
+        '<< /Type /Catalog /Pages 2 0 R >>',
+        '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+        '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 80] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>',
+        `<< /Length ${content.length} >>\nstream\n${content}\nendstream`,
+        '<< /Type /Font /Subtype /Type0 /BaseFont /Helvetica /Encoding /UniJIS-UCS2-H /DescendantFonts [6 0 R] >>',
+        '<< /Type /Font /Subtype /CIDFontType0 /BaseFont /Helvetica /CIDSystemInfo << /Registry (Adobe) /Ordering (Japan1) /Supplement 6 >> /FontDescriptor 7 0 R /DW 1000 >>',
+        '<< /Type /FontDescriptor /FontName /Helvetica /Flags 32 /FontBBox [0 -200 1000 900] /ItalicAngle 0 /Ascent 880 /Descent -120 /CapHeight 700 /StemV 80 >>',
+    ]);
+}
+
+/** Serializes numbered objects (object 1 is the catalog) into a PDF with a correct cross-reference table. */
+function pdfFromObjects(objects: readonly string[]): Uint8Array {
     let text = '%PDF-1.4\n';
     const offsets: number[] = [];
     for (const [index, body] of objects.entries()) {
