@@ -50,6 +50,7 @@ Keep this consolidated ownership. Split out another seam only when a new indepen
 8. `pdfDocument.loadingTask.destroy()` runs in `finally`; pages, canvases, loading failures, finalizers, and workers have matching cleanup paths.
 9. pdf.js asset folders (`cmaps`, `standard_fonts`, `wasm`) come from the installed `pdfjs-dist` package location through `pdfjsAssetDirectory()`, never from the working directory, and there is no working-directory fallback. `getPdfDocument()` passes all three as `cMapUrl`, `standardFontDataUrl`, and `wasmUrl`. Without `wasmUrl`, CCITT, JBIG2, and JPEG 2000 images render blank with no error (issue #278).
 10. `warnIfWasmDecodersMissing()` runs at most once per thread (the library runs the check on the main thread only, so normally once per process), after the metadata-only return and before the output folder is prepared. It emits process warning `PDF_TO_PNG_WASM_MISSING` when `jbig2.wasm` or `openjpeg.wasm` is missing; it cannot detect decode errors.
+11. `pdfToPng()` awaits `warmUpWasmDecoders()` before every main-thread `getPdfDocument()` call, so no main-thread document opens until pdf.js has cached both wasm decoders (issue #288, mozilla/pdf.js#22131). Do not add a main-thread document open that skips it. Remove it under `BACKLOG.md` ARCH-017.
 
 `pagesToProcess` must contain positive integers. Entries above the document page count are silently filtered; duplicates remain separate tasks and are allowed unless disk output makes their resolved filenames collide.
 

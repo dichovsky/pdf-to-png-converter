@@ -75,4 +75,11 @@ export type PdfjsAssetDirectory = (typeof PDFJS_ASSET_DIRECTORIES)[keyof typeof 
 /** Decoder binaries inside the pdfjs-dist wasm directory that image rendering depends on (CCITT/JBIG2 and JPEG 2000). */
 export const PDFJS_WASM_DECODER_FILES = ['jbig2.wasm', 'openjpeg.wasm'] as const;
 
+/**
+ * Upper bound on the one-time wasm warm-up in `warmUpWasmDecoders()` (issue #288), which normally takes well under a
+ * second. Past it, conversions go ahead without the protection rather than wait on a warm-up stalled by other pdf.js
+ * use in the same thread.
+ */
+export const WASM_WARM_UP_TIMEOUT_MS = 10_000;
+
 // Test-only asset lists (STANDARD_FONTS, STANDARD_CMAPS, STANDARD_WASM) live in __tests__/test-data-constants.ts

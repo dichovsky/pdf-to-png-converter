@@ -1,11 +1,14 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
-import { afterEach, expect, test, vi } from 'vitest';
+import { afterEach, beforeAll, expect, test, vi } from 'vitest';
 import type { PngPageOutput } from '../src';
 import { pdfToPng } from '../src';
 import * as pageRenderer from '../src/pageRenderer.js';
 import * as pdfjsLoader from '../src/pdfjsLoader.js';
+
+// Run the real one-time wasm warm-up (issue #288) first, so the short vi.waitFor window below times only the scheduler.
+beforeAll(() => pdfjsLoader.warmUpWasmDecoders());
 
 afterEach(() => {
     vi.restoreAllMocks();

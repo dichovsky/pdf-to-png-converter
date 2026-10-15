@@ -10,7 +10,9 @@
 
 ## ⚙️ ARCH / Core
 
-_No open ARCH items._
+- [ ] 🟢 🔧 ARCH-017 Remove the wasm warm-up once pdfjs-dist includes mozilla/pdf.js#22145
+    - `warmUpWasmDecoders()` in `src/pdfjsLoader.ts` works around mozilla/pdf.js#22131 (issue #288); the upstream fix was merged on 2026-10-12 and is not in 6.4.299
+    - gate on: `__tests__/pdf.to.png.concurrent.wasm.test.ts` passing with the warm-up removed
 
 ## 🛡️ SEC / QA
 
