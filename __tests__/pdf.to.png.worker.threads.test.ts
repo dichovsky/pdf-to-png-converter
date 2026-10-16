@@ -13,12 +13,14 @@ import {
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
+import { runInThisContext } from 'node:vm';
 import { afterEach, beforeAll, describe, expect, test } from 'vitest';
 import { pdfToPng } from '../src/pdfToPng';
 import {
     blankPagePng,
     codecPdf,
     controlPdf,
+    countDark,
     countNonWhite,
     decodePng,
     expectCodecPageMatchesControl,
@@ -27,6 +29,7 @@ import {
     JPX_FLAT_GRAY_PDF,
     MIXED_PAIR_NAME,
     PAIRS,
+    predefinedCMapTextPdf,
     STANDARD_FONT_TEXT_PDF,
 } from './wasmFixtures';
 
@@ -253,22 +256,27 @@ describe('compiled library from a fresh process', () => {
         }
     });
 
-    /** Runs the compiled CLI on one PDF with an empty temporary folder as its working directory. */
-    function runCliFromEmptyDirectory(pdfPath: string, extraArguments: string[] = []): { emptyDirectory: string; outputFolder: string } {
-        const emptyDirectory = makeTemporaryDirectory();
+    /** Runs the compiled CLI on one PDF in `workingDirectory` and returns the output folder. */
+    function runCli(workingDirectory: string, pdfPath: string, extraArguments: string[] = []): string {
         const outputFolder = join(makeTemporaryDirectory(), 'png');
-        expect(readdirSync(emptyDirectory)).toEqual([]);
 
         const result = spawnSync(
             process.execPath,
             [join(compiledDirectory, 'cli.js'), pdfPath, '--output-folder', outputFolder, '--silent', ...extraArguments],
-            { cwd: emptyDirectory, env: childEnvironment(), encoding: 'utf8', timeout: 120_000 },
+            { cwd: workingDirectory, env: childEnvironment(), encoding: 'utf8', timeout: 120_000 },
         );
 
         expect(result.status, result.stderr).toBe(0);
         // Present decoders mean no process warning.
         expect(result.stderr).not.toContain('PDF_TO_PNG_WASM_MISSING');
-        return { emptyDirectory, outputFolder };
+        return outputFolder;
+    }
+
+    /** Runs the compiled CLI on one PDF with an empty temporary folder as its working directory. */
+    function runCliFromEmptyDirectory(pdfPath: string, extraArguments: string[] = []): { emptyDirectory: string; outputFolder: string } {
+        const emptyDirectory = makeTemporaryDirectory();
+        expect(readdirSync(emptyDirectory)).toEqual([]);
+        return { emptyDirectory, outputFolder: runCli(emptyDirectory, pdfPath, extraArguments) };
     }
 
     // Strict proof of working-directory independence for the wasm decoders: a new process has an empty pdf.js
@@ -294,6 +302,51 @@ describe('compiled library from a fresh process', () => {
         },
         180_000,
     );
+
+    test('the compiled CLI renders the JPEG 2000 image from an empty working directory', async () => {
+        const { emptyDirectory, outputFolder } = runCliFromEmptyDirectory(JPX_FLAT_GRAY_PDF);
+
+        const files = readdirSync(outputFolder);
+        expect(files).toHaveLength(1);
+        await expectFlatMidGray(readFileSync(join(outputFolder, files[0])));
+        expect(readdirSync(emptyDirectory)).toEqual([]);
+    }, 180_000);
+
+    // The working directory must be ignored, not merely unnecessary. A lookup that tried `<cwd>/node_modules` first
+    // would read this garbage jbig2.wasm, fail to instantiate it, and import the decoy JS fallback, which writes the marker.
+    test('the compiled CLI ignores a decoy pdfjs-dist in its working directory', async () => {
+        const workingDirectory = makeTemporaryDirectory();
+        const marker = join(makeTemporaryDirectory(), 'decoy-fallback-ran');
+        const decoyRoot = join(workingDirectory, 'node_modules', 'pdfjs-dist');
+        for (const folder of ['cmaps', 'standard_fonts', 'wasm']) {
+            mkdirSync(join(decoyRoot, folder), { recursive: true });
+        }
+        writeFileSync(join(decoyRoot, 'package.json'), JSON.stringify({ name: 'pdfjs-dist', version: '0.0.0-decoy' }));
+        // Both decoder files exist, so the missing-file warning stays quiet and only the render and marker can fail.
+        for (const file of ['jbig2.wasm', 'openjpeg.wasm']) {
+            writeFileSync(join(decoyRoot, 'wasm', file), 'not a wasm module');
+        }
+        // `process.getBuiltinModule` works whether Node loads the file as CommonJS or as an ES module.
+        writeFileSync(
+            join(decoyRoot, 'wasm', 'jbig2_nowasm_fallback.js'),
+            `process.getBuiltinModule('node:fs').writeFileSync(${JSON.stringify(marker)}, 'decoy loaded');\n`,
+        );
+        const pair = PAIRS.find((candidate) => candidate.name === 'jbig2-mmr');
+        expect(pair).toBeDefined();
+
+        const outputFolder = runCli(workingDirectory, codecPdf('jbig2-mmr'));
+
+        const files = readdirSync(outputFolder);
+        expect(files).toHaveLength(1);
+        const [control] = await pdfToPng(controlPdf('jbig2-mmr'));
+        await expectCodecPageMatchesControl(
+            readFileSync(join(outputFolder, files[0])),
+            control.content as Buffer,
+            (pair?.pages ?? [])[0],
+            'jbig2-mmr',
+        );
+        expect(existsSync(marker)).toBe(false);
+    }, 180_000);
 
     // Fresh process + worker threads + empty working directory together: every worker resolves the package root itself,
     // and the 8 mixed G4/G3/JBIG2 pages must match the Flate control page for page.
@@ -325,6 +378,22 @@ describe('compiled library from a fresh process', () => {
         expect(files).toHaveLength(1);
         const [reference] = await pdfToPng(STANDARD_FONT_TEXT_PDF, { pagesToProcess: [1] });
         expect(Buffer.compare(readFileSync(join(outputFolder, files[0])), reference.content as Buffer)).toBe(0);
+    }, 180_000);
+
+    // test-data/sample.pdf loads no CMap. This generated page draws its text through the predefined UniJIS-UCS2-H CMap,
+    // and pdf.js draws nothing for that font when the bcmap fetch fails, so a blank page means cmaps was not found.
+    test('the compiled CLI finds the predefined CMaps from an empty working directory', async () => {
+        const pdfPath = join(makeTemporaryDirectory(), 'predefined-cmap.pdf');
+        writeFileSync(pdfPath, predefinedCMapTextPdf());
+
+        const { outputFolder } = runCliFromEmptyDirectory(pdfPath);
+
+        const files = readdirSync(outputFolder);
+        expect(files).toHaveLength(1);
+        const written = readFileSync(join(outputFolder, files[0]));
+        expect(countDark(await decodePng(written)), 'the CMap text was not drawn').toBeGreaterThan(0);
+        const [reference] = await pdfToPng(predefinedCMapTextPdf());
+        expect(Buffer.compare(written, reference.content as Buffer)).toBe(0);
     }, 180_000);
 
     test('without the wasm folder a CCITT page renders blank and exactly one process warning is emitted', async () => {
@@ -381,4 +450,48 @@ describe('compiled library from a fresh process', () => {
             expect(Buffer.compare(png, controlPng)).not.toBe(0);
         }
     }, 180_000);
+});
+
+// An ESM bundle that inlines this library shims `require` (as `createRequire(import.meta.url)`) but leaves
+// `__filename` and `__dirname` undefined. The compiled loader is evaluated the same way here, so any unguarded
+// `__filename` read throws a ReferenceError.
+describe('compiled loader without __filename, as in an ESM bundle', () => {
+    const loaderPath = resolve(__dirname, '..', 'out', 'pdfjsLoader.js');
+    type LoaderRequire = ReturnType<typeof createRequire>;
+
+    function loadWithoutFilename(loaderRequire: LoaderRequire): typeof import('../src/pdfjsLoader.js') {
+        expect(runInThisContext('typeof __filename')).toBe('undefined');
+        const loaderModule = { exports: {} };
+        const wrapper = runInThisContext(`(function (exports, require, module) {\n${readFileSync(loaderPath, 'utf8')}\n})`, {
+            filename: loaderPath,
+        }) as (exports: object, require: LoaderRequire, module: object) => void;
+        wrapper(loaderModule.exports, loaderRequire, loaderModule);
+        return loaderModule.exports as typeof import('../src/pdfjsLoader.js');
+    }
+
+    test('finds the installed pdfjs-dist package', () => {
+        const { pdfjsAssetDirectory } = loadWithoutFilename(createRequire(loaderPath));
+
+        const pdfjsRoot = dirname(createRequire(__filename).resolve('pdfjs-dist/package.json'));
+        expect(pdfjsAssetDirectory('wasm')).toBe(join(pdfjsRoot, 'wasm'));
+    });
+
+    test('reports an unresolvable pdfjs-dist with the descriptive error, not a ReferenceError', () => {
+        const realRequire = createRequire(loaderPath);
+        const notFound = new Error("Cannot find module 'pdfjs-dist/package.json'");
+        const failingRequire = Object.assign((id: string): unknown => realRequire(id), {
+            resolve: (): never => {
+                throw notFound;
+            },
+        });
+        const { pdfjsAssetDirectory } = loadWithoutFilename(failingRequire as unknown as LoaderRequire);
+
+        let thrown: unknown;
+        try {
+            pdfjsAssetDirectory('wasm');
+        } catch (error) {
+            thrown = error;
+        }
+        expect(thrown).toMatchObject({ message: expect.stringContaining('from "pdf-to-png-converter"'), cause: notFound });
+    });
 });

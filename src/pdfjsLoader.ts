@@ -1,5 +1,4 @@
 import { existsSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import { dirname, join, resolve, sep } from 'node:path';
 import { clearTimeout, setTimeout } from 'node:timers';
 import type { PDFDocumentLoadingTask, PDFDocumentProxy } from 'pdfjs-dist';
@@ -26,13 +25,17 @@ let wasmDecodersChecked = false;
  * Locates the installed pdfjs-dist package from this module's own location. There is deliberately no
  * working-directory fallback: a `node_modules` folder in `process.cwd()` is not necessarily the copy that
  * pdf.js was imported from, and pdf.js can import JavaScript from the asset URL it is given.
+ *
+ * Use the module's own `require.resolve`, not `createRequire(__filename)`: ESM bundlers shim `require` but leave
+ * `__filename` undefined, so the error message reads it only behind a `typeof` guard.
  */
 function locatePdfjsPackageRoot(): string {
     try {
-        return dirname(createRequire(__filename).resolve('pdfjs-dist/package.json'));
+        return dirname(require.resolve('pdfjs-dist/package.json'));
     } catch (error) {
+        const searchedFrom = typeof __filename === 'string' ? __filename : 'pdf-to-png-converter';
         throw new Error(
-            `Cannot resolve "pdfjs-dist/package.json" from "${__filename}". ` +
+            `Cannot resolve "pdfjs-dist/package.json" from "${searchedFrom}". ` +
                 'pdf-to-png-converter reads the pdf.js cmaps, standard_fonts and wasm folders from the installed pdfjs-dist package, ' +
                 'so that package must be resolvable from this file. Check for a bundler that inlines pdfjs-dist, ' +
                 'a pdfjs-dist "exports" map without "./package.json", or an incomplete install.',
@@ -55,8 +58,9 @@ export function pdfjsAssetDirectory(directory: PdfjsAssetDirectory): string {
  * Emits one process warning when the pdf.js wasm decoders are absent. The "already checked" state is module-level,
  * so a thread warns at most once; the library calls this on the main thread only, which makes it once per process
  * unless the caller runs `pdfToPng()` in its own worker threads (each has its own module instance and warns once).
- * pdf.js swallows the resulting decode failure and renders the image blank, so without this a damaged
- * install is silent below verbosity 1. It checks that the files exist; it cannot detect decode errors.
+ * Without a decoder file pdf.js tries its slower JavaScript fallback where that is available, and otherwise swallows the
+ * decode failure and renders the image blank, so without this a damaged install is silent below verbosity 1.
+ * It checks that the files exist; it cannot detect decode errors.
  */
 export function warnIfWasmDecodersMissing(): void {
     if (wasmDecodersChecked) {
@@ -68,7 +72,8 @@ export function warnIfWasmDecodersMissing(): void {
     if (missing.length > 0) {
         process.emitWarning(
             `pdfjs-dist decoder files missing in ${directory}: ${missing.join(', ')}. ` +
-                'Images that use CCITT or JBIG2 (jbig2.wasm) or JPEG 2000 (openjpeg.wasm) compression render blank without them.',
+                'Images that use CCITT or JBIG2 (jbig2.wasm) or JPEG 2000 (openjpeg.wasm) compression may render blank, ' +
+                'or decode more slowly through the pdf.js JavaScript fallback where it is available.',
             { code: 'PDF_TO_PNG_WASM_MISSING' },
         );
     }
@@ -80,10 +85,13 @@ export function warnIfWasmDecodersMissing(): void {
  * the value with "must include trailing slash" and breaks every conversion (issue #173).
  *
  * Known, accepted limit (issue #278): pdf.js reads the wasm decoders with `fs.readFile(url + name)`, which
- * accepts this plain `C:/...` form, but its JavaScript fallback (`jbig2_nowasm_fallback.js`) uses `import()`,
- * which rejects `C:/...` on Windows. The fallback only runs after the wasm read has already failed.
- * A `file:///` URL would flip the two. A custom `BinaryDataFactory` could serve both, but pdf.js does not
- * export it, so it stays out of scope.
+ * accepts this plain path form, but its JavaScript fallback (`*_nowasm_fallback.js`) loads through `import()`,
+ * which rejects `C:/...` on Windows and also fails on POSIX install paths that contain `#`, `?` or `%`. The
+ * `fs.readFile` of the `.wasm` files is unaffected, so this matters only when the wasm load itself fails (for
+ * example under `node --jitless`). A `file:///` URL would flip the two. A duck-typed `BinaryDataFactory` could fix
+ * both: it is a public `getDocument` option, and pdf.js only calls `new Factory({ cMapUrl, standardFontDataUrl,
+ * wasmUrl })` and `factory.fetch({ kind, filename })` on it, so it could read the files from disk while the URLs
+ * are `file://` URLs for the fallback `import()`. That is deferred as a follow-up (`BACKLOG.md` ARCH-017).
  */
 function factoryUrl(path: string): string {
     const absolute = resolve(path).split(sep).join('/');
@@ -127,7 +135,7 @@ let wasmDecodersWarmUp: Promise<void> | undefined;
  * skip it. A failed warm-up is ignored: the caller's conversion then reports its own outcome, and only this protection
  * is lost. A warm-up still pending after `WASM_WARM_UP_TIMEOUT_MS` stops blocking conversions, so other pdf.js use in
  * the same thread that stalls it cannot hang every conversion. Remove it once pdfjs-dist includes mozilla/pdf.js#22145
- * (BACKLOG.md ARCH-017).
+ * (BACKLOG.md ARCH-018).
  */
 export function warmUpWasmDecoders(): Promise<void> {
     wasmDecodersWarmUp ??= new Promise<void>((settle) => {

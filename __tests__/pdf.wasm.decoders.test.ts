@@ -111,10 +111,10 @@ describe('working directory independence', () => {
         }
     });
 
-    // pdf.js keeps wasm bytes in a process-wide cache once one load has succeeded, so this test cannot tell whether
-    // the cwd was honoured when an earlier test already loaded the decoder. It asserts only the positive result and
-    // therefore passes regardless of order. The compiled CLI test in a fresh process is the strict version.
-    test('renders CCITT, JBIG2 and JPEG 2000 images while the working directory is an empty folder', async () => {
+    // Smoke check only: pdf.js keeps wasm bytes in a process-wide cache once one load has succeeded, so in suite order
+    // this test cannot fail even if the loader read the working directory. The strict versions are the compiled CLI
+    // tests in pdf.to.png.worker.threads.test.ts, which run in a fresh process from an empty working directory.
+    test('smoke check: CCITT, JBIG2 and JPEG 2000 images still render after a chdir to an empty folder', async () => {
         emptyDirectory = mkdtempSync(join(tmpdir(), 'pdf-to-png-cwd-'));
         process.chdir(emptyDirectory);
         expect(readdirSync(process.cwd())).toEqual([]);

@@ -10,12 +10,15 @@
 
 ## ⚙️ ARCH / Core
 
-- [ ] 🟢 🔧 ARCH-017 Remove the wasm warm-up once pdfjs-dist includes mozilla/pdf.js#22145
+- [ ] 🟢 🐛 ARCH-017 Core: serve pdf.js binary data through a duck-typed `BinaryDataFactory`
+    - the wasm JS fallback `import()` rejects the plain-path `wasmUrl` on Windows (`C:/...`) and on POSIX install paths containing `#`, `?` or `%`; reached only when the wasm load fails (e.g. `node --jitless`)
+    - pass `file://` URLs plus a factory whose `fetch({ kind, filename })` reads from disk, so the `.wasm` read and the fallback `import()` both work
+- [ ] 🟢 🔧 ARCH-018 Remove the wasm warm-up once pdfjs-dist includes mozilla/pdf.js#22145
     - `warmUpWasmDecoders()` in `src/pdfjsLoader.ts` works around mozilla/pdf.js#22131 (issue #288); the upstream fix was merged on 2026-10-12 and is not in 6.4.299
     - gate on: `__tests__/pdf.to.png.concurrent.wasm.test.ts` passing with the warm-up removed
 
 ## 🛡️ SEC / QA
 
-- [ ] 🟡 🐛 SEC-004 Sec: bound declared image size (pdf.js `maxImageSize`)
-    - the wasm decoders now run (issue #278): about 8 bytes per declared pixel per rendering thread, and an image of about 537 Mpx or more rejects the whole conversion with `Create skia surface failed`
-    - `maxImageSize` drops an oversized image before decoding, but it does not cover SMask images or JPX/JBIG2 files whose header size differs from the dictionary, and a 100 Mpx limit would silently blank 1200 dpi A4 scans. Choose a limit or option and make drops visible
+- [ ] 🟡 🐛 SEC-004 Sec: bound declared image size for all image filters (pdf.js `maxImageSize`)
+    - every image filter (Flate, DCT, CCITT, JBIG2, JPX) costs about 8 bytes per declared pixel per rendering thread, and an image of about 537 Mpx or more rejects the whole conversion with `Create skia surface failed`; since issue #278, CCITT/JBIG2/JPX images reach that path instead of rendering blank
+    - `maxImageSize` drops an oversized image of any filter before decoding, but it does not cover SMask images or JPX/JBIG2 files whose header size differs from the dictionary, and a 100 Mpx limit would silently blank 1200 dpi A4 scans. Choose a limit or option and make drops visible

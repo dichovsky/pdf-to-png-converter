@@ -7,9 +7,9 @@
  * cache, so a "missing decoder" case run after any successful render in the same process would not be missing.
  *
  * It points the compiled loader at a fake pdfjs-dist root (a package.json plus cmaps and standard_fonts, no wasm
- * folder) by wrapping `node:module` `createRequire`. The wrapper calls the real function first and overrides only
- * `resolve('pdfjs-dist/package.json')`, and only for requires created from `pdfjsLoader.js`, because pdf.js itself
- * loads @napi-rs/canvas through the same `createRequire`. pdf.js is still imported from the real package.
+ * folder) by wrapping `Module._resolveFilename`, which the loader's `require.resolve` goes through. The wrapper
+ * overrides only `pdfjs-dist/package.json` requested by `pdfjsLoader.js` and passes every other resolution to the
+ * real function. pdf.js is still imported from the real package.
  *
  * Usage: node wasmMissingChild.cjs <compiled out dir> <fake pdfjs-dist root> <result dir> <codec pdf> <control pdf>
  * Writes codec.png, codec-again.png and control.png into <result dir> and prints one JSON line on stdout with the
@@ -22,18 +22,12 @@ const { join } = require('node:path');
 
 const [outDirectory, fakeRoot, resultDirectory, codecPdf, controlPdf] = process.argv.slice(2);
 
-const realCreateRequire = Module.createRequire;
-Module.createRequire = function createRequireWithFakePdfjsRoot(from) {
-    const loaderRequire = realCreateRequire(from);
-    if (!String(from).endsWith('pdfjsLoader.js')) {
-        return loaderRequire;
+const realResolveFilename = Module._resolveFilename;
+Module._resolveFilename = function resolveFilenameWithFakePdfjsRoot(request, parent, ...rest) {
+    if (request === 'pdfjs-dist/package.json' && String(parent?.filename).endsWith('pdfjsLoader.js')) {
+        return join(fakeRoot, 'package.json');
     }
-    const realResolve = loaderRequire.resolve;
-    loaderRequire.resolve = Object.assign(
-        (request, options) => (request === 'pdfjs-dist/package.json' ? join(fakeRoot, 'package.json') : realResolve(request, options)),
-        realResolve,
-    );
-    return loaderRequire;
+    return realResolveFilename.call(this, request, parent, ...rest);
 };
 
 const warnings = [];
