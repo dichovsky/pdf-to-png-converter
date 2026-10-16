@@ -13,6 +13,9 @@
 - [ ] 🟢 🐛 ARCH-017 Core: serve pdf.js binary data through a duck-typed `BinaryDataFactory`
     - the wasm JS fallback `import()` rejects the plain-path `wasmUrl` on Windows (`C:/...`) and on POSIX install paths containing `#`, `?` or `%`; reached only when the wasm load fails (e.g. `node --jitless`)
     - pass `file://` URLs plus a factory whose `fetch({ kind, filename })` reads from disk, so the `.wasm` read and the fallback `import()` both work
+- [ ] 🟢 🔧 ARCH-018 Remove the wasm warm-up once pdfjs-dist includes mozilla/pdf.js#22145
+    - `warmUpWasmDecoders()` in `src/pdfjsLoader.ts` works around mozilla/pdf.js#22131 (issue #288); the upstream fix was merged on 2026-10-12 and is not in 6.4.299
+    - gate on: `__tests__/pdf.to.png.concurrent.wasm.test.ts` passing with the warm-up removed
 
 ## 🛡️ SEC / QA
 

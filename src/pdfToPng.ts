@@ -13,7 +13,7 @@ import type { OutputFolderHandle } from './outputWriter.js';
 import { getPageMetadata, renderPdfPage } from './pageRenderer.js';
 import type { PageRenderResult } from './pageRenderer.js';
 import { getPdfFileBuffer } from './pdfInput.js';
-import { getPdfDocument, warnIfWasmDecodersMissing } from './pdfjsLoader.js';
+import { getPdfDocument, warmUpWasmDecoders, warnIfWasmDecodersMissing } from './pdfjsLoader.js';
 import type { PdfToPngOptions, PngPageOutput } from './types.js';
 import { VerbosityLevel } from './types.js';
 import { renderPagesInWorkerPool, throwLowestIndexedError } from './workerPool.js';
@@ -230,6 +230,8 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike | Uint8Array, p
     const pdfBytes = await getPdfFileBuffer(pdfFile, options.maxInputBytes);
     // Main pdf.js loading detaches its input; workers need a retained source for their clones.
     const workerPdfBytes = options.renderInWorkerThreads && !options.returnMetadataOnly ? Uint8Array.from(pdfBytes) : undefined;
+    // Every main-thread document opens after the one-time wasm warm-up (issue #288).
+    await warmUpWasmDecoders();
     const pdfDocument: PDFDocumentProxy = await getPdfDocument(pdfBytes, options);
 
     try {
