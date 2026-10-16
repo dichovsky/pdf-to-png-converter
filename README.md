@@ -42,6 +42,7 @@ A high-performance Node.js library for converting PDF files and buffers to PNG i
 - [API Reference](#api-reference)
 - [Examples](#examples)
 - [Performance Notes](#performance-notes)
+- [Troubleshooting](#troubleshooting)
 - [Output Format](#output-format)
 - [Migration Guide](#migration-guide)
 - [Project Links](#project-links)
@@ -184,7 +185,8 @@ Converts PDF pages to PNG images.
     processPagesInParallel?: boolean, // Enable parallel processing (default: false)
     concurrencyLimit?: number,       // Max concurrent pages (parallel) / worker-pool size (worker
                                      // threads): integer 1..16 (default: 4). The upper bound caps
-                                     // peak in-flight canvas memory at ~6.4 GiB.
+                                     // peak in-flight page-canvas memory at ~6.4 GiB
+                                     // (large declared images: see Performance Notes).
     renderInWorkerThreads?: boolean, // Rasterize pages in a pool of worker threads (default: false)
                                      // True multi-core parallelism (pool size = concurrencyLimit); each
                                      // worker loads its own document copy. Pays off on multi-page,
@@ -316,6 +318,15 @@ This is significantly faster than full rendering and useful for checking page co
 - **Threadpool sizing.** PNG encodes and disk writes share Node's libuv threadpool (4 threads by default). For parallel file-output workloads on many-core machines, raising it can help: `UV_THREADPOOL_SIZE=8 node app.js`.
 - **Strict serial processing.** If you need exactly one page in flight at a time (minimal memory, strict on-disk ordering), use `processPagesInParallel: true` with `concurrencyLimit: 1` — a sliding window of exactly one page.
 - **Multi-core rendering.** `processPagesInParallel` interleaves pages on one thread — rasterization itself never runs in parallel. For CPU-bound documents (large embedded images, complex vector art), `renderInWorkerThreads: true` rasterizes pages in a pool of worker threads instead (measured ~3× end-to-end on a 12-page image-heavy document with the default pool of 4). Cost: one PDF copy + one pdf.js instance of memory per worker, plus one extra copy of the PDF retained on the main thread for the duration of the conversion, and a few hundred ms of pool startup per conversion — so prefer it for multi-page, render-heavy work rather than small documents.
+- **Large images and untrusted PDFs.** pdf.js decodes every image, whatever its compression (Flate, JPEG, CCITT, JBIG2, or JPEG 2000), into a temporary canvas that costs about 8 bytes per declared image pixel on each thread that renders a page (the main thread, or each worker with `renderInWorkerThreads`). An image declared at about 537 million pixels or more (for example an A0 bilevel scan at 600 dpi, 19866×28087) makes pdf.js fail with `Create skia surface failed`, and `pdfToPng()` rejects the whole conversion. CCITT, JBIG2, and JPEG 2000 images can declare such sizes from even smaller files, and they also use the wasm decoders shipped in `pdfjs-dist`: each decoder instance is capped at 2 GiB of wasm heap, and every worker has its own. Neither `maxInputBytes` nor the canvas pixel limit bounds the size of an image declared inside the PDF. For untrusted PDFs, set container memory limits and per-job time limits. On the main thread (the default mode and `processPagesInParallel`) pdf.js decodes images one at a time, so the peak stays near one image whatever the concurrency (measured: three 20000×20000 images peak at 3.3 GB, the same as one). With `renderInWorkerThreads` every worker decodes at the same time with its own memory, so the peak multiplies (measured at 20000×20000: 2 workers 6.3 GB, 4 workers 12.5 GB); lower `concurrencyLimit` to limit that.
+
+---
+
+## Troubleshooting
+
+- **A scanned page renders blank.** pdf.js reports image decode failures only as warnings and still renders the rest of the page. Run with `verbosityLevel: VerbosityLevel.WARNINGS` (CLI: `--verbosity-level 1`) and look for `Unable to decode image` in the output.
+- **`PDF_TO_PNG_WASM_MISSING` process warning.** CCITT, JBIG2, and JPEG 2000 images are decoded by `jbig2.wasm` and `openjpeg.wasm` in the `wasm` folder of the installed `pdfjs-dist` package. If either file is missing, the library emits this Node.js process warning at most once per thread (the library runs the check on the main thread only, so normally once per process), and images that use those compressions may render blank, or decode more slowly through the pdf.js JavaScript fallback where it is available. The warning only detects missing files, not decode errors. Reinstall your dependencies to restore the files. To silence only this warning, run Node with `--disable-warning=PDF_TO_PNG_WASM_MISSING` or add that flag to `NODE_OPTIONS`; `--no-warnings` would hide every process warning.
+- **`Cannot resolve "pdfjs-dist/package.json"`.** The pdf.js `cmaps`, `standard_fonts`, and `wasm` folders are read from the installed `pdfjs-dist` package, not from the working directory, so that package must be resolvable from `pdf-to-png-converter`. Check for a bundler that inlines `pdfjs-dist`, or an incomplete install.
 
 ---
 

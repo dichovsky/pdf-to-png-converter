@@ -13,7 +13,7 @@ import type { OutputFolderHandle } from './outputWriter.js';
 import { getPageMetadata, renderPdfPage } from './pageRenderer.js';
 import type { PageRenderResult } from './pageRenderer.js';
 import { getPdfFileBuffer } from './pdfInput.js';
-import { getPdfDocument } from './pdfjsLoader.js';
+import { getPdfDocument, warnIfWasmDecodersMissing } from './pdfjsLoader.js';
 import type { PdfToPngOptions, PngPageOutput } from './types.js';
 import { VerbosityLevel } from './types.js';
 import { renderPagesInWorkerPool, throwLowestIndexedError } from './workerPool.js';
@@ -263,6 +263,7 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike | Uint8Array, p
             );
         }
 
+        warnIfWasmDecodersMissing();
         const folder = resolvedOutputFolder === undefined ? undefined : await prepareOutputFolder(resolvedOutputFolder);
         const materializeContent = folder !== undefined || options.returnPageContent;
 
