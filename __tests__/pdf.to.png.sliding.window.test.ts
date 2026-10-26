@@ -1,4 +1,4 @@
-import { afterEach, expect, test, vi } from 'vitest';
+import { afterEach, beforeAll, expect, test, vi } from 'vitest';
 import { setImmediate } from 'node:timers';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import * as pageRenderer from '../src/pageRenderer.js';
@@ -13,6 +13,9 @@ function createDeferred(): { promise: Promise<void>; resolve: () => void } {
 
     return { promise, resolve };
 }
+
+// Run the real one-time wasm warm-up (issue #288) first, so the short vi.waitFor windows below time only the scheduler.
+beforeAll(() => pdfjsLoader.warmUpWasmDecoders());
 
 afterEach(() => {
     vi.restoreAllMocks();
