@@ -58,6 +58,11 @@ function npmThrows(failure: unknown): (args: string[]) => string {
 }
 
 describe('retry', () => {
+    test('waits long enough for npm to finish processing a fresh publish', () => {
+        // npm took about 75 s to serve 4.3.0 after `npm publish` reported success; the old 27 s window failed.
+        expect((RETRY_ATTEMPTS - 1) * RETRY_DELAY_MS).toBeGreaterThanOrEqual(5 * 60_000);
+    });
+
     test('returns an available value at once without waiting', async () => {
         const registry = replay(ok('4.2.2'));
         const wait = fakeWait();

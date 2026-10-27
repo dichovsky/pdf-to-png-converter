@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Development tooling only, with no change to the published package. `release:postcheck` now waits up to 5 minutes (21 attempts, 15 s apart) for a new version to appear on the registry, instead of about 27 seconds. npm processes a publish asynchronously, and 4.3.0 became visible about 75 seconds after `npm publish` succeeded, so the publish workflow failed its post-release checks although the release was fine.
+
 ## [4.3.0] — 2026-10-27
 
 ### Added
