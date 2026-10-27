@@ -24,7 +24,7 @@ All items are release blockers:
 - `npm audit` and `npm audit --omit=dev` report zero vulnerabilities.
 - `npm run check` passes from a clean install and the coverage report is at least 98% for statements, branches, functions, and lines.
 - `npm run build` passes and produces the required CommonJS library, declarations, CLI, and worker entry in `out/`.
-- `npm run release:precheck` passes after the version/changelog cut, including the registry-version and tarball-content checks (since 4.2.1, the tarball check also requires every `main`, `types`, `bin` and `exports` target and a `#!/usr/bin/env node` first line in each `bin` file).
+- `npm run release:precheck` passes after the version/changelog cut, including the registry-version and tarball-content checks (after 4.2.1, the tarball check also requires every `main`, `types`, `bin` and `exports` target and a `#!/usr/bin/env node` first line in each `bin` file).
 - A normal render, metadata-only conversion, file output, CLI invocation, and worker-thread render remain covered by the automated suite.
 - The Node.js 22.13 and 24 CI matrix passes on the release commit, confirming the patch preserves the published runtime floor. Retain the local macOS render result because `@napi-rs/canvas` is native and the publish job runs on Linux.
 - Review confirms that `[Unreleased]` contains no breaking public API change. If one is found, stop and choose the appropriate SemVer version before tagging.
@@ -40,7 +40,7 @@ The Node.js 24 Windows smoke is informational. Windows support is best-effort, s
 5. Run `npm run check && npm run build`.
 6. Run `RELEASE_TAG=v4.2.1 npm run release:precheck`; inspect `npm pack --dry-run --json` if it fails.
 7. Commit the version, lockfile, and changelog together; open the release PR and require the repository CI check.
-8. Merge, then publish a non-prerelease GitHub Release tagged `v4.2.1`. The publish workflow will build, run the precheck again, publish with npm provenance, and run the registry/install/render postchecks (since 4.2.1, the postcheck retries a registry read only while the package or version is absent and reports npm's own error otherwise, instead of a generic retry timeout).
+8. Merge, then publish a non-prerelease GitHub Release tagged `v4.2.1`. The publish workflow will build, run the precheck again, publish with npm provenance, and run the registry/install/render postchecks (after 4.2.1, the postcheck retries a registry read only while the package or version is absent and reports npm's own error otherwise, instead of a generic retry timeout).
 
 ## Post-release verification
 
