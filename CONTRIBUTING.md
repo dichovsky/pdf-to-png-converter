@@ -39,7 +39,7 @@ The visual-comparison tests compare each render with a golden PNG under `test-da
 UPDATE_GOLDENS=1 npx vitest run __tests__/<filename>.test.ts
 ```
 
-Creation is refused when `CI` is set, and an existing golden is never overwritten. To refresh one deliberately, delete it, rerun the test with the variable, review the image, and commit it. CI also fails any run that leaves a new or modified file under `test-data/`.
+Creation is refused when `CI` is set, and an existing golden is never overwritten. To refresh one deliberately, delete it, rerun the test with the variable, review the image, and commit it. The visual tests accept fewer than `RELAXED_COMPARE_DIFFERENCE_THRESHOLD` (6) mismatched pixels (`__tests__/test-data-constants.ts`), so a golden created on one platform can differ slightly from a render on another; the Ubuntu CI run shows whether it still matches. The Ubuntu CI jobs also fail any run that leaves a new or modified file under `test-data/`.
 
 ## Strict type-check
 
@@ -56,7 +56,7 @@ Do not work around `build:strict` failures by adding `continue-on-error` to the 
 `pdfjs-dist` is both a type boundary and the rendering engine, so an upgrade must pass more than the package-manager checks:
 
 - `__tests__/pdfjs.assets.test.ts` exact-checks the installed `cmaps`, `standard_fonts`, and `wasm` directory contents, and the set of top-level `pdfjs-dist` directories, against `__tests__/test-data-constants.ts`. Update those lists only after reviewing the upstream package-layout diff; added files and added top-level directories are deliberately review-gated rather than accepted as a subset. Review every top-level folder, not only the known ones: the loader must pass pdf.js a location for each asset folder it reads in Node (`iccs` is deliberately not wired: pdf.js turns ICC wasm off in Node, so it never reads that folder), and a missed folder (`wasm`) left CCITT and JBIG2 images blank in issue #278. The loader reads these folders from the installed `pdfjs-dist` package, never from the working directory.
-- Run the visual-comparison suites against the existing reference PNGs. A missing golden fails the test, and CI fails any run that leaves a new or modified file under `test-data/`. Do not create or refresh golden files merely to make an upgrade pass. If a rendering change is understood and intentional, refresh the golden deliberately: delete it, rerun that test with `UPDATE_GOLDENS=1` (refused when `CI` is set, and it never overwrites), review the image, and commit it.
+- Run the visual-comparison suites against the existing reference PNGs. A missing golden fails the test, and the Ubuntu CI jobs fail any run that leaves a new or modified file under `test-data/`. Do not create or refresh golden files merely to make an upgrade pass. If a rendering change is understood and intentional, refresh the golden as described under "Running Tests" and commit the reviewed image.
 - Run the real worker-thread integration tests so the CommonJS-to-legacy-ESM import and per-worker pdf.js lifecycle stay covered. Worker and main-thread PNGs are byte-identical, so output alone cannot show which path rendered: these tests spy on `renderPagesInWorkerPool` and `renderPdfPage` to assert that the pool ran. For a new worker-mode case in `__tests__/pdf.to.png.worker.threads.test.ts`, convert through its `pdfToPngInWorkers()` helper.
 - Finish from a clean install with `npm run check`, `npm run build`, `npm audit --audit-level=high`,
   `npm audit --omit=dev --audit-level=high`, and `npm pack --dry-run --ignore-scripts --json`.
