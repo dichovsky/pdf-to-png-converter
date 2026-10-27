@@ -14,8 +14,12 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { runInThisContext } from 'node:vm';
-import { afterEach, beforeAll, describe, expect, test } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, test, vi, type MockInstance } from 'vitest';
+import { PDF_TO_PNG_OPTIONS_DEFAULTS } from '../src/const';
+import * as pageRenderer from '../src/pageRenderer';
 import { pdfToPng } from '../src/pdfToPng';
+import type { PdfToPngOptions, PngPageOutput } from '../src/types';
+import * as workerPool from '../src/workerPool';
 import {
     blankPagePng,
     codecPdf,
@@ -62,10 +66,56 @@ const samplePdf = resolve('./test-data/sample.pdf');
 const largePdf = resolve('./test-data/large_pdf.pdf');
 const protectedPdf = resolve('./test-data/large_pdf-protected.pdf');
 
+// Worker and main-thread rendering produce byte-identical PNGs, so comparing output cannot show which of them ran. These spies can:
+// pdfToPng() calls renderPagesInWorkerPool for renderInWorkerThreads and renderPdfPage for every page it renders itself. Workers run
+// the compiled copy in out/, which a spy here cannot see, so a conversion that really ran in workers never reaches the renderer spy.
+let poolSpy: MockInstance<typeof workerPool.renderPagesInWorkerPool>;
+let rendererSpy: MockInstance<typeof pageRenderer.renderPdfPage>;
+
+beforeEach(() => {
+    poolSpy = vi.spyOn(workerPool, 'renderPagesInWorkerPool');
+    rendererSpy = vi.spyOn(pageRenderer, 'renderPdfPage');
+});
+
+afterEach(() => {
+    vi.restoreAllMocks();
+});
+
+/**
+ * Converts with `renderInWorkerThreads: true` and proves the pool did the work: it ran exactly once, with one task per returned
+ * page and a size of `concurrencyLimit`, and the main thread rendered none of the pages itself.
+ */
+async function pdfToPngInWorkers(pdfFile: Parameters<typeof pdfToPng>[0], options: PdfToPngOptions = {}): Promise<PngPageOutput[]> {
+    const poolRuns = poolSpy.mock.calls.length;
+    const mainThreadRenders = rendererSpy.mock.calls.length;
+
+    const pages = await pdfToPng(pdfFile, { ...options, renderInWorkerThreads: true });
+
+    expect(poolSpy.mock.calls).toHaveLength(poolRuns + 1);
+    // renderPagesInWorkerPool(pdfBuffer, renderOptions, materializeContent, tasks, poolSize, onPageRendered)
+    const [, , , tasks, poolSize] = poolSpy.mock.calls[poolRuns];
+    expect(tasks.map((task) => task.pageNumber)).toEqual(pages.map((page) => page.pageNumber));
+    expect(poolSize).toBe(options.concurrencyLimit ?? PDF_TO_PNG_OPTIONS_DEFAULTS.concurrencyLimit);
+    expect(rendererSpy.mock.calls).toHaveLength(mainThreadRenders);
+    return pages;
+}
+
+test('main-thread conversions render on the main thread and never start the worker pool', async () => {
+    // Sequential, and then main-thread parallel: neither may reach the pool. The renderer spy seeing both pages is also the proof
+    // that it intercepts pdfToPng()'s calls, which is what gives "the main thread rendered nothing" meaning in worker mode.
+    expect(await pdfToPng(samplePdf, { pagesToProcess: [1, 2] })).toHaveLength(2);
+    expect(rendererSpy).toHaveBeenCalledTimes(2);
+
+    expect(await pdfToPng(samplePdf, { pagesToProcess: [1, 2], processPagesInParallel: true, concurrencyLimit: 2 })).toHaveLength(2);
+    expect(rendererSpy).toHaveBeenCalledTimes(4);
+
+    expect(poolSpy).not.toHaveBeenCalled();
+});
+
 test('worker mode returns byte-identical page content to main-thread mode', async () => {
     const [mainThread, workers] = [
         await pdfToPng(samplePdf, { pagesToProcess: [1, 2] }),
-        await pdfToPng(samplePdf, { pagesToProcess: [1, 2], renderInWorkerThreads: true }),
+        await pdfToPngInWorkers(samplePdf, { pagesToProcess: [1, 2] }),
     ];
 
     expect(workers).toHaveLength(mainThread.length);
@@ -87,9 +137,8 @@ test('worker mode writes byte-identical files through the main-thread sink', asy
     await fsPromises.rm(mainFolder, { recursive: true, force: true });
 
     // Pages 1 and 3 are light pages of the 12-page fixture — fast, still exercises >1 task.
-    const workers = await pdfToPng(largePdf, {
+    const workers = await pdfToPngInWorkers(largePdf, {
         pagesToProcess: [1, 3],
-        renderInWorkerThreads: true,
         outputFolder: workerFolder,
         returnPageContent: false,
     });
@@ -115,8 +164,7 @@ test('worker mode respects outputFileMaskFunc (names resolved on the main thread
     const outputFolder = resolve('./test-results/worker-threads-mask');
     await fsPromises.rm(outputFolder, { recursive: true, force: true });
 
-    const pages = await pdfToPng(samplePdf, {
-        renderInWorkerThreads: true,
+    const pages = await pdfToPngInWorkers(samplePdf, {
         outputFolder,
         returnPageContent: false,
         outputFileMaskFunc: (pageNumber: number) => `masked_${pageNumber}.png`,
@@ -129,10 +177,7 @@ test('worker mode respects outputFileMaskFunc (names resolved on the main thread
 test('worker mode silently filters out-of-range page numbers like main-thread mode', async () => {
     // 99 exceeds numPages and is silently dropped; non-positive numbers are rejected by
     // normalization before any mode-specific code runs, so they are not part of this test.
-    const pages = await pdfToPng(samplePdf, {
-        pagesToProcess: [1, 99],
-        renderInWorkerThreads: true,
-    });
+    const pages = await pdfToPngInWorkers(samplePdf, { pagesToProcess: [1, 99] });
 
     expect(pages.map((page) => page.pageNumber)).toEqual([1]);
 });
@@ -140,7 +185,7 @@ test('worker mode silently filters out-of-range page numbers like main-thread mo
 test('a single worker reuses its document across pages and stays byte-identical (pool of 1, 3 pages)', async () => {
     const [mainThread, workers] = [
         await pdfToPng(largePdf, { pagesToProcess: [1, 3, 5] }),
-        await pdfToPng(largePdf, { pagesToProcess: [1, 3, 5], renderInWorkerThreads: true, concurrencyLimit: 1 }),
+        await pdfToPngInWorkers(largePdf, { pagesToProcess: [1, 3, 5], concurrencyLimit: 1 }),
     ];
 
     expect(workers.map((page) => page.pageNumber)).toEqual([1, 3, 5]);
@@ -153,7 +198,7 @@ test('worker mode passes the password through and renders a protected PDF byte-i
     const password = 'uES69xm545C/HP!';
     const [mainThread, workers] = [
         await pdfToPng(protectedPdf, { pagesToProcess: [1], pdfFilePassword: password }),
-        await pdfToPng(protectedPdf, { pagesToProcess: [1], pdfFilePassword: password, renderInWorkerThreads: true }),
+        await pdfToPngInWorkers(protectedPdf, { pagesToProcess: [1], pdfFilePassword: password }),
     ];
 
     expect(Buffer.compare(workers[0].content as Buffer, mainThread[0].content as Buffer)).toBe(0);
@@ -162,7 +207,7 @@ test('worker mode passes the password through and renders a protected PDF byte-i
 test('worker mode applies viewportScale and stays byte-identical to main-thread mode', async () => {
     const [mainThread, workers] = [
         await pdfToPng(samplePdf, { pagesToProcess: [1], viewportScale: 2 }),
-        await pdfToPng(samplePdf, { pagesToProcess: [1], viewportScale: 2, renderInWorkerThreads: true }),
+        await pdfToPngInWorkers(samplePdf, { pagesToProcess: [1], viewportScale: 2 }),
     ];
 
     expect(workers[0].width).toBe(mainThread[0].width);
@@ -177,6 +222,8 @@ test('worker mode rejects with the pdfjs password error when the password is wro
             pdfFilePassword: 'wrong-password',
         }),
     ).rejects.toThrow(/password/i);
+    // The main thread opens the document first and fails there, so no worker was ever started.
+    expect(poolSpy).not.toHaveBeenCalled();
 });
 
 test('worker mode is ignored for metadata-only conversions', async () => {
@@ -185,12 +232,22 @@ test('worker mode is ignored for metadata-only conversions', async () => {
         returnMetadataOnly: true,
     });
 
+    // Metadata-only never renders: no worker pool, and no main-thread page render either.
+    expect(poolSpy).not.toHaveBeenCalled();
+    expect(rendererSpy).not.toHaveBeenCalled();
     expect(pages).toHaveLength(2);
     for (const page of pages) {
         expect(page.kind).toBe('metadata');
         expect(page.content).toBeUndefined();
         expect(page.width).toBeGreaterThan(0);
     }
+});
+
+test('worker mode takes precedence over processPagesInParallel', async () => {
+    // The helper's checks are the assertion: the pool ran once with a size of 2, and the main thread rendered nothing.
+    const pages = await pdfToPngInWorkers(largePdf, { pagesToProcess: [1, 3], processPagesInParallel: true, concurrencyLimit: 2 });
+
+    expect(pages.map((page) => page.pageNumber)).toEqual([1, 3]);
 });
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -200,7 +257,7 @@ test('worker mode is ignored for metadata-only conversions', async () => {
 describe.each(PAIRS)('wasm decoder fixture $name in worker threads', (pair) => {
     test('renders byte-identical to its Flate control rendered on the main thread', async () => {
         const control = await pdfToPng(controlPdf(pair.name));
-        const codec = await pdfToPng(codecPdf(pair.name), { renderInWorkerThreads: true, concurrencyLimit: 4 });
+        const codec = await pdfToPngInWorkers(codecPdf(pair.name), { concurrencyLimit: 4 });
 
         expect(codec).toHaveLength(pair.pages.length);
         for (const [index, page] of pair.pages.entries()) {
@@ -215,7 +272,7 @@ test('one worker decodes every codec page of a mixed document and reuses its dec
     expect(pair?.pages).toHaveLength(8);
 
     const control = await pdfToPng(controlPdf(MIXED_PAIR_NAME));
-    const codec = await pdfToPng(codecPdf(MIXED_PAIR_NAME), { renderInWorkerThreads: true, concurrencyLimit: 1 });
+    const codec = await pdfToPngInWorkers(codecPdf(MIXED_PAIR_NAME), { concurrencyLimit: 1 });
 
     expect(codec.map((page) => page.pageNumber)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
     for (const [index, page] of (pair?.pages ?? []).entries()) {
@@ -224,7 +281,7 @@ test('one worker decodes every codec page of a mixed document and reuses its dec
 });
 
 test('worker threads decode a JPEG 2000 image through openjpeg.wasm', async () => {
-    const [page] = await pdfToPng(JPX_FLAT_GRAY_PDF, { renderInWorkerThreads: true });
+    const [page] = await pdfToPngInWorkers(JPX_FLAT_GRAY_PDF);
 
     await expectFlatMidGray(page.content as Buffer);
 });
