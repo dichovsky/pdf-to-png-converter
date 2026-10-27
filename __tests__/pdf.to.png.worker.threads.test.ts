@@ -18,7 +18,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, test, vi, type Mock
 import { PDF_TO_PNG_OPTIONS_DEFAULTS } from '../src/const';
 import * as pageRenderer from '../src/pageRenderer';
 import { pdfToPng } from '../src/pdfToPng';
-import type { PdfToPngOptions, PngPageOutput } from '../src/types';
+import { VerbosityLevel, type PdfToPngOptions, type PngPageOutput } from '../src/types';
 import * as workerPool from '../src/workerPool';
 import {
     blankPagePng,
@@ -622,5 +622,50 @@ describe('compiled loader without __filename, as in an ESM bundle', () => {
             thrown = error;
         }
         expect(thrown).toMatchObject({ message: expect.stringContaining('from "pdf-to-png-converter"'), cause: notFound });
+    });
+});
+
+// The worker pool locates pageRenderWorker.js from `__dirname`, which such a bundle leaves undefined as well. Worker mode cannot work
+// there, so it has to fail with a message that says why instead of "ReferenceError: __dirname is not defined".
+describe('compiled worker pool without __dirname, as in an ESM bundle', () => {
+    const poolPath = resolve(__dirname, '..', 'out', 'workerPool.js');
+    const renderOptions = {
+        viewportScale: 1,
+        disableFontFace: true,
+        useSystemFonts: false,
+        enableXfa: true,
+        pdfFilePassword: undefined,
+        verbosityLevel: VerbosityLevel.ERRORS,
+    } satisfies workerPool.WorkerRenderOptions;
+
+    function loadWithoutDirname(): typeof workerPool {
+        expect(runInThisContext('typeof __dirname')).toBe('undefined');
+        const poolModule = { exports: {} };
+        const wrapper = runInThisContext(`(function (exports, require, module) {\n${readFileSync(poolPath, 'utf8')}\n})`, {
+            filename: poolPath,
+        }) as (exports: object, require: ReturnType<typeof createRequire>, module: object) => void;
+        wrapper(poolModule.exports, createRequire(poolPath), poolModule);
+        return poolModule.exports as typeof workerPool;
+    }
+
+    test('rejects worker mode with an error that names pageRenderWorker.js and the out/ directory, not a ReferenceError', async () => {
+        const { renderPagesInWorkerPool } = loadWithoutDirname();
+
+        const error = await rejectionOf(
+            renderPagesInWorkerPool(new Uint8Array([1]), renderOptions, true, [{ index: 0, pageNumber: 1 }], 1, async () => undefined),
+        );
+
+        expect(error).toBeInstanceOf(Error);
+        expect(error).not.toBeInstanceOf(ReferenceError);
+        expect((error as Error).message).toContain('pageRenderWorker.js');
+        expect((error as Error).message).toContain('unbundled out/ directory');
+    });
+
+    test('still returns for an empty task list, because that never needs the worker entry', async () => {
+        const { renderPagesInWorkerPool } = loadWithoutDirname();
+
+        await expect(
+            renderPagesInWorkerPool(new Uint8Array([1]), renderOptions, true, [], 1, async () => undefined),
+        ).resolves.toBeUndefined();
     });
 });

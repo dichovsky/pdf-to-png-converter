@@ -85,8 +85,19 @@ function restoreErrorName(error: unknown, errorName: string | undefined): unknow
  * next to this file. When this module runs from `src/` (vitest transforms TypeScript in-place,
  * so `__dirname` is `src/`), fall back to the repo's `out/` build — the integration tests
  * compile it first. Workers can only execute plain JavaScript, never `.ts` sources.
+ *
+ * An ESM bundle that inlines this module shims `require` but leaves `__dirname` undefined, and a bundle cannot carry the worker
+ * file anyway, so that case gets a descriptive error rather than a bare ReferenceError.
  */
 function resolveWorkerEntryPath(): string {
+    if (typeof __dirname !== 'string') {
+        throw new Error(
+            'renderInWorkerThreads cannot locate pageRenderWorker.js because __dirname is not defined, which happens when ' +
+                'pdf-to-png-converter is bundled into ESM code. Worker mode loads that compiled file from beside this module, so it needs ' +
+                'the unbundled out/ directory of the installed package: import the package from node_modules instead of bundling it, ' +
+                'or turn renderInWorkerThreads off.',
+        );
+    }
     const compiled = join(__dirname, 'pageRenderWorker.js');
     if (existsSync(compiled)) {
         return compiled;
