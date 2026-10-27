@@ -134,8 +134,9 @@ let wasmDecodersWarmUp: Promise<void> | undefined;
  * `pdfToPng()` awaits it before every main-thread `getPdfDocument()` call. Worker threads open one document each and
  * skip it. A failed warm-up is ignored: the caller's conversion then reports its own outcome, and only this protection
  * is lost. A warm-up still pending after `WASM_WARM_UP_TIMEOUT_MS` stops blocking conversions, so other pdf.js use in
- * the same thread that stalls it cannot hang every conversion. Remove it once pdfjs-dist includes mozilla/pdf.js#22145
- * (BACKLOG.md ARCH-018).
+ * the same thread that stalls it cannot hang every conversion. The stalled document is left alone on timeout: its
+ * `destroy()` did not settle with pdfjs-dist 6.4.299, so waiting on it would defeat the timeout. Remove it once
+ * pdfjs-dist includes mozilla/pdf.js#22145 (BACKLOG.md ARCH-018).
  */
 export function warmUpWasmDecoders(): Promise<void> {
     wasmDecodersWarmUp ??= new Promise<void>((settle) => {

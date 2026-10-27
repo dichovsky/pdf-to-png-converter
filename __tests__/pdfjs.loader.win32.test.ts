@@ -45,6 +45,35 @@ test('pdf.js factory URLs retain forward slashes under Windows path semantics', 
     expect(parameters.wasmUrl).toMatch(/\/wasm\/$/);
 });
 
+// The loader forwards whatever it is given (pdfToPng validates and defaults the options before calling it). Non-default
+// values prove each option reaches its own pdf.js parameter; the two flag sets differ in every pair of flags, so a
+// swapped pair cannot pass either.
+test.each([
+    { disableFontFace: false, useSystemFonts: true, enableXfa: false },
+    { disableFontFace: false, useSystemFonts: false, enableXfa: true },
+])(
+    'getPdfDocument forwards the options (disableFontFace $disableFontFace, useSystemFonts $useSystemFonts, enableXfa $enableXfa)',
+    async (flags) => {
+        pathHarness.returnRoot = false;
+        getDocument.mockReturnValueOnce({ promise: Promise.resolve({} as PDFDocumentProxy) } as PDFDocumentLoadingTask);
+        const { getPdfDocument } = await import('../src/pdfjsLoader.js');
+        const bytes = new Uint8Array([1, 2, 3]);
+
+        await getPdfDocument(bytes, { ...flags, pdfFilePassword: 'secret', verbosityLevel: VerbosityLevel.INFOS });
+
+        const parameters = getDocument.mock.calls.at(-1)?.[0];
+        expect(parameters?.data).toBe(bytes);
+        expect(parameters).toMatchObject({
+            cMapPacked: true,
+            verbosity: VerbosityLevel.INFOS,
+            disableFontFace: flags.disableFontFace,
+            useSystemFonts: flags.useSystemFonts,
+            enableXfa: flags.enableXfa,
+            password: 'secret',
+        });
+    },
+);
+
 test('pdf.js factory URLs preserve an existing portable trailing slash', async () => {
     pathHarness.returnRoot = true;
     const document = {} as PDFDocumentProxy;
