@@ -26,7 +26,7 @@ Options:
   --help                            Show this help message
 
 Environment:
-  PDF_TO_PNG_PASSWORD               Password for encrypted PDFs, used when --pdf-file-password is not given (not visible in process listings)`;
+  PDF_TO_PNG_PASSWORD               Password for encrypted PDFs, used when --pdf-file-password is not given (other local users cannot read it)`;
 
 const CLI_OPTIONS = {
     'output-folder': { type: 'string' },
@@ -97,7 +97,7 @@ function parseNumber(value: string | undefined, errorMessage: string, integer = 
     return parsed;
 }
 
-/** The password from `PDF_TO_PNG_PASSWORD`, which unlike `--pdf-file-password` is not visible in process listings. Empty means unset. */
+/** The password from `PDF_TO_PNG_PASSWORD`, which unlike `--pdf-file-password` other local users cannot read from a process listing. Empty means unset. */
 function passwordFromEnvironment(): string | undefined {
     const password = process.env.PDF_TO_PNG_PASSWORD;
     return password === '' ? undefined : password;
