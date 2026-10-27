@@ -33,6 +33,29 @@ export const MAX_CANVAS_SIDE = 1_000_000;
 export const MAX_INPUT_BYTES = 256 * 1024 * 1024;
 
 /**
+ * Longest string accepted as a file path input: POSIX PATH_MAX on Linux. A longer string cannot be a usable path, it
+ * is document content passed by mistake, and the filesystem error for it would copy the whole value into its message.
+ * Windows extended-length paths (up to 32,767 characters) are therefore not accepted as string input; raise this if that
+ * is ever needed.
+ */
+export const MAX_INPUT_PATH_LENGTH = 4096;
+
+/**
+ * Largest single `FileHandle.read()` request when an input PDF is read from a path. `read()` takes an int32 `length`, so
+ * a request of 2 GiB or more is unsafe: depending on the Node version it aborts the process (a failed C++ CHECK) or
+ * throws ERR_OUT_OF_RANGE, and a multiple of 4 GiB wraps to a zero-length read that the read loop would take for EOF and
+ * return a silently short buffer. No single request may exceed this; the loop already assembles a file from short reads.
+ */
+export const FILE_READ_MAX_CHUNK_BYTES = 2 ** 30;
+
+/**
+ * NAME_MAX: one path segment holds at most 255 units on every common filesystem. APFS, HFS+ and NTFS count UTF-16 code
+ * units; ext4, xfs, btrfs and most other hosts count UTF-8 bytes, which are never fewer than the code units. Node
+ * exposes no pathconf, so `assertValidOutputFilename()` lets the host family stand in for the filesystem.
+ */
+export const MAX_FILENAME_LENGTH = 255;
+
+/**
  * Upper bound on `concurrencyLimit` for local parallel and worker rendering. At this cap,
  * worst-case in-flight canvas memory alone is roughly 6.4 GB, so the limit bounds rather than
  * prevents memory exhaustion. Callers should choose a substantially lower value in containers.

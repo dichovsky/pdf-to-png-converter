@@ -1,5 +1,6 @@
 import { promises as fsPromises } from 'node:fs';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { MAX_FILENAME_LENGTH } from './const.js';
 
 // Reject only characters the host OS treats as path separators. On Windows both "\\" and "/"
 // are separators; on POSIX only "/" is. A backslash therefore remains a valid POSIX filename
@@ -9,10 +10,6 @@ const PATH_SEPARATOR_PATTERN = IS_WINDOWS_PATH ? /[\\/]/ : /\//;
 // eslint-disable-next-line no-control-regex -- Windows forbids U+0000-U+001F in filenames.
 const WINDOWS_INVALID_FILENAME_CHARACTER_PATTERN = /[<>:"|?*\u0000-\u001f]/u;
 const WINDOWS_RESERVED_DEVICE_BASENAME_PATTERN = /^(?:con|prn|aux|nul|com[1-9¹²³]|lpt[1-9¹²³]|conin\$|conout\$)$/iu;
-// NAME_MAX: one path segment holds at most 255 units on every common filesystem. APFS, HFS+ and NTFS
-// count UTF-16 code units; ext4, xfs, btrfs and most other hosts count UTF-8 bytes, which are never
-// fewer than the code units. Node exposes no pathconf, so the host family stands in for the filesystem.
-const MAX_FILENAME_LENGTH = 255;
 
 export const HOST_PATH_SEPARATOR_DESCRIPTION = IS_WINDOWS_PATH ? '"/" or "\\"' : '"/"';
 

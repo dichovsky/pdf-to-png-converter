@@ -1,19 +1,8 @@
 import { constants as fsConstants, promises as fsPromises } from 'node:fs';
 import type { FileHandle } from 'node:fs/promises';
+import { FILE_READ_MAX_CHUNK_BYTES, MAX_INPUT_PATH_LENGTH } from './const.js';
 
 const FILE_READ_GROWTH_BYTES = 64 * 1024;
-
-// FileHandle.read() takes an int32 `length`, so a request of 2 GiB or more is unsafe: depending on the
-// Node version it aborts the process (a failed C++ CHECK) or throws ERR_OUT_OF_RANGE, and a multiple
-// of 4 GiB wraps to a zero-length read that the read loop would take for EOF and return a silently
-// short buffer. No single request may exceed this; the loop already assembles a file from short reads.
-const FILE_READ_MAX_CHUNK_BYTES = 2 ** 30;
-
-// POSIX PATH_MAX on Linux. A longer string cannot be a usable path: it is document content passed by
-// mistake, and the filesystem error for it would copy the whole value into its message. Windows
-// extended-length paths (up to 32,767 characters) are therefore not accepted as string input; raise
-// this if that is ever needed.
-const MAX_INPUT_PATH_LENGTH = 4096;
 
 function rejectOversized(byteLength: number, maxInputBytes: number): void {
     if (byteLength > maxInputBytes) {
