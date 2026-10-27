@@ -154,6 +154,23 @@ function fail(error: unknown): void {
     process.exit(1);
 }
 
+/**
+ * Runs `task` with `console.log` and `console.info` writing to stderr. pdf.js reports Info lines (verbosity 5) with
+ * `console.info`, which is stdout and would corrupt the `--return-metadata-only` JSON; the CLI prints its own output
+ * after the task. Worker threads have their own console, which this does not change.
+ */
+async function withConsoleOnStderr<T>(task: () => Promise<T>): Promise<T> {
+    const { log, info } = console;
+    console.log = console.error;
+    console.info = console.error;
+    try {
+        return await task();
+    } finally {
+        console.log = log;
+        console.info = info;
+    }
+}
+
 /** Parses argv, delegates conversion to the public library interface, and prints CLI output. */
 export async function run(): Promise<void> {
     let parsed: ReturnType<typeof parseArgs<typeof PARSE_CONFIG>>;
@@ -203,7 +220,7 @@ export async function run(): Promise<void> {
 
         let results;
         try {
-            results = await pdfToPng(pdfFilePath, options);
+            results = await withConsoleOnStderr(() => pdfToPng(pdfFilePath, options));
         } catch (error: unknown) {
             throw new ConversionError(error);
         }

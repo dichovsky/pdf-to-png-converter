@@ -242,6 +242,36 @@ describe('CLI', () => {
         expect(logSpy).not.toHaveBeenCalled();
     });
 
+    it('routes console output written during the conversion to stderr and restores the console afterwards', async () => {
+        const consoleBefore = { log: console.log, info: console.info };
+        vi.mocked(pdfToPng).mockImplementationOnce(async () => {
+            // pdf.js writes Info lines (verbosity 5) with console.info and deprecation notices with console.log.
+            console.info('Info: (while reading XRef): FormatError');
+            console.log('Deprecated API usage: example');
+            return [];
+        });
+        setArgv('test.pdf', '--return-metadata-only', '--verbosity-level', '5');
+        await run();
+
+        expect(errorSpy).toHaveBeenCalledWith('Info: (while reading XRef): FormatError');
+        expect(errorSpy).toHaveBeenCalledWith('Deprecated API usage: example');
+        // Only the metadata document reaches stdout.
+        expect(logSpy.mock.calls).toEqual([['[]']]);
+        expect(console.log).toBe(consoleBefore.log);
+        expect(console.info).toBe(consoleBefore.info);
+    });
+
+    it('restores the console when the conversion fails', async () => {
+        const consoleBefore = { log: console.log, info: console.info };
+        vi.mocked(pdfToPng).mockRejectedValueOnce(new Error('render failed'));
+        setArgv('test.pdf', '--output-folder', '/out');
+        await run();
+
+        expect(exitSpy).toHaveBeenCalledWith(1);
+        expect(console.log).toBe(consoleBefore.log);
+        expect(console.info).toBe(consoleBefore.info);
+    });
+
     it('prints public conversion errors and exits 1', async () => {
         vi.mocked(pdfToPng).mockRejectedValueOnce(new Error('render failed'));
         setArgv('test.pdf', '--output-folder', '/out');

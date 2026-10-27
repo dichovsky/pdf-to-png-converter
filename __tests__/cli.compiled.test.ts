@@ -1,6 +1,6 @@
 import { execSync, spawnSync } from 'node:child_process';
 import type { SpawnSyncReturns } from 'node:child_process';
-import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, beforeAll, describe, expect, test } from 'vitest';
@@ -109,5 +109,26 @@ describe('entry point', () => {
         expect(result.status, result.stderr).toBe(0);
         expect(result.stdout).toBe('');
         expect(result.stderr).toBe('');
+    });
+});
+
+describe('--return-metadata-only', () => {
+    // A startxref offset far beyond the end of the file makes pdf.js log "Info: (while reading XRef): ..." at verbosity 5
+    // and rebuild the table by scanning the file. pdf.js writes Info lines with console.info, which is stdout.
+    test('prints only JSON on stdout at verbosity 5 and sends the pdf.js Info lines to stderr', () => {
+        const original = readFileSync(join(repositoryRoot, 'test-data', 'sample.pdf'));
+        const startxref = original.lastIndexOf('startxref');
+        expect(startxref).toBeGreaterThan(0);
+        const damagedPdf = join(makeTemporaryDirectory(), 'damaged-xref.pdf');
+        writeFileSync(damagedPdf, Buffer.concat([original.subarray(0, startxref), Buffer.from('startxref\n999999\n%%EOF\n')]));
+
+        const result = runNode([cliPath, damagedPdf, '--return-metadata-only', '--verbosity-level', '5']);
+
+        expect(result.status, result.stderr).toBe(0);
+        const pages = JSON.parse(result.stdout) as Array<{ pageNumber: number }>;
+        expect(pages.map((page) => page.pageNumber)).toEqual([1, 2]);
+        // The trigger fired and the verbosity option still works. Without this the test would pass vacuously if pdf.js
+        // stopped logging for this file.
+        expect(result.stderr).toContain('Info: ');
     });
 });
