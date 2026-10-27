@@ -5,7 +5,7 @@ Thank you for taking the time to contribute!
 ## Prerequisites
 
 - **Node.js 24+** for the contributor toolchain (`.nvmrc`: `nvm use`); the published runtime supports Node.js 22.13+
-- **npm 11+** for development (the publish workflow pins npm 12.0.2)
+- **npm 11.11+** for development, because older releases drop the `libc` fields from `package-lock.json` when they rewrite it (the publish workflow pins npm 12.0.2)
 
 ## Getting Started
 
@@ -21,7 +21,7 @@ npm ci
 npm run check         # full validation gate: types, format, lint, licenses, and tests
 npm test              # run tests with coverage only
 npm run test:fast     # fast Vitest loop without coverage
-npm run lint          # ESLint across the repository using eslint.config.mjs
+npm run lint          # ESLint on src/ and __tests__/ using eslint.config.mjs
 npm run build:test    # type-check src/ + __tests__/ (no emit)
 npm run build:strict  # stricter dependency-boundary type-check
 npm run test:license  # verify production dependency licenses
@@ -60,7 +60,7 @@ Do not work around `build:strict` failures by adding `continue-on-error` to the 
 - **Imports:** use `.js` extensions in all relative imports (required by `"moduleResolution": "node16"`).
 - **Type imports:** use `import type` for type-only imports.
 - **Return types:** all functions in `src/` need explicit return type annotations.
-- **Accessibility:** all class members need explicit `public` / `private` modifiers.
+- **Accessibility:** all class members need explicit `public` / `private` modifiers (constructors omit `public`).
 
 ## Commit Messages
 
@@ -89,7 +89,7 @@ Releases are published to npm by `.github/workflows/publish.yml` when a non-prer
 **Cutting a release:**
 
 1. On a release branch, bump the version with `npm version <x.y.z> --no-git-tag-version` (updates `package.json` + `package-lock.json`).
-2. Move the `## [Unreleased]` entries in `CHANGELOG.md` into a new `## [x.y.z] — <date>` section.
+2. Move the `## [Unreleased]` entries in `CHANGELOG.md` into a new `## [x.y.z] — <date>` section, then update the comparison links at the bottom of the file: `[Unreleased]` compares `vx.y.z...HEAD`, and a new `[x.y.z]` link compares the previous tag with `vx.y.z`.
 3. Run `npm run check && npm run build`, then `RELEASE_TAG=vx.y.z npm run release:precheck`. The precheck confirms the tag/version match, version availability, versioned changelog entry, empty `[Unreleased]` section, required compiled artifacts, and absence of source, tests, or build metadata from the tarball.
 4. Merge the branch, then create a non-prerelease GitHub Release tagged exactly `vx.y.z`.
 5. The workflow runs `release:precheck` → `npm publish --provenance` → `release:postcheck` (verifies the published version, the `latest` dist-tag, the provenance attestation, a clean-install smoke test, and a real conversion in worker-thread mode against the installed package).

@@ -10,11 +10,11 @@
 
 ## Reporting a Vulnerability
 
-Please **do not** open a public GitHub issue for security vulnerabilities.
+Please **do not** put the details of a security vulnerability in a public GitHub issue.
 
-Report security issues privately via [GitHub Security Advisories](https://github.com/dichovsky/pdf-to-png-converter/security/advisories/new).
+Private vulnerability reporting through GitHub Security Advisories is not currently enabled for this repository. Until it is, open a [GitHub issue](https://github.com/dichovsky/pdf-to-png-converter/issues/new) that only asks the maintainers for a private way to send a security report, and leave out any details of the vulnerability. Send the details only once the maintainers have given you that private channel.
 
-Include:
+When you send the details, include:
 
 - A description of the vulnerability and its potential impact
 - Steps to reproduce (proof-of-concept code or a minimal test case)

@@ -1,5 +1,7 @@
 # Release plan: v4.2.1
 
+> **Status:** This plan was executed and `4.2.1` was published to npm on 2026-08-25 (UTC+3). The file is kept as a record of that release's go/no-go criteria and cut sequence; in the text below, `[Unreleased]` means the `CHANGELOG.md` entries that became the `## [4.2.1]` section. The maintained release procedure is the "Releasing" section of [CONTRIBUTING.md](CONTRIBUTING.md#releasing).
+
 ## Decision
 
 Release `4.2.1` as a patch after the checks below are green. The changes since `4.2.0` preserve the public exports, options, defaults, output variants, CLI contract, and Node.js 22.13 minimum. They consist of backward-compatible fixes, security hardening, internal consolidation, dependency maintenance, documentation corrections, and stronger tests, so a minor or major version is not warranted.
