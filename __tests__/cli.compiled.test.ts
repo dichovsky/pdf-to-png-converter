@@ -132,3 +132,26 @@ describe('--return-metadata-only', () => {
         expect(result.stderr).toContain('Info: ');
     });
 });
+
+describe('PDF_TO_PNG_PASSWORD', () => {
+    // The password of the encrypted fixture, which is public (see protected.pdf.test.ts).
+    const FIXTURE_PASSWORD = 'uES69xm545C/HP!';
+
+    test('opens an encrypted PDF when --pdf-file-password is absent', () => {
+        const args = [
+            cliPath,
+            join(repositoryRoot, 'test-data', 'large_pdf-protected.pdf'),
+            '--return-metadata-only',
+            '--pages-to-process',
+            '1',
+        ];
+
+        const withoutPassword = runNode(args);
+        expect(withoutPassword.status).toBe(1);
+
+        const withPassword = runNode(args, { env: { PDF_TO_PNG_PASSWORD: FIXTURE_PASSWORD } });
+        expect(withPassword.status, withPassword.stderr).toBe(0);
+        expect(JSON.parse(withPassword.stdout)).toHaveLength(1);
+        expect(withPassword.stdout + withPassword.stderr).not.toContain(FIXTURE_PASSWORD);
+    });
+});

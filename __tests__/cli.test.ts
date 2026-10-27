@@ -35,6 +35,7 @@ describe('CLI', () => {
     afterEach(() => {
         process.argv = originalArgv;
         vi.restoreAllMocks();
+        vi.unstubAllEnvs();
     });
 
     it('prints help and does not invoke conversion', async () => {
@@ -206,6 +207,51 @@ describe('CLI', () => {
             maxInputBytes: 256 * 1024 * 1024,
         });
         expect(logSpy).toHaveBeenCalledWith('Successfully processed 0 page(s).');
+    });
+
+    it('reads the PDF password from PDF_TO_PNG_PASSWORD when --pdf-file-password is absent', async () => {
+        vi.stubEnv('PDF_TO_PNG_PASSWORD', 'env-password');
+        setArgv('test.pdf', '--output-folder', '/out');
+        await run();
+
+        expect(pdfToPng).toHaveBeenCalledWith('test.pdf', expect.objectContaining({ pdfFilePassword: 'env-password' }));
+    });
+
+    it('prefers --pdf-file-password over PDF_TO_PNG_PASSWORD', async () => {
+        vi.stubEnv('PDF_TO_PNG_PASSWORD', 'env-password');
+        setArgv('test.pdf', '--output-folder', '/out', '--pdf-file-password', 'flag-password');
+        await run();
+
+        expect(pdfToPng).toHaveBeenCalledWith('test.pdf', expect.objectContaining({ pdfFilePassword: 'flag-password' }));
+    });
+
+    it.each([
+        ['empty', ''],
+        ['unset', undefined],
+    ])('passes no password when PDF_TO_PNG_PASSWORD is %s', async (_state, value) => {
+        vi.stubEnv('PDF_TO_PNG_PASSWORD', value);
+        setArgv('test.pdf', '--output-folder', '/out');
+        await run();
+
+        expect(pdfToPng).toHaveBeenCalledWith('test.pdf', expect.objectContaining({ pdfFilePassword: undefined }));
+    });
+
+    it('never prints a password it was given, on success or on failure', async () => {
+        vi.stubEnv('PDF_TO_PNG_PASSWORD', 'env-secret');
+        setArgv('test.pdf', '--output-folder', '/out', '--pdf-file-password', 'flag-secret');
+        await run();
+        vi.mocked(pdfToPng).mockRejectedValueOnce(new Error('render failed'));
+        await run();
+
+        const printed = JSON.stringify([...logSpy.mock.calls, ...errorSpy.mock.calls]);
+        expect(printed).toContain('Successfully processed');
+        expect(printed).toContain('render failed');
+        expect(printed).not.toContain('env-secret');
+        expect(printed).not.toContain('flag-secret');
+    });
+
+    it('documents the password environment variable in the help text', () => {
+        expect(HELP_TEXT).toContain('PDF_TO_PNG_PASSWORD');
     });
 
     it('normalizes an omitted metadata flag to file mode before applying CLI policy', async () => {

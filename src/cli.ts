@@ -12,7 +12,7 @@ Options:
   --output-folder <dir>             Folder path where PNG files will be written (required unless --return-metadata-only)
   --viewport-scale <number>         Scale factor applied to each page viewport
   --use-system-fonts                Attempt to use fonts installed on the host system
-  --disable-font-face <true|false>  Draw glyphs as paths (true/false/1/0, default true; false can render text as boxes)
+  --disable-font-face <true|false>  Draw glyphs as paths (true/false/1/0, default true; false is coerced to true with a process warning)
   --enable-xfa <true|false>         Process XFA form data (true/false/1/0)
   --pdf-file-password <pwd>         Password for encrypted PDFs
   --pages-to-process <n,m,...>      Comma-separated list of 1-based page numbers
@@ -23,7 +23,10 @@ Options:
   --render-in-worker-threads        Rasterize pages in a pool of worker threads (multi-core)
   --silent                          Suppress progress and success messages (metadata JSON and errors are still printed)
   --version                         Show version
-  --help                            Show this help message`;
+  --help                            Show this help message
+
+Environment:
+  PDF_TO_PNG_PASSWORD               Password for encrypted PDFs, used when --pdf-file-password is not given (not visible in process listings)`;
 
 const CLI_OPTIONS = {
     'output-folder': { type: 'string' },
@@ -94,6 +97,12 @@ function parseNumber(value: string | undefined, errorMessage: string, integer = 
     return parsed;
 }
 
+/** The password from `PDF_TO_PNG_PASSWORD`, which unlike `--pdf-file-password` is not visible in process listings. Empty means unset. */
+function passwordFromEnvironment(): string | undefined {
+    const password = process.env.PDF_TO_PNG_PASSWORD;
+    return password === '' ? undefined : password;
+}
+
 function buildConversion(
     values: ParsedValues,
     positionals: string[],
@@ -111,7 +120,7 @@ function buildConversion(
         useSystemFonts: values['use-system-fonts'],
         disableFontFace: parseBoolean(values['disable-font-face']),
         enableXfa: parseBoolean(values['enable-xfa']),
-        pdfFilePassword: values['pdf-file-password'],
+        pdfFilePassword: values['pdf-file-password'] ?? passwordFromEnvironment(),
         pagesToProcess: parseNumberList(values['pages-to-process']),
         verbosityLevel: parseNumber(values['verbosity-level'], '--verbosity-level must be a valid integer.', true),
         returnMetadataOnly: values['return-metadata-only'],
