@@ -14,6 +14,23 @@ function unsupportedBufferError(value: unknown): Error {
     return new Error(`Unsupported buffer type: ${Object.prototype.toString.call(value)}`);
 }
 
+// An `Object.prototype.toString` tag can be forged with `Symbol.toStringTag`, so it cannot prove an object is a buffer.
+// These prototype getters can: they throw unless the receiver really is an ArrayBuffer or SharedArrayBuffer (from any
+// realm), and they report the true size even when the `byteLength` property was shadowed.
+type ByteLengthGetter = PropertyDescriptor & { get: () => number };
+const ARRAY_BUFFER_BYTE_LENGTH = Object.getOwnPropertyDescriptor(ArrayBuffer.prototype, 'byteLength') as ByteLengthGetter;
+const SHARED_ARRAY_BUFFER_BYTE_LENGTH = Object.getOwnPropertyDescriptor(SharedArrayBuffer.prototype, 'byteLength') as ByteLengthGetter;
+
+/** The genuine byte length of a cross-realm buffer with the given tag, or `undefined` for an object that only forges the tag. */
+function genuineBufferByteLength(candidate: unknown, tag: string): number | undefined {
+    const { get } = tag === '[object SharedArrayBuffer]' ? SHARED_ARRAY_BUFFER_BYTE_LENGTH : ARRAY_BUFFER_BYTE_LENGTH;
+    try {
+        return get.call(candidate);
+    } catch {
+        return undefined;
+    }
+}
+
 function toTransferableView(buffer: Buffer, byteLength: number): Uint8Array {
     // A full-span allocation is owned exclusively by this read, so pdf.js may transfer its
     // ArrayBuffer without a copy. A short read must be copied into an exact-size allocation: its
@@ -144,11 +161,17 @@ export async function getPdfFileBuffer(pdfFile: string | ArrayBufferLike | Uint8
         return Uint8Array.from(new Uint8Array(candidate.buffer, candidate.byteOffset, candidate.byteLength));
     }
 
-    // Cross-realm `ArrayBuffer` and `SharedArrayBuffer`, for the same reason. `Uint8Array.from`
-    // copies, so a shared buffer also leaves here as unshared memory.
+    // Cross-realm `ArrayBuffer` and `SharedArrayBuffer`, for the same reason. The tag only selects the getter that
+    // decides: an object that merely forges the tag has no genuine byte length, so it falls through to the
+    // unsupported-shape error instead of reaching the copy. `Uint8Array.from` copies, so a shared buffer also leaves
+    // here as unshared memory.
     const tag = Object.prototype.toString.call(candidate);
     if (tag === '[object ArrayBuffer]' || tag === '[object SharedArrayBuffer]') {
-        return Uint8Array.from(new Uint8Array(candidate as ArrayBuffer));
+        const byteLength = genuineBufferByteLength(candidate, tag);
+        if (byteLength !== undefined) {
+            rejectOversized(byteLength, maxInputBytes);
+            return Uint8Array.from(new Uint8Array(candidate as ArrayBuffer));
+        }
     }
 
     // Arrays of byte values — most commonly a Node `Buffer` that round-tripped through JSON as
