@@ -31,7 +31,7 @@ The current source tree has 11 modules:
 - `src/outputWriter.ts` — disk filename validation, output-folder preparation, realpath checks, and exclusive-create writes.
 - `src/workerPool.ts` — worker protocol types, dynamic dispatch, error policy, main-thread finalizers, and worker teardown.
 - `src/pageRenderWorker.ts` — compiled worker entry; lazy document load and page rendering inside each worker.
-- `src/cli.ts` — CLI parsing and policy; delegates to the public `pdfToPng` function. It takes exactly one `<pdf-file-path>`, reads the password from `--pdf-file-password`, else `PDF_TO_PNG_PASSWORD`, and sends pdf.js console output written on the main thread to stderr, so a metadata run's stdout is only the JSON.
+- `src/cli.ts` — CLI parsing and policy; delegates to the public `pdfToPng` function. It takes exactly one `<pdf-file-path>`, reads the password from `--pdf-file-password`, else `PDF_TO_PNG_PASSWORD`, and sends pdf.js console output written on the main thread to stderr, so a metadata run's stdout is only the JSON. An empty `PDF_TO_PNG_PASSWORD` counts as unset. The entry check resolves `process.argv[1]` the way Node resolved the entry module, so extensionless, relative and symlinked launches run the CLI while `require()`-ing the module does not.
 - `src/types.ts` — public option and output types plus `VerbosityLevel`.
 - `src/const.ts` — defaults, resource/concurrency limits, pipeline window, wasm warm-up timeout, and pdf.js asset-directory and wasm-decoder file names.
 - `src/index.ts` — public re-exports only.
@@ -41,7 +41,7 @@ Keep this consolidated ownership. Split out another seam only when a new indepen
 ## Conversion invariants
 
 1. `pdfToPng()` validates and snapshots options before input I/O (`null` counts as unset) and, unless `returnMetadataOnly` is set, resolves a relative `outputFolder` against `process.cwd()` before its first `await`.
-2. `getPdfFileBuffer()` returns owned `Uint8Array` bytes. Path input is opened, checked, and read through one handle; caller-owned byte containers are copied so pdf.js cannot detach them.
+2. `getPdfFileBuffer()` returns owned `Uint8Array` bytes. Path input is opened, checked, and read through one handle; caller-owned byte containers are copied so pdf.js cannot detach them. Byte input is a `Buffer`, `Uint8Array`, `ArrayBuffer` or `SharedArrayBuffer` (cross-realm ones included) or a real `Array` of bytes; an object that only claims a numeric `length` is rejected.
 3. Worker mode retains one main-thread byte copy before the main pdf.js loading task may detach its input.
 4. All page names are resolved before output-folder creation. Disk names (flat, host-valid, at most `MAX_FILENAME_LENGTH` units) and duplicates under the `outputNameKey()` Unicode fold are preflighted before any output I/O.
 5. Metadata-only mode creates no canvas, worker pool, output folder, PNG bytes, or files.
@@ -60,7 +60,7 @@ Keep this consolidated ownership. Split out another seam only when a new indepen
 - `processPagesInParallel: true` uses `concurrencyLimit` on the main thread. Set the limit to `1` for exactly one page task in flight.
 - `renderInWorkerThreads: true` takes precedence over main-thread parallelism and is ignored for metadata-only requests. Each worker loads one private document copy; names and files stay main-side.
 - In-flight work drains after a page error. Main-thread/page errors are deterministic by lowest page index; worker-level fatal errors take priority in worker mode.
-- Errors a worker reports reach the caller as native `Error`s with `message`, `name`, and `cause` preserved; the class and pdf.js-specific fields such as `details` and `code` are not carried across. Worker mode needs the unbundled installed package: `resolveWorkerEntryPath()` needs `__dirname`, and an ESM bundle gets a descriptive error instead.
+- Errors a worker reports reach the caller as native `Error`s with `message`, `name`, and `cause` preserved. Built-in subclasses such as `TypeError` keep their class; the class of a pdf.js exception or any custom `Error` subclass, and pdf.js-specific fields such as `details` and `code`, are not carried across. Worker mode needs the unbundled installed package: `resolveWorkerEntryPath()` needs `__dirname`, and an ESM bundle gets a descriptive error instead.
 - File mode always materializes content for the write, then omits it from the result when `returnPageContent` is false. In-memory mode may omit PNG encoding when content is not requested.
 
 ## Output and security
@@ -83,7 +83,7 @@ Hard limits are also centralized in `src/const.ts` (`MAX_INPUT_BYTES` is only th
 - `MAX_VIEWPORT_SCALE = 100`
 - `MAX_CANVAS_PIXELS = 100_000_000`
 - `MAX_CANVAS_SIDE = 1_000_000` (libpng's per-side limit; a page over it is rejected on every path, including metadata-only and `returnPageContent: false`)
-- `MAX_INPUT_BYTES = 256 MiB`
+- `MAX_INPUT_BYTES = 256 MiB` (the CLI has no flag for `maxInputBytes`, so it always uses this default)
 - `MAX_INPUT_PATH_LENGTH = 4096` (a longer string input is rejected before any filesystem access)
 - `FILE_READ_MAX_CHUNK_BYTES = 2 ** 30` (largest single `FileHandle.read()` request, 1 GiB)
 - `MAX_FILENAME_LENGTH = 255` (output file name units: UTF-16 code units on macOS and Windows, UTF-8 bytes elsewhere)

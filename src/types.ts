@@ -10,16 +10,18 @@ export interface PdfToPngOptions {
      * Scale factor applied to each page viewport before rendering.
      * Values above `1` produce larger, higher-resolution images; values below `1` produce smaller images.
      * Must be a finite positive number. Maximum allowed value is `100`; values above this limit throw
-     * immediately to prevent runaway memory allocation (OOM) during canvas creation.
+     * immediately. A page whose rendered size would still exceed the canvas limits is rejected before any canvas is
+     * allocated.
      * Default: `1`.
      */
     viewportScale?: number;
 
     /**
-     * pdf.js has no Font Loading API in Node.js, so it is always given `true`, which draws glyphs as paths with its
-     * built-in font renderer (embedded fonts are still used). An explicit `false` is accepted but ignored, on the main
-     * thread and in worker threads, and a process warning with code `PDF_TO_PNG_DISABLE_FONT_FACE_IGNORED` is emitted once
-     * per process; silence only that warning with `node --disable-warning=PDF_TO_PNG_DISABLE_FONT_FACE_IGNORED`.
+     * Always `true` at runtime. pdf.js has no Font Loading API in Node.js, and with `false` it would draw text in
+     * embedded fonts as missing-glyph boxes, so the library passes `true`, which makes pdf.js draw glyph outlines as
+     * paths (embedded fonts are still used). An explicit `false` is accepted but ignored, on the main thread and in
+     * worker threads, and a process warning with code `PDF_TO_PNG_DISABLE_FONT_FACE_IGNORED` is emitted once per
+     * process; silence only that warning with `node --disable-warning=PDF_TO_PNG_DISABLE_FONT_FACE_IGNORED`.
      * Default: `true`.
      */
     disableFontFace?: boolean;
@@ -96,7 +98,9 @@ export interface PdfToPngOptions {
      * `VerbosityLevel.ERRORS` (0), `VerbosityLevel.WARNINGS` (1), `VerbosityLevel.INFOS` (5).
      * It changes pdf.js log lines only, never the output or errors. On the main thread the level is process-wide: pdf.js
      * keeps one verbosity setting that every opened document overwrites, so conversions that overlap with different
-     * levels all log at the level of the document opened last. Worker threads (`renderInWorkerThreads`) have their own.
+     * levels all log at the level of the document opened last. Page rendering in worker threads (`renderInWorkerThreads`)
+     * uses each worker's own level, but the main thread still opens every document, so its load-time log lines follow the
+     * process-wide level.
      * Default: `VerbosityLevel.ERRORS` (0).
      */
     verbosityLevel?: VerbosityLevel;
@@ -182,9 +186,10 @@ export interface PdfToPngOptions {
      * inputs (validated via `byteLength`; a byte `Array` counts by its `length`). Non-regular files such as FIFOs,
      * sockets and devices are rejected. Must be a positive integer.
      * The cap bounds the input bytes only, not the memory pdf.js needs to parse them: a non-PDF payload that is one long
-     * run of a single byte value costs about 32 to 64 heap bytes per input byte in pdf.js's recovery scan and can abort
-     * the process on heap exhaustion even below this cap. Convert untrusted files in an isolated process (with
-     * `--max-old-space-size` set) or in a `Worker` started with `resourceLimits`.
+     * run of a single byte value (zeros, for example) costs about 32 to 64 heap bytes per input byte in pdf.js's recovery
+     * scan and can abort the process on heap exhaustion even below this cap. Convert untrusted files in an isolated
+     * process (with `--max-old-space-size` set) or in a Node.js `Worker` that you start yourself with `resourceLimits`;
+     * `renderInWorkerThreads` does not help, because the main thread still opens every document.
      * Default: `256 * 1024 * 1024` (256 MiB).
      * @since 4.1.0
      */

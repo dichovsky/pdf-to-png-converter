@@ -55,13 +55,13 @@ Keep this consolidated ownership. Add another seam only when a new independent i
 
 1. `pdfToPng()` calls its private `normalizeOptions()` once (`null` counts as unset; `pagesToProcess` must be a real `Array` and is snapshotted) and, unless `returnMetadataOnly` is set, resolves a relative `outputFolder` against `process.cwd()` before its first `await`.
 2. `getPdfFileBuffer()` returns owned, unshared `Uint8Array` bytes under `maxInputBytes`.
-3. Worker mode retains one byte copy. `warmUpWasmDecoders()` is awaited before every main-thread `getPdfDocument()` call (issue #288, mozilla/pdf.js#22131; do not add a main-thread document open that skips it; remove under `BACKLOG.md` ARCH-018). It runs once per thread, workers skip it, a failed warm-up is ignored, and one still pending after `WASM_WARM_UP_TIMEOUT_MS` stops blocking. `getPdfDocument()` loads the main document, maps the already validated pdf.js fields, and passes `cMapUrl`, `standardFontDataUrl`, and `wasmUrl` built from the installed `pdfjs-dist` package location (never the working directory).
+3. Worker mode retains one byte copy. `warmUpWasmDecoders()` is awaited before every main-thread `getPdfDocument()` call (issue #288, mozilla/pdf.js#22131; do not add a main-thread document open that skips it, and `__tests__/loader.document.open.call.sites.test.ts` fails when a file other than `pdfToPng.ts`, `pageRenderWorker.ts`, or the warm-up in `pdfjsLoader.ts` opens one; remove under `BACKLOG.md` ARCH-018). It runs once per thread, workers skip it, a failed warm-up is ignored, and one still pending after `WASM_WARM_UP_TIMEOUT_MS` stops blocking. `getPdfDocument()` loads the main document, maps the already validated pdf.js fields, and passes `cMapUrl`, `standardFontDataUrl`, and `wasmUrl` built from the installed `pdfjs-dist` package location (never the working directory).
 4. Page selection, page naming, disk-name validation (including `MAX_FILENAME_LENGTH`), and duplicate checks under the `outputNameKey()` Unicode fold happen before output-folder creation. After the metadata-only return and before the folder is prepared, `warnIfWasmDecodersMissing()` runs at most once per thread (the library runs the check on the main thread only, so normally once per process).
 5. Metadata calls `getPageMetadata()`. Main-thread rendering calls `renderPdfPage()` through `mapLimitOrdered()`. Worker rendering calls `renderPagesInWorkerPool()` and uses the same loader/renderer in each worker.
 6. `finalizePage()` attaches the public identity fields. Disk output goes through `savePNGfile()` on the main thread in every rendering mode.
 7. The main loading task is destroyed in `finally`; pages, canvases, failed loads, worker finalizers, and workers have paired cleanup paths.
 
-The CLI builds ordinary `PdfToPngOptions` and calls `pdfToPng()`. Image conversion requires `--output-folder`; metadata-only mode prints JSON; `--return-page-content` is rejected because in-memory buffers are a library-only result. It takes exactly one `<pdf-file-path>` (more is a usage error with exit code 1), reads the password from `--pdf-file-password`, else `PDF_TO_PNG_PASSWORD`, and sends pdf.js console output written on the main thread to stderr, so a metadata run's stdout is only the JSON.
+The CLI builds ordinary `PdfToPngOptions` and calls `pdfToPng()`. Image conversion requires `--output-folder`; metadata-only mode prints JSON; `--return-page-content` is rejected because in-memory buffers are a library-only result. The CLI takes exactly one `<pdf-file-path>` (more is a usage error with exit code 1), reads the password from `--pdf-file-password`, else `PDF_TO_PNG_PASSWORD`, and sends pdf.js console output written on the main thread to stderr, so a metadata run's stdout is only the JSON.
 
 ## Modes and ordering
 
@@ -70,7 +70,7 @@ The CLI builds ordinary `PdfToPngOptions` and calls `pdfToPng()`. Image conversi
 - `processPagesInParallel: true`: ordered main-thread window of `concurrencyLimit`; use `1` for one page task in flight.
 - `renderInWorkerThreads: true`: dynamic pool with at most `concurrencyLimit` workers, takes precedence over main-thread parallelism, and is ignored for metadata.
 
-Every mode returns results in requested page order. Once an error occurs, no new work is dispatched and in-flight work drains. Page errors are reported deterministically by lowest page index; worker-level fatal errors take priority in worker mode. Workers and pending main-thread output finalizers must finish teardown before the call settles. Errors a worker reports reach the caller as native `Error`s with `message`, `name`, and `cause` preserved; the class and pdf.js-specific fields such as `details` and `code` are not carried across. Worker mode needs the unbundled installed package (`resolveWorkerEntryPath()` needs `__dirname`).
+Every mode returns results in requested page order. Once an error occurs, no new work is dispatched and in-flight work drains. Page errors are reported deterministically by lowest page index; worker-level fatal errors take priority in worker mode. Workers and pending main-thread output finalizers must finish teardown before the call settles. Errors a worker reports reach the caller as native `Error`s with `message`, `name`, and `cause` preserved. Built-in subclasses such as `TypeError` keep their class; the class of a pdf.js exception or any custom `Error` subclass, and pdf.js-specific fields such as `details` and `code`, are not carried across. Worker mode needs the unbundled installed package (`resolveWorkerEntryPath()` needs `__dirname`).
 
 ## Output contract
 
@@ -108,7 +108,7 @@ All variants include `pageNumber`, `name`, floored integer `width`/`height`, and
 
 - viewport scale: `1`, maximum `100`
 - canvas area: `100_000_000` pixels; canvas side: `1_000_000` pixels (libpng's per-side limit, enforced on every path including metadata-only and `returnPageContent: false`)
-- input size: `256 MiB`, the default of `maxInputBytes`, which bounds input bytes and not pdf.js memory; string path input: at most `4096` characters; one `FileHandle.read()` request: at most `2 ** 30` bytes
+- input size: `256 MiB`, the default of `maxInputBytes` (the CLI has no flag for it), which bounds input bytes and not pdf.js memory; string path input: at most `4096` characters; one `FileHandle.read()` request: at most `2 ** 30` bytes
 - output file name: at most `255` units (UTF-16 code units on macOS and Windows, UTF-8 bytes elsewhere)
 - concurrency: default `4`, maximum `16`
 - default in-memory content: enabled
@@ -142,7 +142,7 @@ High-value regression areas:
 - output callback CWD changes, flat names, name length, Unicode-fold duplicate names, symlink changes, `'wx'` collisions, and removal of a file left by a failed write
 - metadata/render dimension parity and cleanup on every failure hop
 - result order and deterministic failures in default, parallel, and worker modes
-- worker routing (asserted with spies, not inferred from byte parity), document reuse, crashes, error identity across the thread boundary, output-finalizer failures, and complete termination
+- worker routing (asserted with spies, not inferred from byte parity), document reuse, crashes, error `message`, `name`, and `cause` across the thread boundary, output-finalizer failures, and complete termination
 - pdf.js import/type compatibility, installed asset layout, wasm decoders and warm-up, golden rendering, and main/worker byte parity
 - CLI metadata JSON (stdout only), required output-folder policy, the single `<pdf-file-path>` rule, `PDF_TO_PNG_PASSWORD`, stderr routing of pdf.js output, silent behavior, compiled-CLI launch forms (with or without `.js`, relative, symlinked), and packaging/version errors
 
