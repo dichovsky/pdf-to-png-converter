@@ -31,8 +31,10 @@ interface PackumentVersion {
 
 const NPM: string = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const REPO_ROOT: string = join(__dirname, '..');
-export const RETRY_ATTEMPTS = 10;
-export const RETRY_DELAY_MS = 3000;
+// npm processes a publish asynchronously ("may take a few minutes to become available"): 4.3.0 took about
+// 75 s to appear. 20 waits of 15 s give it 5 minutes.
+export const RETRY_ATTEMPTS = 21;
+export const RETRY_DELAY_MS = 15_000;
 
 // What one registry read found. `absent` (E404 or no result yet) is the only outcome worth retrying: the
 // release may still be propagating. An `error` (network, auth, unexpected output) will not fix itself.

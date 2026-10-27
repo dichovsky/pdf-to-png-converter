@@ -1,6 +1,6 @@
 # Release plan: v4.3.0
 
-> **Status:** Prepared on 2026-10-27 for the `4.3.0` release. The file records this release's go/no-go criteria and cut sequence; the maintained release procedure is the "Releasing" section of [CONTRIBUTING.md](CONTRIBUTING.md#releasing). The previous plan (`4.2.1`) is in the git history of this file.
+> **Status:** This plan was executed and `4.3.0` was published to npm on 2026-10-27. The publish workflow's post-release step failed because npm needed about 75 seconds to make the new version visible, longer than the step's 27-second retry window. Run locally from the release commit, `release:postcheck` passed, and the retry window has since been widened. The file records this release's go/no-go criteria and cut sequence; the maintained release procedure is the "Releasing" section of [CONTRIBUTING.md](CONTRIBUTING.md#releasing). The previous plan (`4.2.1`) is in the git history of this file.
 
 ## Decision
 
