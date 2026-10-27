@@ -16,9 +16,10 @@ export interface PdfToPngOptions {
     viewportScale?: number;
 
     /**
-     * When `true` (the default), pdf.js does not load fonts through the browser Font Loading API and draws glyph
-     * outlines as paths instead. Keep it `true` in Node.js: `false` relies on the Font Loading API, which Node.js
-     * lacks, and can render text as missing-glyph boxes.
+     * pdf.js has no Font Loading API in Node.js, so it is always given `true`, which draws glyphs as paths with its
+     * built-in font renderer (embedded fonts are still used). An explicit `false` is accepted but ignored, on the main
+     * thread and in worker threads, and a process warning with code `PDF_TO_PNG_DISABLE_FONT_FACE_IGNORED` is emitted once
+     * per process; silence only that warning with `node --disable-warning=PDF_TO_PNG_DISABLE_FONT_FACE_IGNORED`.
      * Default: `true`.
      */
     disableFontFace?: boolean;
@@ -26,7 +27,6 @@ export interface PdfToPngOptions {
     /**
      * When `true`, pdfjs attempts to use fonts installed on the host system for fonts that are not embedded.
      * Output then depends on the fonts installed on the machine that runs the conversion.
-     * Do not combine it with `disableFontFace: false`, which can render text as missing-glyph boxes.
      * Default: `false`.
      */
     useSystemFonts?: boolean;
@@ -46,9 +46,10 @@ export interface PdfToPngOptions {
 
     /**
      * Folder path (relative or absolute) where PNG files will be written.
-     * Relative paths are resolved against `process.cwd()`.
+     * A relative path is resolved against `process.cwd()` when `pdfToPng()` is called, before any asynchronous work, so a
+     * later `process.chdir()` cannot redirect the output.
      * The folder is created recursively if it does not exist.
-     * When omitted, no files are written to disk.
+     * When omitted (or `null`), no files are written to disk. Any other non-string value throws before the input is read.
      *
      * @remarks
      * **Security (TOCTOU):** The write-containment guard rejects filenames that contain path
@@ -62,22 +63,30 @@ export interface PdfToPngOptions {
 
     /**
      * Custom naming function for output PNG files.
-     * Receives the 1-based page number and must return a filename string. Include the `.png` extension yourself:
-     * the library neither adds nor checks it (e.g. `(pageNumber) => \`page_${pageNumber}.png\``).
+     * Receives the 1-based page number and must return a filename string. The library neither adds nor checks a file
+     * extension: by convention, add `.png` yourself (e.g. `(pageNumber) => \`page_${pageNumber}.png\``).
      * In every mode the value must be non-empty and contain no host path separator. For disk
-     * output it must also be a host-valid filename: NUL and directory aliases are rejected, and
+     * output it must also be a host-valid filename of at most 255 units (UTF-16 code units on macOS and Windows, UTF-8
+     * bytes on other hosts): NUL and directory aliases are rejected, and
      * Windows additionally rejects invalid characters, alternate-data-stream syntax, reserved
      * device basenames, and trailing dots/spaces before output I/O.
+     * For disk output, names that a filesystem may treat as one file are also rejected as duplicates before the output
+     * folder is created. Names are compared after Unicode normalization (NFC and NFD forms) and case folding, so
+     * `Page.png` and `page.png`, `straße.png` and `STRASSE.png`, or two spellings of one accented name collide on every
+     * platform.
      * When omitted, names default to `<pdfBasename>_page_<pageNumber>.png`,
      * or `buffer_page_<pageNumber>.png` when the PDF is supplied as bytes instead of a file path.
+     * `null` counts as omitted; any other non-function value throws before the input is read.
      * @since 3.14.0
      */
     outputFileMaskFunc?: (pageNumber: number) => string;
 
     /**
-     * 1-based integer page numbers to convert. Non-integer values and values less than or equal to zero throw immediately.
+     * 1-based integer page numbers to convert. Must be an `Array` of positive integers: any other container (a typed
+     * array, `Set`, string or other array-like), an array with holes, non-integer values and values less than or equal
+     * to zero throw immediately, before any I/O.
      * Pages above the document page count are silently ignored.
-     * When omitted, all pages in the document are processed.
+     * When omitted (or `null`), all pages in the document are processed.
      * @since 3.3.0
      */
     pagesToProcess?: number[];
@@ -85,6 +94,9 @@ export interface PdfToPngOptions {
     /**
      * pdfjs verbosity level. Use the `VerbosityLevel` const for readable values:
      * `VerbosityLevel.ERRORS` (0), `VerbosityLevel.WARNINGS` (1), `VerbosityLevel.INFOS` (5).
+     * It changes pdf.js log lines only, never the output or errors. On the main thread the level is process-wide: pdf.js
+     * keeps one verbosity setting that every opened document overwrites, so conversions that overlap with different
+     * levels all log at the level of the document opened last. Worker threads (`renderInWorkerThreads`) have their own.
      * Default: `VerbosityLevel.ERRORS` (0).
      */
     verbosityLevel?: VerbosityLevel;
@@ -105,8 +117,9 @@ export interface PdfToPngOptions {
      * This is significantly faster than full rendering and useful for inspecting page dimensions
      * and rotation without generating images.
      * To stay consistent with a real render, this path still rejects pages that could not be
-     * rendered at the requested `viewportScale` — both those that floor to `0` px and those whose
-     * rendered (floored) canvas area exceeds the internal canvas pixel limit — rather than reporting
+     * rendered at the requested `viewportScale` — those that floor to `0` px, those whose rendered
+     * (floored) canvas area exceeds the internal canvas pixel limit, and those whose floored width or
+     * height exceeds 1,000,000 px (the PNG encoder's per-side limit) — rather than reporting
      * dimensions for a page that would throw on render.
      * Default: `false`.
      * @since 3.14.0
@@ -154,6 +167,9 @@ export interface PdfToPngOptions {
      * Takes precedence over `processPagesInParallel`. Ignored when `returnMetadataOnly` is `true`
      * (metadata extraction does not render). `outputFileMaskFunc` is fully supported — names are
      * resolved on the main thread before dispatch.
+     * The workers run the compiled `pageRenderWorker.js` found beside the library's own modules, so this mode needs the
+     * installed, unbundled package: from an ESM bundle, where `__dirname` is undefined, a conversion that selects at least
+     * one page rejects with an error that says so.
      * Default: `false`.
      * @since 4.2.0
      */
@@ -163,8 +179,12 @@ export interface PdfToPngOptions {
      * Maximum allowed input PDF size in bytes. Inputs larger than this throw immediately,
      * before any rendering work is started. Applies to both the file path branch (opened once,
      * verified and read through one handle with bounded allocation) and buffer / `Uint8Array`
-     * inputs (validated via `byteLength`). Non-regular files such as FIFOs, sockets and devices are
-     * rejected. Must be a positive integer.
+     * inputs (validated via `byteLength`; a byte `Array` counts by its `length`). Non-regular files such as FIFOs,
+     * sockets and devices are rejected. Must be a positive integer.
+     * The cap bounds the input bytes only, not the memory pdf.js needs to parse them: a non-PDF payload that is one long
+     * run of a single byte value costs about 32 to 64 heap bytes per input byte in pdf.js's recovery scan and can abort
+     * the process on heap exhaustion even below this cap. Convert untrusted files in an isolated process (with
+     * `--max-old-space-size` set) or in a `Worker` started with `resourceLimits`.
      * Default: `256 * 1024 * 1024` (256 MiB).
      * @since 4.1.0
      */
@@ -177,9 +197,12 @@ export type PageRotation = 0 | 90 | 180 | 270;
 interface BasePngPageOutput {
     pageNumber: number;
     name: string;
-    /** Image width in pixels, floored to match the rendered bitmap. */
+    /**
+     * Image width in pixels, floored to match the rendered bitmap. A length up to 1e-6 px below an integer counts as that
+     * integer, so a 612 × 792 pt Letter page at `viewportScale: 350 / 72` (350 dpi) is 2975 × 3850 px, not 2974 × 3849.
+     */
     width: number;
-    /** Image height in pixels, floored to match the rendered bitmap. */
+    /** Image height in pixels, floored to match the rendered bitmap, with the same 1e-6 px tolerance as `width`. */
     height: number;
     rotation: PageRotation;
 }

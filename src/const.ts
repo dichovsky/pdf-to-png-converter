@@ -23,8 +23,10 @@ export const MAX_CANVAS_PIXELS = 100_000_000;
 export const MAX_CANVAS_SIDE = 1_000_000;
 
 /**
- * Default upper bound on input PDF size in bytes. 256 MiB is a generous ceiling for legitimate
- * PDFs while keeping a single conversion well below typical service container memory limits.
+ * Default upper bound on input PDF size in bytes. 256 MiB is a generous ceiling for legitimate PDFs.
+ * It bounds the input bytes only, not the memory pdf.js needs to parse them: a non-PDF payload that is one long run of a
+ * single byte value costs about 32 to 64 heap bytes per input byte in pdf.js's recovery scan and can abort the process on
+ * heap exhaustion even below this cap, so this value is not a service memory limit.
  * The path branch of `getPdfFileBuffer()` opens once, verifies that same handle is a regular file,
  * and reads it with a bounded allocation, so devices, FIFOs, sockets, and unbounded growth cannot
  * bypass the cap through a pathname race.
