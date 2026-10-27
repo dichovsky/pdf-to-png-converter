@@ -19,5 +19,7 @@
             "module": "CommonJS"
         }
     },
-    "include": ["./src/**/*", "./__tests__/**/*"]
+    "include": ["./src/**/*", "./__tests__/**/*", "./scripts/**/*"],
+    // benchmark.ts imports the built ../out/index.js, which `npm run clean` deletes before `build:test`.
+    "exclude": ["./scripts/benchmark.ts"]
 }

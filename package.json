@@ -56,7 +56,7 @@
         "docker:test": "vitest run --coverage",
         "format": "prettier --write .",
         "format:check": "prettier --check .",
-        "lint": "eslint .",
+        "lint": "eslint . --max-warnings 0",
         "prepare": "husky",
         "prepublishOnly": "npm run check && npm run build",
         "release:precheck": "ts-node scripts/release-precheck.ts",
@@ -67,13 +67,12 @@
         "test:license": "license-checker-rseidelsohn --production --onlyAllow \"ISC; MIT; MIT OR X11; BSD; Apache-2.0; Unlicense\""
     },
     "lint-staged": {
-        "src/**/*.ts": [
-            "eslint --fix",
+        "{src,__tests__,scripts}/**/*.ts": [
+            "eslint --fix --max-warnings 0 --no-warn-ignored",
             "prettier --write"
         ],
-        "__tests__/**/*.ts": [
-            "prettier --write"
-        ]
+        "*.{js,mjs,cjs,json,md,yml,yaml}": "prettier --write",
+        ".prettierrc": "prettier --write"
     },
     "dependencies": {
         "@napi-rs/canvas": "~1.0.13",

@@ -223,6 +223,7 @@ function smokeTestRender(name: string, dir: string): void {
         if (error !== null && typeof error === 'object' && (error as { signal?: string }).signal === 'SIGKILL') {
             throw new Error(
                 `Q5 render smoke timed out after ${RENDER_SMOKE_TIMEOUT_MS / 1000}s — the worker pool never settled (a present but unusable ${'`pageRenderWorker.js`'} can hang instead of failing)`,
+                { cause: error },
             );
         }
         throw error;
