@@ -95,7 +95,7 @@ const pngPages: PngPageOutput[] = await pdfToPng('document.pdf', {
 });
 ```
 
-> **Existing files are not overwritten.** Disk writes use exclusive-create mode, so a pre-existing target causes `EEXIST`. Names within one disk-output request must also be unique case-insensitively; collisions are rejected before the output folder is created.
+> **Existing files are not overwritten.** Disk writes use exclusive-create mode, so a pre-existing target causes `EEXIST`. If a write fails after its file was created (for example a full disk), that file is removed (best effort) and the original error is thrown, so no truncated PNG stays under its final name; files of pages written before the failure stay. Names within one disk-output request must also be unique after folding letter case and Unicode forms: `Page.png` and `page.png`, `straße.png` and `STRASSE.png`, or the precomposed and decomposed spellings of `é` count as one name on every platform. Colliding names, and names longer than 255 units (UTF-16 code units on macOS and Windows, UTF-8 bytes elsewhere), are rejected before the output folder is created.
 
 ---
 
@@ -112,11 +112,11 @@ npx pdf-to-png-converter my-document.pdf --output-folder ./output
 - `--output-folder <dir>`: Directory to save PNG files. Required for image conversion. Existing targets are not overwritten; a pre-existing target causes `EEXIST`.
 - `--viewport-scale <number>`: Scale factor applied to each page viewport (default: `1`, maximum: `100`).
 - `--use-system-fonts`: Attempt to use fonts installed on the host system.
-- `--disable-font-face <true|false|1|0>`: Draw glyph outlines as paths instead of loading fonts through the browser Font Loading API (default: `true`; `false` can render text as missing-glyph boxes in Node.js).
+- `--disable-font-face <true|false|1|0>`: Draw glyphs as paths (default: `true`; embedded fonts are still used). `false` is coerced to `true` with the process warning `PDF_TO_PNG_DISABLE_FONT_FACE_IGNORED`, because pdf.js has no Font Loading API in Node.js.
 - `--enable-xfa <true|false|1|0>`: Process XFA form data.
-- `--pdf-file-password <pwd>`: Password for encrypted PDFs.
+- `--pdf-file-password <pwd>`: Password for encrypted PDFs. Without this flag the CLI reads the `PDF_TO_PNG_PASSWORD` environment variable (the flag wins when both are set, and an empty variable counts as unset). Prefer the variable: the flag is visible in process listings, shell history, and audit logs.
 - `--pages-to-process <n,m,...>`: Comma-separated list of 1-based page numbers.
-- `--verbosity-level <number>`: pdfjs verbosity level (0=errors, 1=warnings, 5=infos).
+- `--verbosity-level <number>`: pdfjs verbosity level (0=errors, 1=warnings, 5=infos). The CLI writes pdf.js messages from the main thread to stderr; worker threads (`--render-in-worker-threads`) keep their own console, so their Info lines can still reach stdout.
 - `--return-metadata-only`: Return page metadata without rendering images. This prints JSON to stdout and does not require `--output-folder`.
 - `--process-pages-in-parallel`: Process pages concurrently.
 - `--concurrency-limit <number>`: Maximum number of in-flight pages, or worker-pool size with worker-thread rendering (default: `4`, range when enabled: `1..16`).
@@ -128,9 +128,11 @@ npx pdf-to-png-converter my-document.pdf --output-folder ./output
 The CLI has two output modes:
 
 - image conversion: writes PNG files to `--output-folder`
-- metadata inspection: prints JSON metadata to stdout with `--return-metadata-only`, including when `--silent` is set
+- metadata inspection: prints JSON metadata to stdout with `--return-metadata-only`, including when `--silent` is set; stdout carries only that JSON, even at `--verbosity-level 5`
 
 If you need in-memory PNG buffers, use the library API (`returnPageContent`) rather than the CLI.
+
+The CLI takes exactly one `<pdf-file-path>`; loop in the shell to convert several files. A second positional argument is a usage error (exit code 1). That includes a value after a flag that takes none, such as `--use-system-fonts false`, and the second word of an unquoted path that contains a space. The CLI cannot raise the 256 MiB input size limit; only the library option `maxInputBytes` can.
 
 ---
 
@@ -147,6 +149,8 @@ Converts PDF pages to PNG images.
 | `input`   | `string \| ArrayBufferLike \| Uint8Array` | PDF file path, ArrayBuffer, or Uint8Array/Buffer |
 | `options` | `PdfToPngOptions`                         | Optional configuration object                    |
 
+A string `input` is always read as a file path of at most 4096 characters. A longer string is rejected before any file access, without being echoed in the error; pass PDF bytes as a `Buffer` or `Uint8Array` instead.
+
 **Returns:** `Promise<PngPageOutput[]>` - Array of converted PNG pages
 
 ### Options
@@ -154,24 +158,33 @@ Converts PDF pages to PNG images.
 ```typescript
 {
     // Font & Rendering Options
-    disableFontFace?: boolean,       // Disable font face rendering (default: true)
-                                     // Keep true: false relies on the browser Font Loading API, which
-                                     // Node.js lacks, and can render text as missing-glyph boxes
+    disableFontFace?: boolean,       // Draw glyphs as paths (default: true); embedded fonts are still used
+                                     // false is ignored: pdf.js has no Font Loading API in Node.js, so true
+                                     // is used and a one-time process warning
+                                     // (PDF_TO_PNG_DISABLE_FONT_FACE_IGNORED) reports it
     useSystemFonts?: boolean,        // Use system fonts as fallback (default: false)
     enableXfa?: boolean,             // Render XFA forms (default: true)
 
     // Output Options
     outputFolder?: string,           // Directory to save PNG files; existing files are not overwritten
+                                     // A relative path is resolved against process.cwd() when pdfToPng()
+                                     // is called, so a later process.chdir() cannot redirect the output
+                                     // null counts as unset, here and for outputFileMaskFunc
     outputFileMaskFunc?: (pageNumber: number) => string, // Custom filename function
                                      // Must return a non-empty flat name. "/" is always rejected;
                                      // "\" is also rejected on Windows. For disk output, NUL and
                                      // directory aliases are rejected; Windows also rejects invalid
                                      // characters, device names, streams, and trailing dots/spaces.
+                                     // For disk output, a name over 255 units (UTF-16 code units on
+                                     // macOS and Windows, UTF-8 bytes elsewhere) is also rejected,
+                                     // before the output folder is created.
 
     // Rendering Options
     viewportScale?: number,          // PNG scale/zoom level (default: 1.0, max: 100)
                                      // Note: large pages can still hit the 100-million-pixel canvas limit
-                                     // at scales well below 100. Reduce viewportScale if you get an error.
+                                     // at scales well below 100, and a canvas side over 1,000,000 px (a
+                                     // very long, thin page) is rejected too. Reduce viewportScale if you
+                                     // get an error.
 
     // Security
     pdfFilePassword?: string,        // Password for encrypted PDFs
@@ -179,11 +192,16 @@ Converts PDF pages to PNG images.
                                      // Path inputs are opened once, then fstat()'d and bounded-read
                                      // through that same handle; non-regular files are rejected.
                                      // In-memory byte containers, including cross-realm views and
-                                     // supported array-likes, are copied and checked against the cap.
+                                     // byte Arrays (for example the data array of a JSON-serialized
+                                     // Buffer), are copied and checked against the cap. Any other object
+                                     // with a numeric length is rejected as "Unsupported buffer type".
+                                     // The cap limits input bytes only, not the memory pdf.js needs to
+                                     // parse them (see Performance Notes).
 
     // Processing
     pagesToProcess?: number[],       // 1-indexed integer pages to convert (e.g., [1, 3, 5])
                                     // Non-integer and <= 0 values throw; pages beyond the PDF length are ignored
+                                    // Must be a real array without holes; typed arrays, Sets, and sparse arrays throw
     processPagesInParallel?: boolean, // Enable parallel processing (default: false)
     concurrencyLimit?: number,       // Max concurrent pages (parallel) / worker-pool size (worker
                                      // threads): integer 1..16 (default: 4). The upper bound caps
@@ -193,6 +211,10 @@ Converts PDF pages to PNG images.
                                      // True multi-core parallelism (pool size = concurrencyLimit); each
                                      // worker loads its own document copy. Pays off on multi-page,
                                      // render-heavy PDFs; identical pixels, ordered results.
+                                     // Needs the installed, unbundled package (see Troubleshooting).
+                                     // A pdf.js error thrown in a worker reaches you as a plain Error
+                                     // with the same message, name, and cause; its class and fields
+                                     // such as details and code are not carried across.
 
     // Output Control
     returnPageContent?: boolean,     // Include PNG buffer in output (default: true)
@@ -202,6 +224,11 @@ Converts PDF pages to PNG images.
     verbosityLevel?: VerbosityLevel, // VerbosityLevel.ERRORS | WARNINGS | INFOS (default: ERRORS)
                                       // Use the VerbosityLevel enum for readable values:
                                       // import { VerbosityLevel } from 'pdf-to-png-converter'
+                                      // pdf.js keeps one level per thread, and each conversion sets it when
+                                      // it opens its document, so with overlapping main-thread conversions
+                                      // the document opened last decides the level for all of them. It
+                                      // changes log lines only, never output or errors. Worker threads
+                                      // have their own level.
 }
 ```
 
@@ -327,15 +354,18 @@ This is significantly faster than full rendering and useful for checking page co
     - **Too large for a canvas.** An image declared at about 537 million pixels or more (for example an A0 bilevel scan at 600 dpi, 19866×28087) needs a canvas of 2 GiB or more (4 bytes per pixel). For a Flate, JPEG, CCITT, or JBIG2 image, `@napi-rs/canvas` creates that canvas but silently ignores everything drawn into it, so `pdfToPng()` resolves, the image is missing from the page, and no error or warning is reported, even with `VerbosityLevel.WARNINGS`. JPEG 2000 is the exception: pdf.js decodes a JPEG 2000 image that exceeds a lower size limit of its own at a reduced resolution, so the image is drawn with less detail, and a warning is logged with `VerbosityLevel.WARNINGS` (a file that cannot be reduced is left out, with an `Unable to decode image` warning).
     - **Wasm decoders.** CCITT, JBIG2, and JPEG 2000 images can declare such sizes from even smaller files, and they also use the wasm decoders shipped in `pdfjs-dist`: each decoder instance is capped at 2 GiB of wasm heap, and every worker has its own.
     - **Limits.** Neither `maxInputBytes` nor the canvas pixel limit bounds the size of an image declared inside the PDF. For untrusted PDFs, set container memory limits and per-job time limits.
+    - **Corrupt and non-PDF input.** `maxInputBytes` limits the input bytes, not the memory pdf.js needs to parse them. When pdf.js has to rebuild a missing or damaged cross-reference table, a long run of the same byte (a file of zeros, for example) costs about 32 to 64 bytes of heap per input byte, so a junk file well under `maxInputBytes` can exhaust the heap and abort the process with `JavaScript heap out of memory`, not a rejection you can catch. For untrusted PDFs, set `--max-old-space-size` and convert in an isolated process, or in a worker thread of your own created with `resourceLimits`. `renderInWorkerThreads` does not help, because the main thread opens the document first.
     - **Concurrency.** On the main thread (the default mode and `processPagesInParallel`) pdf.js decodes images one at a time, so the peak stays near one image whatever the concurrency (measured: three 20000×20000 images peak at 3.3 GB, the same as one). With `renderInWorkerThreads` every worker decodes at the same time with its own memory, so the peak multiplies (measured at 20000×20000: 2 workers 6.3 GB, 4 workers 12.5 GB); lower `concurrencyLimit` to limit that.
 
 ---
 
 ## Troubleshooting
 
-- **A scanned page renders blank.** pdf.js reports image decode failures only as warnings and still renders the rest of the page. Run with `verbosityLevel: VerbosityLevel.WARNINGS` (CLI: `--verbosity-level 1`) and look for `Unable to decode image` in the output. If there is no such warning, check whether the image is declared at about 537 million pixels or more: a Flate, JPEG, CCITT, or JBIG2 image that large is silently left out and nothing is logged (see [Performance Notes](#performance-notes)).
+- **A scanned page renders blank.** pdf.js reports image decode failures only as warnings and still renders the rest of the page. Run with `verbosityLevel: VerbosityLevel.WARNINGS` (CLI: `--verbosity-level 1`) and look for `Unable to decode image` in the output. If there is no such warning, check whether the image is declared at about 537 million pixels or more: a Flate, JPEG, CCITT, or JBIG2 image that large is silently left out and nothing is logged (see [Performance Notes](#performance-notes)). Run the conversion on its own: pdf.js keeps one verbosity level per thread, so a conversion running at the same time with a different `verbosityLevel` can hide these warnings.
 - **`PDF_TO_PNG_WASM_MISSING` process warning.** CCITT, JBIG2, and JPEG 2000 images are decoded by `jbig2.wasm` and `openjpeg.wasm` in the `wasm` folder of the installed `pdfjs-dist` package. If either file is missing, the library emits this Node.js process warning at most once per thread (the library runs the check on the main thread only, so normally once per process), and images that use those compressions may render blank, or decode more slowly through the pdf.js JavaScript fallback where it is available. The warning only detects missing files, not decode errors. Reinstall your dependencies to restore the files. To silence only this warning, run Node with `--disable-warning=PDF_TO_PNG_WASM_MISSING` or add that flag to `NODE_OPTIONS`; `--no-warnings` would hide every process warning.
+- **`PDF_TO_PNG_DISABLE_FONT_FACE_IGNORED` process warning.** You passed `disableFontFace: false` (or `--disable-font-face false`). pdf.js has no Font Loading API in Node.js, so `false` would draw text in embedded fonts as missing-glyph boxes. The library ignores the value, uses `true`, and emits this Node.js process warning at most once per thread (normally once per process). Remove the option. To silence only this warning, run Node with `--disable-warning=PDF_TO_PNG_DISABLE_FONT_FACE_IGNORED` or add that flag to `NODE_OPTIONS`; `--no-warnings` would hide every process warning.
 - **`Cannot resolve "pdfjs-dist/package.json"`.** The pdf.js `cmaps`, `standard_fonts`, and `wasm` folders are read from the installed `pdfjs-dist` package, not from the working directory, so that package must be resolvable from `pdf-to-png-converter`. Check for a bundler that inlines `pdfjs-dist`, or an incomplete install.
+- **`renderInWorkerThreads` cannot locate `pageRenderWorker.js` because `__dirname` is not defined.** Worker mode loads the compiled `pageRenderWorker.js` from beside the library, so it needs the unbundled `out/` directory of the installed package and cannot run from code where `pdf-to-png-converter` is inlined into an ESM bundle. Import the package from `node_modules` instead of bundling it, or turn `renderInWorkerThreads` off; the other modes are not affected.
 
 ---
 
@@ -349,7 +379,7 @@ The `pdfToPng` function returns an array of discriminated page objects. Branch o
 | `content`  | Rendering without `outputFolder` | `''`      | PNG `Buffer`, unless `returnPageContent: false` |
 | `file`     | Rendering with `outputFolder`    | File path | PNG `Buffer`, unless `returnPageContent: false` |
 
-All output objects also include `pageNumber`, `name`, `width`, `height`, and `rotation`. `width` and `height` are integer pixel dimensions of the rendered image: a fractional viewport (for example a 595×842 pt A4 page at `viewportScale: 1.5`, i.e. 892.5×1263) is floored to match the bitmap the canvas allocates (892×1263). `returnMetadataOnly` reports the same floored dimensions a render would produce — and, for the same reason, rejects the same unrenderable pages a render would: a `viewportScale` that floors a page to `0` px, or one whose rendered (floored) canvas area exceeds the internal canvas pixel limit, throws the identical error on both paths rather than returning dimensions for a page that cannot be rendered.
+All output objects also include `pageNumber`, `name`, `width`, `height`, and `rotation`. `width` and `height` are integer pixel dimensions of the rendered image: a fractional viewport (for example a 595×842 pt A4 page at `viewportScale: 1.5`, i.e. 892.5×1263) is floored to match the bitmap the canvas allocates (892×1263). A viewport length up to 1e-6 px below a whole number counts as that number, so floating-point noise does not cost a pixel: a 612×792 pt Letter page at `viewportScale: 350 / 72` is 2975×3850 px, not 2974×3849. `returnMetadataOnly` reports the same floored dimensions a render would produce — and, for the same reason, rejects the same unrenderable pages a render would: a `viewportScale` that floors a page to `0` px, one whose rendered (floored) canvas area exceeds the internal canvas pixel limit, or one that makes a floored width or height exceed the 1,000,000 px per-side limit of the PNG encoder, throws the identical error on both paths rather than returning dimensions for a page that cannot be rendered. A render with `returnPageContent: false` applies the same checks.
 
 ```javascript
 [
