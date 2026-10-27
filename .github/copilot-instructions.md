@@ -89,7 +89,7 @@ All variants include `pageNumber`, `name`, floored integer `width`/`height`, and
 ### Input
 
 - Open a path once with `O_RDONLY | O_NONBLOCK`; inspect and positionally read through that same handle, then close in `finally`.
-- Reject non-regular files and enforce `maxInputBytes` across initial size, later growth, buffers, cross-realm views and buffers, and byte `Array`s counted by `length`. Accept no other array-like: an object that merely claims a `length` is rejected.
+- Reject non-regular files and enforce `maxInputBytes` across initial size, later growth, buffers, cross-realm views and buffers, and byte `Array`s counted by `length`. Accept no other array-like: an object that merely claims a `length` is rejected, and so is an object that only forges the `ArrayBuffer` or `SharedArrayBuffer` tag (the size comes from the prototype `byteLength` getters).
 - Preserve caller byte containers by copying before pdf.js can transfer/detach them. Preserve the path-input dedicated-allocation zero-copy handoff where safe.
 
 ### Output
@@ -99,7 +99,7 @@ All variants include `pageNumber`, `name`, floored integer `width`/`height`, and
 - Revalidate with `assertValidOutputFilename()` in `savePNGfile()` as defense in depth.
 - Keep filenames to one flat path segment under the host's separator rules, at most `MAX_FILENAME_LENGTH` units, and reject `"."` / `".."` disk aliases.
 - Preserve `OutputFolderHandle`, the per-write realpath equality check, and `'wx'` opens.
-- If a write or close fails after the `'wx'` open succeeded, remove the file this call created (best effort) and rethrow the original error. Never unlink on an `open()` failure, so an existing target stays untouched.
+- If a write or close fails after the `'wx'` open succeeded, remove the file this call created (best effort, and only while the path still names that file: same device and inode, taken from the open handle) and rethrow the original error. Never unlink on an `open()` failure, so an existing target stays untouched.
 - Do not claim the path checks eliminate directory-swap races. Callers must use an output folder that untrusted users cannot modify.
 
 ## Defaults and limits
@@ -116,7 +116,7 @@ All variants include `pageNumber`, `name`, floored integer `width`/`height`, and
 
 Use `??`, not `||`, for optional values where `false` or `0` are meaningful. Keep `src/types.ts` JSDoc synchronized with behavior.
 
-`disableFontFace` is always `true` at runtime: pdf.js has no Font Loading API in Node.js, so `normalizeOptions()` ignores an explicit `false` and emits process warning `PDF_TO_PNG_DISABLE_FONT_FACE_IGNORED` once per process. Do not forward the caller's value to pdf.js or the workers.
+`disableFontFace` is always `true` at runtime: pdf.js has no Font Loading API in Node.js, so `normalizeOptions()` ignores an explicit `false` and emits process warning `PDF_TO_PNG_DISABLE_FONT_FACE_IGNORED` at most once per thread (normally once per process). Do not forward the caller's value to pdf.js or the workers.
 
 ## TypeScript and style
 
