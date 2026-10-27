@@ -12,8 +12,8 @@ Options:
   --output-folder <dir>             Folder path where PNG files will be written (required unless --return-metadata-only)
   --viewport-scale <number>         Scale factor applied to each page viewport
   --use-system-fonts                Attempt to use fonts installed on the host system
-  --disable-font-face <true|false>  Do not load embedded fonts (true/false)
-  --enable-xfa <true|false>         Process XFA form data (true/false)
+  --disable-font-face <true|false>  Draw glyphs as paths (true/false/1/0, default true; false can render text as boxes)
+  --enable-xfa <true|false>         Process XFA form data (true/false/1/0)
   --pdf-file-password <pwd>         Password for encrypted PDFs
   --pages-to-process <n,m,...>      Comma-separated list of 1-based page numbers
   --verbosity-level <number>        pdfjs verbosity level (0=errors, 1=warnings, 5=infos)
@@ -21,7 +21,7 @@ Options:
   --process-pages-in-parallel       Process pages concurrently
   --concurrency-limit <number>      Max concurrent pages (parallel) / worker-pool size (worker threads)
   --render-in-worker-threads        Rasterize pages in a pool of worker threads (multi-core)
-  --silent                          Suppress output unless there is an error
+  --silent                          Suppress progress and success messages (metadata JSON and errors are still printed)
   --version                         Show version
   --help                            Show this help message`;
 

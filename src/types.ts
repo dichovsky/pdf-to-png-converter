@@ -1,8 +1,9 @@
 /**
  * Options for the `pdfToPng` conversion function.
  *
- * All properties are optional. Any unset property falls back to the corresponding
- * value in `PDF_TO_PNG_OPTIONS_DEFAULTS` defined in `src/const.ts`.
+ * All properties are optional. Unset properties take the shared defaults in `PDF_TO_PNG_OPTIONS_DEFAULTS`
+ * (`src/const.ts`) or, for the verbosity and mode flags, the defaults applied in `normalizeOptions()`
+ * (`src/pdfToPng.ts`); each property below states its default.
  */
 export interface PdfToPngOptions {
     /**
@@ -15,15 +16,17 @@ export interface PdfToPngOptions {
     viewportScale?: number;
 
     /**
-     * When `true`, pdfjs will not load embedded fonts and substitutes them with built-in fonts.
-     * Speeds up rendering but may affect visual fidelity for PDFs with custom fonts.
+     * When `true` (the default), pdf.js does not load fonts through the browser Font Loading API and draws glyph
+     * outlines as paths instead. Keep it `true` in Node.js: `false` relies on the Font Loading API, which Node.js
+     * lacks, and can render text as missing-glyph boxes.
      * Default: `true`.
      */
     disableFontFace?: boolean;
 
     /**
-     * When `true`, pdfjs attempts to use fonts installed on the host system.
-     * Typically combined with `disableFontFace: false` to improve font rendering accuracy.
+     * When `true`, pdfjs attempts to use fonts installed on the host system for fonts that are not embedded.
+     * Output then depends on the fonts installed on the machine that runs the conversion.
+     * Do not combine it with `disableFontFace: false`, which can render text as missing-glyph boxes.
      * Default: `false`.
      */
     useSystemFonts?: boolean;
@@ -59,14 +62,14 @@ export interface PdfToPngOptions {
 
     /**
      * Custom naming function for output PNG files.
-     * Receives the 1-based page number and must return a full filename string including the `.png` extension
-     * (e.g. `(pageNumber) => \`page_${pageNumber}.png\``).
+     * Receives the 1-based page number and must return a filename string. Include the `.png` extension yourself:
+     * the library neither adds nor checks it (e.g. `(pageNumber) => \`page_${pageNumber}.png\``).
      * In every mode the value must be non-empty and contain no host path separator. For disk
      * output it must also be a host-valid filename: NUL and directory aliases are rejected, and
      * Windows additionally rejects invalid characters, alternate-data-stream syntax, reserved
      * device basenames, and trailing dots/spaces before output I/O.
      * When omitted, names default to `<pdfBasename>_page_<pageNumber>.png`,
-     * or `buffer_page_<pageNumber>.png` when the PDF is supplied as an `ArrayBufferLike`.
+     * or `buffer_page_<pageNumber>.png` when the PDF is supplied as bytes instead of a file path.
      * @since 3.14.0
      */
     outputFileMaskFunc?: (pageNumber: number) => string;
@@ -128,12 +131,12 @@ export interface PdfToPngOptions {
 
     /**
      * Maximum number of pages rendered simultaneously when `processPagesInParallel` is `true`.
-     * Must be a positive integer between `1` and `16` (inclusive); values outside that range throw
-     * immediately (before any I/O). The upper bound caps peak in-flight canvas memory at roughly
-     * `16 × MAX_CANVAS_PIXELS × 4 bytes ≈ 6.4 GiB`; this is a bound, not a guarantee against
-     * container exhaustion. Higher values increase throughput at the cost of memory. Applies when
-     * `processPagesInParallel` or `renderInWorkerThreads` is enabled; in worker-thread mode it
-     * sets the worker-pool size.
+     * When `processPagesInParallel` or `renderInWorkerThreads` is enabled it must be a positive integer
+     * between `1` and `16` (inclusive); values outside that range throw immediately (before any I/O).
+     * Otherwise it is ignored. The upper bound caps peak in-flight canvas memory at roughly
+     * `16 × MAX_CANVAS_PIXELS × 4 bytes ≈ 6.4 GB`; this is a bound, not a guarantee against
+     * container exhaustion. Higher values increase throughput at the cost of memory. In worker-thread
+     * mode it sets the worker-pool size.
      * Default: `4`.
      * @since 3.14.0
      */

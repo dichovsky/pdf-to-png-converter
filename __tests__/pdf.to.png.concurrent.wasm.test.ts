@@ -4,7 +4,7 @@ import { beforeAll, expect, test } from 'vitest';
 import { codecPdf, JPX_FLAT_GRAY_PDF } from './wasmFixtures';
 
 /**
- * Issue #288 (upstream mozilla/pdf.js#22131): in pdfjs-dist 6.3 two main-thread conversions running at once could
+ * Issue #288 (upstream mozilla/pdf.js#22131): in pdfjs-dist 6.3 and 6.4 (up to 6.4.299) two main-thread conversions running at once could
  * leave a CCITT, JBIG2 or JPEG 2000 conversion pending forever when the other one settled before its first wasm
  * decode. Each case runs in a fresh Node process because the bug depends on process-wide pdf.js state.
  *

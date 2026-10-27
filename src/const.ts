@@ -1,7 +1,6 @@
 /**
- * Maximum allowed value for `viewportScale`. Values above this limit would produce canvases
- * so large (an A4 page at scale 100 already yields ~5×10⁹ pixels) that they risk OOM crashes
- * before the pixel-count guard in `processPdfPage` can fire.
+ * Maximum allowed value for `viewportScale`. Larger scales are rejected up front: an A4 page at
+ * scale 100 already yields ~5×10⁹ pixels, far above `MAX_CANVAS_PIXELS`, so no such page could be rendered.
  */
 export const MAX_VIEWPORT_SCALE = 100;
 
@@ -25,7 +24,7 @@ export const MAX_INPUT_BYTES = 256 * 1024 * 1024;
 
 /**
  * Upper bound on `concurrencyLimit` for local parallel and worker rendering. At this cap,
- * worst-case in-flight canvas memory alone is roughly 6.4 GiB, so the limit bounds rather than
+ * worst-case in-flight canvas memory alone is roughly 6.4 GB, so the limit bounds rather than
  * prevents memory exhaustion. Callers should choose a substantially lower value in containers.
  */
 export const MAX_CONCURRENCY_LIMIT = 16;
@@ -33,7 +32,7 @@ export const MAX_CONCURRENCY_LIMIT = 16;
 /**
  * Sliding-window size used for sequential (non-parallel) conversions. The window lets the
  * off-thread PNG encode and disk write of finished pages overlap the main-thread render of the
- * next page. Result order is preserved by the window helper; rendered pixels are unaffected.
+ * next page. Result order is preserved by `mapLimitOrdered()`; rendered pixels are unaffected.
  *
  * Sized 3 by paired A/B measurement: on text-heavy documents PNG encode costs ~2× render, and a
  * second in-flight encode recovers a small but consistent margin (TAMReview.pdf: −2…−5% median
@@ -44,8 +43,10 @@ export const MAX_CONCURRENCY_LIMIT = 16;
 export const SEQUENTIAL_PIPELINE_WINDOW = 3;
 
 /**
- * Default values applied to `PdfToPngOptions` fields that are not explicitly set by the caller.
- * These are also used as the source of truth for documented defaults in JSDoc comments on the type.
+ * Shared default values for `PdfToPngOptions` fields that the caller does not set. The verbosity and
+ * mode flags (`verbosityLevel`, `returnPageContent`, `returnMetadataOnly`, `processPagesInParallel`,
+ * `renderInWorkerThreads`) default inside `normalizeOptions()` in `src/pdfToPng.ts`. The JSDoc on the
+ * type states every default, so keep it in sync with both places.
  */
 export const PDF_TO_PNG_OPTIONS_DEFAULTS = {
     viewportScale: 1,
