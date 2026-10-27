@@ -1,6 +1,6 @@
 import type { Canvas, SKRSContext2D } from '@napi-rs/canvas';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
-import { MAX_CANVAS_PIXELS } from './const.js';
+import { MAX_CANVAS_PIXELS, MAX_CANVAS_SIDE } from './const.js';
 import type { PageRotation } from './types.js';
 
 /** The renderer-owned data for one page; observable identity is attached on the main thread. */
@@ -102,6 +102,22 @@ export function canvasPixelLimitError(canvasWidth: number, canvasHeight: number)
     );
 }
 
+/**
+ * Builds the error thrown when a page's floored canvas is wider or taller than `MAX_CANVAS_SIDE`.
+ *
+ * The area limit does not bound a thin page, and the PNG encoder rejects any side above libpng's limit only after the
+ * page has been rendered, with an opaque encoder error. Both `renderPdfPage` and the `returnMetadataOnly` path therefore
+ * reject such a page up front with this message, before a canvas is allocated. Same shape as
+ * {@link canvasPixelLimitError}, with the same pinned locale for the thousands separator.
+ *
+ * @internal
+ */
+export function canvasSideLimitError(canvasWidth: number, canvasHeight: number): Error {
+    return new Error(
+        `Canvas ${canvasWidth}×${canvasHeight} px exceeds the ${MAX_CANVAS_SIDE.toLocaleString('en-US')} pixel per-side limit. Reduce viewportScale.`,
+    );
+}
+
 export function normalizeRotation(raw: number): PageRotation {
     const normalized = ((raw % 360) + 360) % 360;
     switch (normalized) {
@@ -129,6 +145,9 @@ export async function getPageMetadata(pdf: PDFDocumentProxy, pageNumber: number,
         const height = toPixelDimension(viewport.height);
         if (width * height > MAX_CANVAS_PIXELS) {
             throw canvasPixelLimitError(width, height);
+        }
+        if (width > MAX_CANVAS_SIDE || height > MAX_CANVAS_SIDE) {
+            throw canvasSideLimitError(width, height);
         }
         if (width <= 0 || height <= 0) {
             throw nonRenderableDimensionsError(width, height);
@@ -163,6 +182,9 @@ export async function renderPdfPage(
         const canvasHeight = toPixelDimension(viewport.height);
         if (canvasWidth * canvasHeight > MAX_CANVAS_PIXELS) {
             throw canvasPixelLimitError(canvasWidth, canvasHeight);
+        }
+        if (canvasWidth > MAX_CANVAS_SIDE || canvasHeight > MAX_CANVAS_SIDE) {
+            throw canvasSideLimitError(canvasWidth, canvasHeight);
         }
         if (canvasWidth <= 0 || canvasHeight <= 0) {
             throw nonRenderableDimensionsError(canvasWidth, canvasHeight);

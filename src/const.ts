@@ -13,6 +13,16 @@ export const MAX_VIEWPORT_SCALE = 100;
 export const MAX_CANVAS_PIXELS = 100_000_000;
 
 /**
+ * Maximum canvas width or height in pixels: libpng's default per-side limit (PNG_USER_WIDTH_MAX and
+ * PNG_USER_HEIGHT_MAX). The PNG encoder behind `@napi-rs/canvas` refuses a wider or taller bitmap with an opaque
+ * "Get png data from surface failed" and raw libpng output on stderr, only after the page has been rendered.
+ * `MAX_CANVAS_PIXELS` bounds the area alone, so a very thin page passes it: 10,001 × 0.5 pt at scale 100 is a
+ * 1,000,100 × 50 px bitmap. A page whose floored width or height exceeds this limit is rejected before any canvas
+ * is allocated.
+ */
+export const MAX_CANVAS_SIDE = 1_000_000;
+
+/**
  * Default upper bound on input PDF size in bytes. 256 MiB is a generous ceiling for legitimate
  * PDFs while keeping a single conversion well below typical service container memory limits.
  * The path branch of `getPdfFileBuffer()` opens once, verifies that same handle is a regular file,
