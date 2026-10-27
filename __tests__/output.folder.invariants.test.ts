@@ -66,3 +66,30 @@ test('a relative outputFolder is anchored to the cwd at conversion start, not af
         await fsPromises.rm(expectedFolder, { recursive: true, force: true });
     }
 });
+
+// The folder is resolved before the call's first await, not after the input read, the wasm warm-up and the document
+// load. A process.chdir() made while the call is pending (by the caller, or by another conversion's outputFileMaskFunc)
+// therefore cannot move the output.
+test('a relative outputFolder is anchored at the call, so a later process.chdir() cannot redirect it', async () => {
+    const baseDir = await fsPromises.mkdtemp(join(tmpdir(), 'pdf-to-png-invariant-'));
+    const callerDir = join(baseDir, 'caller');
+    const elsewhere = join(baseDir, 'elsewhere');
+    await fsPromises.mkdir(callerDir);
+    await fsPromises.mkdir(elsewhere);
+
+    try {
+        process.chdir(callerDir);
+        const callerCwd = process.cwd();
+        const conversion = pdfToPng(SAMPLE_PDF, { outputFolder: 'out', pagesToProcess: [1], returnPageContent: false });
+        process.chdir(elsewhere);
+        const pages = await conversion;
+
+        expect(pages).toHaveLength(1);
+        expect(pages[0].path).toBe(join(callerCwd, 'out', 'sample_page_1.png'));
+        await expect(fsPromises.access(pages[0].path)).resolves.toBeUndefined();
+        expect(await fsPromises.readdir(elsewhere)).toEqual([]);
+    } finally {
+        process.chdir(originalCwd);
+        await fsPromises.rm(baseDir, { recursive: true, force: true });
+    }
+});

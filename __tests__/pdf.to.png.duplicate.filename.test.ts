@@ -175,3 +175,51 @@ describe('VAL-001: duplicate output filename pre-flight check', () => {
         expect(pages.every((page) => page.path === '')).toBe(true);
     });
 });
+
+// Names a common filesystem stores as one file must fail the same clean pre-flight as a case-only pair, instead of
+// passing it, creating the folder and failing the second exclusive-create write with a raw EEXIST that names the
+// folder. macOS APFS folds all of these; ext4 folds none, where the unfolded pre-flight let both files be written.
+// Escapes keep the pairs from being re-normalized by an editor or formatter.
+describe('duplicate output filename pre-flight folds filesystem-equivalent names', () => {
+    function maskFor(first: string, second: string): (pageNumber: number) => string {
+        return (pageNumber) => (pageNumber === 1 ? first : second);
+    }
+
+    test.each([
+        ['NFC and NFD forms of one name', 'café.png', 'café.png'],
+        ['NFC and NFD Hangul', '가.png', '가.png'],
+        ['sharp s and SS', 'straße.png', 'STRASSE.png'],
+        ['capital sharp s and sharp s', 'ẞ.png', 'ß.png'],
+        ['capital sharp s and ss', 'ẞ.png', 'ss.png'],
+        ['sigma and final sigma', 'σ.png', 'ς.png'],
+        ['a ligature and its letters', 'ﬁ.png', 'FI.png'],
+        ['two different lone surrogates, which Node encodes as the same U+FFFD bytes', 'a\ud800.png', 'a\ud801.png'],
+        ['a lone surrogate and U+FFFD', 'a\ud800.png', 'a�.png'],
+    ])('rejects %s before any output is created', async (_label, first, second) => {
+        const outputFolder = join(baseOutputFolder, 'fold-collision');
+
+        await expect(
+            pdfToPng(pdfFilePath, { outputFolder, outputFileMaskFunc: maskFor(first, second), pagesToProcess: [1, 2] }),
+        ).rejects.toThrow(/^Duplicate output filename ".+" for pages 1, 2\./);
+
+        await expect(fsPromises.stat(outputFolder)).rejects.toMatchObject({ code: 'ENOENT' });
+    });
+
+    test.each([
+        ['an accented name and its unaccented spelling', 'café.png', 'cafe.png'],
+        ['two ordinary names', 'first.png', 'second.png'],
+        ['names that differ only in a digit', 'page_1.png', 'page_2.png'],
+    ])('does not treat %s as one file', async (_label, first, second) => {
+        const outputFolder = join(baseOutputFolder, 'fold-distinct');
+
+        const pages = await pdfToPng(pdfFilePath, {
+            outputFolder,
+            outputFileMaskFunc: maskFor(first, second),
+            pagesToProcess: [1, 2],
+            returnPageContent: false,
+        });
+
+        expect(pages.map((page) => page.name)).toEqual([first, second]);
+        expect(await pngFilesIn(outputFolder)).toHaveLength(2);
+    });
+});

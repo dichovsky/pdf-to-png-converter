@@ -37,7 +37,29 @@ interface NormalizedPdfToPngOptions {
     maxInputBytes: number;
 }
 
-/** Validates/defaults the public options once and snapshots caller-owned page arrays. */
+let disableFontFaceWarned = false;
+
+/**
+ * pdf.js has no Font Loading API in Node.js, so `disableFontFace: false` makes it draw text in embedded fonts as
+ * missing-glyph boxes, silently. The option stays accepted for compatibility but its value is ignored; this tells the
+ * caller once per process (module state, like the wasm decoder warning in pdfjsLoader.ts).
+ */
+function warnDisableFontFaceIgnored(): void {
+    if (disableFontFaceWarned) {
+        return;
+    }
+    disableFontFaceWarned = true;
+    process.emitWarning(
+        'disableFontFace: false is ignored and true is used. pdf.js has no Font Loading API in Node.js, so false would ' +
+            'render text in embedded fonts as missing-glyph boxes.',
+        { code: 'PDF_TO_PNG_DISABLE_FONT_FACE_IGNORED' },
+    );
+}
+
+/**
+ * Validates/defaults the public options once and snapshots caller-owned page arrays. An explicit `disableFontFace: false`
+ * is ignored here, with a one-time process warning, so every consumer of the snapshot sees `true`.
+ */
 function normalizeOptions(props: PdfToPngOptions | undefined): NormalizedPdfToPngOptions {
     const viewportScale = props?.viewportScale ?? PDF_TO_PNG_OPTIONS_DEFAULTS.viewportScale;
     if (typeof viewportScale !== 'number' || !Number.isFinite(viewportScale) || viewportScale <= 0 || viewportScale > MAX_VIEWPORT_SCALE) {
@@ -46,9 +68,18 @@ function normalizeOptions(props: PdfToPngOptions | undefined): NormalizedPdfToPn
         );
     }
 
-    const outputFolder = props?.outputFolder;
+    // null is "unset" for every option (`??`), so it must reach neither the string nor the function paths below.
+    const outputFolder = props?.outputFolder ?? undefined;
+    if (outputFolder !== undefined && typeof outputFolder !== 'string') {
+        throw new Error('outputFolder must be a string');
+    }
     if (outputFolder?.trim() === '') {
         throw new Error('outputFolder must not be empty');
+    }
+
+    const outputFileMaskFunc = props?.outputFileMaskFunc ?? undefined;
+    if (outputFileMaskFunc !== undefined && typeof outputFileMaskFunc !== 'function') {
+        throw new Error('outputFileMaskFunc must be a function');
     }
 
     const verbosityLevel = props?.verbosityLevel ?? VerbosityLevel.ERRORS;
@@ -56,12 +87,21 @@ function normalizeOptions(props: PdfToPngOptions | undefined): NormalizedPdfToPn
         throw new Error('verbosityLevel must be 0, 1, or 5');
     }
 
-    const pagesToProcess = props?.pagesToProcess?.map((pageNumber) => {
-        if (!Number.isInteger(pageNumber) || pageNumber <= 0) {
-            throw new Error(`pagesToProcess contains invalid page number: ${pageNumber}`);
-        }
-        return pageNumber;
-    });
+    // Only a real Array is accepted: a typed array would keep its own map(), so it would survive as a typed "snapshot" and
+    // later turn page names into numbers. Array.from always yields a plain number[], and visits holes as undefined.
+    const requestedPages = props?.pagesToProcess ?? undefined;
+    if (requestedPages !== undefined && !Array.isArray(requestedPages)) {
+        throw new Error('pagesToProcess must be an array of positive integers');
+    }
+    const pagesToProcess =
+        requestedPages === undefined
+            ? undefined
+            : Array.from(requestedPages, (pageNumber) => {
+                  if (!Number.isInteger(pageNumber) || pageNumber <= 0) {
+                      throw new Error(`pagesToProcess contains invalid page number: ${pageNumber}`);
+                  }
+                  return pageNumber;
+              });
 
     const processPagesInParallel = props?.processPagesInParallel ?? false;
     const renderInWorkerThreads = props?.renderInWorkerThreads ?? false;
@@ -80,14 +120,19 @@ function normalizeOptions(props: PdfToPngOptions | undefined): NormalizedPdfToPn
         throw new Error(`maxInputBytes must be a positive integer, received: ${maxInputBytes}`);
     }
 
+    // An explicit false is ignored rather than forwarded, so the main thread and the workers read the same value.
+    if (props?.disableFontFace === false) {
+        warnDisableFontFaceIgnored();
+    }
+
     return {
         viewportScale,
-        disableFontFace: props?.disableFontFace ?? PDF_TO_PNG_OPTIONS_DEFAULTS.disableFontFace,
+        disableFontFace: PDF_TO_PNG_OPTIONS_DEFAULTS.disableFontFace,
         useSystemFonts: props?.useSystemFonts ?? PDF_TO_PNG_OPTIONS_DEFAULTS.useSystemFonts,
         enableXfa: props?.enableXfa ?? PDF_TO_PNG_OPTIONS_DEFAULTS.enableXfa,
         pdfFilePassword: props?.pdfFilePassword ?? PDF_TO_PNG_OPTIONS_DEFAULTS.pdfFilePassword,
         outputFolder,
-        outputFileMaskFunc: props?.outputFileMaskFunc,
+        outputFileMaskFunc,
         pagesToProcess,
         verbosityLevel,
         returnPageContent: props?.returnPageContent ?? true,
@@ -158,10 +203,21 @@ function resolvePageName(pageNumber: number, defaultMask: string, mask: ((page: 
     return name;
 }
 
+/**
+ * The key under which two output names count as one file. It folds what common filesystems treat as one name: canonical
+ * equivalence (NFC and NFD forms, which macOS stores as one), full case folding (sharp s and SS, sigma and final sigma),
+ * and lone surrogates, which Node encodes to the same U+FFFD bytes in a path. Lower, upper, lower is idempotent where
+ * upper, lower is not (capital sharp s U+1E9E would stay apart from ss). It also rejects some names a case-sensitive
+ * filesystem keeps apart, the same conservative trade the ASCII case rule already makes.
+ */
+function outputNameKey(name: string): string {
+    return name.toWellFormed().normalize('NFD').toLowerCase().toUpperCase().toLowerCase();
+}
+
 function findDuplicateOutputName(names: string[], pages: number[]): { name: string; pages: number[] } | undefined {
     const byKey = new Map<string, { name: string; pages: number[] }>();
     for (let index = 0; index < names.length; index += 1) {
-        const key = names[index].toLowerCase();
+        const key = outputNameKey(names[index]);
         const existing = byKey.get(key);
         if (existing === undefined) {
             byKey.set(key, { name: names[index], pages: [pages[index]] });
@@ -227,6 +283,10 @@ async function finalizePage(
 /** Converts a PDF input into ordered PNG page results. */
 export async function pdfToPng(pdfFile: string | ArrayBufferLike | Uint8Array, props?: PdfToPngOptions): Promise<PngPageOutput[]> {
     const options: NormalizedPdfToPngOptions = normalizeOptions(props);
+    // Resolve a relative folder once, before the first await: a later process.chdir() (by the caller, or by another
+    // conversion's outputFileMaskFunc) must not redirect it. It also precedes this conversion's own mask callbacks.
+    const resolvedOutputFolder =
+        options.returnMetadataOnly || options.outputFolder === undefined ? undefined : resolveOutputFolder(options.outputFolder);
     const pdfBytes = await getPdfFileBuffer(pdfFile, options.maxInputBytes);
     // Main pdf.js loading detaches its input; workers need a retained source for their clones.
     const workerPdfBytes = options.renderInWorkerThreads && !options.returnMetadataOnly ? Uint8Array.from(pdfBytes) : undefined;
@@ -240,9 +300,6 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike | Uint8Array, p
                 ? Array.from({ length: pdfDocument.numPages }, (_, index) => index + 1)
                 : options.pagesToProcess.filter((pageNumber) => pageNumber >= 1 && pageNumber <= pdfDocument.numPages);
 
-        // Resolve the path before callbacks run so process.chdir() cannot redirect a relative folder.
-        const resolvedOutputFolder =
-            options.returnMetadataOnly || options.outputFolder === undefined ? undefined : resolveOutputFolder(options.outputFolder);
         const defaultMask = typeof pdfFile === 'string' ? parse(pdfFile).name : PDF_TO_PNG_OPTIONS_DEFAULTS.outputFileMask;
         const names = pageNumbers.map((pageNumber) => resolvePageName(pageNumber, defaultMask, options.outputFileMaskFunc));
 
