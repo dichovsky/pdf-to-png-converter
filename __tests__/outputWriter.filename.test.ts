@@ -19,6 +19,13 @@ test('rejects NUL on every host', () => {
     expect(() => assertValidOutputFilename('page\0.png')).toThrow('must not contain a NUL byte');
 });
 
+test('accepts a 255-character ASCII name and rejects a 256-character one on every host', () => {
+    expect(() => assertValidOutputFilename('a'.repeat(255))).not.toThrow();
+    expect(() => assertValidOutputFilename('a'.repeat(256))).toThrow(
+        /^Output file name must be at most 255 (UTF-16 code units|UTF-8 bytes), received 256\.$/,
+    );
+});
+
 test.skipIf(sep === '\\')('keeps Windows-only spellings valid on POSIX', () => {
     for (const name of [
         'report:stream.png',

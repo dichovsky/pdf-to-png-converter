@@ -9,6 +9,10 @@ const PATH_SEPARATOR_PATTERN = IS_WINDOWS_PATH ? /[\\/]/ : /\//;
 // eslint-disable-next-line no-control-regex -- Windows forbids U+0000-U+001F in filenames.
 const WINDOWS_INVALID_FILENAME_CHARACTER_PATTERN = /[<>:"|?*\u0000-\u001f]/u;
 const WINDOWS_RESERVED_DEVICE_BASENAME_PATTERN = /^(?:con|prn|aux|nul|com[1-9¹²³]|lpt[1-9¹²³]|conin\$|conout\$)$/iu;
+// NAME_MAX: one path segment holds at most 255 units on every common filesystem. APFS, HFS+ and NTFS
+// count UTF-16 code units; ext4, xfs, btrfs and most other hosts count UTF-8 bytes, which are never
+// fewer than the code units. Node exposes no pathconf, so the host family stands in for the filesystem.
+const MAX_FILENAME_LENGTH = 255;
 
 export const HOST_PATH_SEPARATOR_DESCRIPTION = IS_WINDOWS_PATH ? '"/" or "\\"' : '"/"';
 
@@ -30,7 +34,9 @@ function isEscapingRelativePath(rel: string): boolean {
  *
  * Call this while preflighting page names so invalid names fail before output-folder creation,
  * and call it again at the write boundary as defense in depth. The target must be one plain path
- * segment: no empty name, current/parent directory aliases, absolute path, or host separator.
+ * segment: no empty name, current/parent directory aliases, absolute path, or host separator, and
+ * at most 255 units (UTF-16 code units on darwin and Windows, UTF-8 bytes on other hosts). The
+ * length rule estimates the target filesystem from the host family; it does not probe the folder.
  */
 export function assertValidOutputFilename(name: string): void {
     if (name === '') {
@@ -41,6 +47,15 @@ export function assertValidOutputFilename(name: string): void {
     // callers get the filename-contract error instead of an environment-dependent fs error.
     if (name.includes('\0')) {
         throw new Error('Output file name must not contain a NUL byte.');
+    }
+
+    // An over-long name would only fail at open() with a raw ENAMETOOLONG that carries the absolute
+    // path, after the output folder exists and pages were rendered. Report counts, not the name.
+    const countsBytes = !IS_WINDOWS_PATH && process.platform !== 'darwin';
+    const length = countsBytes ? Buffer.byteLength(name) : name.length;
+    if (length > MAX_FILENAME_LENGTH) {
+        const unit = countsBytes ? 'UTF-8 bytes' : 'UTF-16 code units';
+        throw new Error(`Output file name must be at most ${MAX_FILENAME_LENGTH} ${unit}, received ${length}.`);
     }
 
     if (containsHostPathSeparator(name)) {

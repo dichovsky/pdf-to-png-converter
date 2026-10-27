@@ -1,4 +1,4 @@
-import { expect, test, vi } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 import { assertValidOutputFilename, savePNGfile } from '../src/outputWriter.js';
 
 const pathHarness = vi.hoisted(() => ({ forceEscapingRelativePath: false }));
@@ -12,6 +12,10 @@ vi.mock('node:path', async (importOriginal) => {
         default: actual.win32,
         relative: (...paths: [string, string]): string => (pathHarness.forceEscapingRelativePath ? '..' : actual.win32.relative(...paths)),
     };
+});
+
+afterEach(() => {
+    vi.restoreAllMocks();
 });
 
 test('rejects both path separators under Windows semantics', () => {
@@ -72,6 +76,28 @@ test.each(['page.png.', 'page.png '])('rejects a Windows filename ending with a 
 
 test('rejects NUL before any filesystem operation under Windows semantics', () => {
     expect(() => assertValidOutputFilename('page\0.png')).toThrow('must not contain a NUL byte');
+});
+
+// NTFS counts UTF-16 code units. The platform is pinned to "linux" so these hold only if the path
+// semantics alone select the unit, which is the situation on a POSIX CI host running this simulation.
+test.each([
+    ['255 ASCII characters', 'a'.repeat(255)],
+    ['255 CJK characters (765 UTF-8 bytes)', '漢'.repeat(255)],
+    ['127 emoji and one letter (255 code units, 509 UTF-8 bytes)', '😀'.repeat(127) + 'a'],
+])('accepts %s under Windows semantics', (_label, name) => {
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('linux');
+
+    expect(() => assertValidOutputFilename(name)).not.toThrow();
+});
+
+test.each([
+    ['256 ASCII characters', 'a'.repeat(256)],
+    ['256 CJK characters', '漢'.repeat(256)],
+    ['128 emoji (256 code units)', '😀'.repeat(128)],
+])('rejects %s under Windows semantics', (_label, name) => {
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('linux');
+
+    expect(() => assertValidOutputFilename(name)).toThrow('Output file name must be at most 255 UTF-16 code units, received 256.');
 });
 
 test.each(['COM0.png', 'COM10.png', 'COM⁰.png', 'COM⁴.png', 'LPT0.txt', 'LPT10.txt', 'LPT⁰.txt', 'LPT⁴.txt', 'console.png'])(
