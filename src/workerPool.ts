@@ -44,12 +44,19 @@ interface RenderErrorMessage {
     type: 'render-error';
     index: number;
     error: unknown;
+    /**
+     * `error.name` when it is not "Error". Structured clone resets any name outside the standard error classes to "Error",
+     * so the pool restores it from here.
+     */
+    errorName?: string;
 }
 
 /** Worker → main: this worker cannot serve any page. */
 interface FatalErrorMessage {
     type: 'fatal';
     error: unknown;
+    /** See `RenderErrorMessage.errorName`. */
+    errorName?: string;
 }
 
 export type WorkerResponse = RenderedPageMessage | RenderErrorMessage | FatalErrorMessage;
@@ -60,6 +67,17 @@ export function throwLowestIndexedError(errorsByIndex: ReadonlyMap<number, unkno
         return;
     }
     throw errorsByIndex.get(Math.min(...errorsByIndex.keys()));
+}
+
+/**
+ * Re-applies the name that structured clone reset while an error crossed the thread boundary. The received error is this call's
+ * own object, so setting its name is safe, and a rebuilt copy would lose the stack. A name the clone kept is left alone.
+ */
+function restoreErrorName(error: unknown, errorName: string | undefined): unknown {
+    if (errorName !== undefined && error instanceof Error && error.name !== errorName) {
+        error.name = errorName;
+    }
+    return error;
 }
 
 /**
@@ -198,12 +216,12 @@ export async function renderPagesInWorkerPool(
                     return;
                 }
                 if (response.type === 'fatal') {
-                    recordFatal(response.error);
+                    recordFatal(restoreErrorName(response.error, response.errorName));
                     finish();
                     return;
                 }
                 if (response.type === 'render-error') {
-                    errorsByIndex.set(response.index, response.error);
+                    errorsByIndex.set(response.index, restoreErrorName(response.error, response.errorName));
                     dispatchNext();
                     return;
                 }

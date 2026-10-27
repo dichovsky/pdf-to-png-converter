@@ -250,6 +250,52 @@ test('worker mode takes precedence over processPagesInParallel', async () => {
     expect(pages.map((page) => page.pageNumber)).toEqual([1, 3]);
 });
 
+/**
+ * A two-page PDF that opens normally but whose page tree lists a second kid, object 99, that does not exist. The main thread loads
+ * the document and sees two pages; fetching page 2 then throws a pdf.js exception (UnknownErrorException). Like every pdf.js exception
+ * it is `instanceof Error` without being a native error, so the structured clone behind `postMessage` turns it into a plain object.
+ */
+function pdfWithMissingPageKid(): Uint8Array {
+    const header = '%PDF-1.7\n';
+    const objects = [
+        '<< /Type /Catalog /Pages 2 0 R >>',
+        '<< /Type /Pages /Kids [3 0 R 99 0 R] /Count 2 >>',
+        '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] >>',
+    ].map((body, index) => `${index + 1} 0 obj\n${body}\nendobj\n`);
+    const offsets = objects.map((_, index) => header.length + objects.slice(0, index).join('').length);
+    const xref =
+        `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n` +
+        offsets.map((offset) => `${String(offset).padStart(10, '0')} 00000 n \n`).join('');
+    const trailer = `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${header.length + objects.join('').length}\n%%EOF\n`;
+    return Buffer.from(header + objects.join('') + xref + trailer, 'latin1');
+}
+
+/** What a conversion rejects with, whatever that is. */
+async function rejectionOf(conversion: Promise<unknown>): Promise<unknown> {
+    return conversion.then(
+        () => {
+            throw new Error('the conversion was expected to reject');
+        },
+        (reason: unknown) => reason,
+    );
+}
+
+test('worker mode rejects with a real Error carrying the pdf.js message and name, like main-thread mode', async () => {
+    const pdf = pdfWithMissingPageKid();
+    const mainThreadError = await rejectionOf(pdfToPng(pdf, { pagesToProcess: [2] }));
+    expect(mainThreadError).toBeInstanceOf(Error);
+    // Premise: pdf.js picked this name, so only the name sent separately and restored by the pool can make the two modes agree.
+    expect((mainThreadError as Error).name).not.toBe('Error');
+
+    const workerError = await rejectionOf(pdfToPng(pdf, { pagesToProcess: [2], renderInWorkerThreads: true }));
+
+    // The failure really crossed the thread boundary: the pool ran for it.
+    expect(poolSpy).toHaveBeenCalledOnce();
+    expect(workerError).toBeInstanceOf(Error);
+    expect(workerError).toMatchObject({ name: (mainThreadError as Error).name, message: (mainThreadError as Error).message });
+    expect(String(workerError)).not.toContain('[object Object]');
+});
+
 // ---------------------------------------------------------------------------------------------------------------------
 // Issue #278: CCITT, JBIG2 and JPEG 2000 images need the pdf.js wasm decoders (see __tests__/wasmFixtures.ts).
 // ---------------------------------------------------------------------------------------------------------------------
@@ -426,6 +472,32 @@ describe('compiled library from a fresh process', () => {
             await expectCodecPageMatchesControl(written, control[index].content as Buffer, page, `mixed-pages page ${index + 1}`);
         }
         expect(readdirSync(emptyDirectory)).toEqual([]);
+    }, 180_000);
+
+    // A page that fails inside a worker used to reach the CLI as a plain object, which it printed as "[object Object]".
+    test('the compiled CLI prints the pdf.js message when a page fails in worker threads', async () => {
+        const pdfPath = join(makeTemporaryDirectory(), 'missing-kid.pdf');
+        writeFileSync(pdfPath, pdfWithMissingPageKid());
+        const expectedMessage = ((await rejectionOf(pdfToPng(pdfPath, { pagesToProcess: [2] }))) as Error).message;
+
+        const result = spawnSync(
+            process.execPath,
+            [
+                join(compiledDirectory, 'cli.js'),
+                pdfPath,
+                '--output-folder',
+                join(makeTemporaryDirectory(), 'png'),
+                '--silent',
+                '--pages-to-process',
+                '2',
+                '--render-in-worker-threads',
+            ],
+            { env: childEnvironment(), encoding: 'utf8', timeout: 120_000 },
+        );
+
+        expect(result.status, result.stderr).toBe(1);
+        expect(result.stderr).toContain(expectedMessage);
+        expect(result.stderr).not.toContain('[object Object]');
     }, 180_000);
 
     test('the compiled CLI finds the standard fonts from an empty working directory', async () => {

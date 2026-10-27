@@ -439,3 +439,70 @@ test('resolves immediately for an empty task list without spawning workers', asy
     await renderPagesInWorkerPool(new Uint8Array([1]), RENDER_OPTIONS, true, [], 4, async () => undefined);
     expect(harness.instances).toHaveLength(0);
 });
+
+/** Runs a one-task pool, lets `respond` answer through its only worker, and returns whatever the pool rejects with. */
+async function rejectionOf(respond: (worker: InstanceType<typeof harness.FakeWorker>) => void): Promise<unknown> {
+    const poolPromise = renderPagesInWorkerPool(new Uint8Array([1]), RENDER_OPTIONS, true, makeTasks(1), 1, async () => undefined);
+    await vi.waitFor(() => {
+        expect(harness.instances).toHaveLength(1);
+    });
+    respond(harness.instances[0]);
+    return poolPromise.then(
+        () => {
+            throw new Error('the pool was expected to reject');
+        },
+        (reason: unknown) => reason,
+    );
+}
+
+test('restores the name that structured clone reset on a render error', async () => {
+    const reason = await rejectionOf((worker) => {
+        worker.emit('message', {
+            type: 'render-error',
+            index: 0,
+            error: new Error('Invalid PDF structure.'),
+            errorName: 'InvalidPDFException',
+        } satisfies WorkerResponse);
+    });
+
+    expect(reason).toBeInstanceOf(Error);
+    expect(reason).toMatchObject({ name: 'InvalidPDFException', message: 'Invalid PDF structure.' });
+});
+
+test('restores the name that structured clone reset on a fatal error', async () => {
+    const reason = await rejectionOf((worker) => {
+        worker.emit('message', {
+            type: 'fatal',
+            error: new Error('Incorrect Password'),
+            errorName: 'PasswordException',
+        } satisfies WorkerResponse);
+    });
+
+    expect(reason).toBeInstanceOf(Error);
+    expect(reason).toMatchObject({ name: 'PasswordException', message: 'Incorrect Password' });
+});
+
+test('leaves a name that structured clone already preserved alone', async () => {
+    const failure = new TypeError('bad argument');
+
+    const reason = await rejectionOf((worker) => {
+        worker.emit('message', { type: 'render-error', index: 0, error: failure, errorName: 'TypeError' } satisfies WorkerResponse);
+    });
+
+    expect(reason).toBe(failure);
+    // The name is still the inherited one: no own property was added to an error that did not need it.
+    expect(Object.hasOwn(failure, 'name')).toBe(false);
+});
+
+test('rejects with a non-Error value as is, even when a name accompanies it', async () => {
+    const reason = await rejectionOf((worker) => {
+        worker.emit('message', {
+            type: 'render-error',
+            index: 0,
+            error: 'plain failure',
+            errorName: 'IgnoredName',
+        } satisfies WorkerResponse);
+    });
+
+    expect(reason).toBe('plain failure');
+});
