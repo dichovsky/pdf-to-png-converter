@@ -41,7 +41,7 @@ Keep this consolidated ownership. Split out another seam only when a new indepen
 ## Conversion invariants
 
 1. `pdfToPng()` validates and snapshots options before input I/O (`null` counts as unset) and, unless `returnMetadataOnly` is set, resolves a relative `outputFolder` against `process.cwd()` before its first `await`.
-2. `getPdfFileBuffer()` returns owned `Uint8Array` bytes. Path input is opened, checked, and read through one handle; caller-owned byte containers are copied so pdf.js cannot detach them. Byte input is a `Buffer`, `Uint8Array`, `ArrayBuffer` or `SharedArrayBuffer` (cross-realm ones included) or a real `Array` of bytes; an object that only claims a numeric `length` is rejected.
+2. `getPdfFileBuffer()` returns owned `Uint8Array` bytes. Path input is opened, checked, and read through one handle; caller-owned byte containers are copied so pdf.js cannot detach them. Byte input is a `Buffer`, `Uint8Array`, `ArrayBuffer` or `SharedArrayBuffer` (cross-realm ones included) or a real `Array` of bytes; an object that only claims a numeric `length`, or only forges a buffer tag, is rejected.
 3. Worker mode retains one main-thread byte copy before the main pdf.js loading task may detach its input.
 4. All page names are resolved before output-folder creation. Disk names (flat, host-valid, at most `MAX_FILENAME_LENGTH` units) and duplicates under the `outputNameKey()` Unicode fold are preflighted before any output I/O.
 5. Metadata-only mode creates no canvas, worker pool, output folder, PNG bytes, or files.
@@ -69,14 +69,14 @@ Keep this consolidated ownership. Split out another seam only when a new indepen
 - Keep disk names flat. Preflight with `assertValidOutputFilename()` (which also enforces `MAX_FILENAME_LENGTH`) before folder creation and repeat validation in `savePNGfile()` as defense in depth.
 - Detect duplicate disk names before I/O under the `outputNameKey()` fold (NFD, full case folding, lone surrogates), not only ASCII case. The check is deliberately conservative: it also rejects names a case-sensitive filesystem would keep apart.
 - Preserve `OutputFolderHandle` as one value: the resolved folder and its baseline realpath must not drift apart.
-- Preserve `'wx'` file opens. Never replace them with overwrite-capable `writeFile()` calls. If the write or close fails after the open succeeded, `savePNGfile()` removes the file this call created (best effort) and rethrows the original error; keep that unlink out of the `open()` failure path so an existing target is never removed.
+- Preserve `'wx'` file opens. Never replace them with overwrite-capable `writeFile()` calls. If the write or close fails after the open succeeded, `savePNGfile()` removes the file this call created (best effort, and only while the path still names that file: same device and inode, taken from the open handle) and rethrows the original error; keep that unlink out of the `open()` failure path so an existing target is never removed.
 - Realpath checks cannot atomically bind a pathname to a directory inode. Documentation must continue to require an output directory that untrusted users cannot modify.
 
 ## Defaults
 
 Runtime defaults live in `PDF_TO_PNG_OPTIONS_DEFAULTS` in `src/const.ts`; mode defaults are applied in `normalizeOptions()` in `src/pdfToPng.ts`. Use `??`, not `||`, when `false` or `0` are valid values. Keep public JSDoc defaults synchronized with runtime behavior.
 
-`disableFontFace` is always `true` at runtime: pdf.js has no Font Loading API in Node.js, so `normalizeOptions()` ignores an explicit `false` and emits process warning `PDF_TO_PNG_DISABLE_FONT_FACE_IGNORED` once per process. Do not forward the caller's value to pdf.js or the workers.
+`disableFontFace` is always `true` at runtime: pdf.js has no Font Loading API in Node.js, so `normalizeOptions()` ignores an explicit `false` and emits process warning `PDF_TO_PNG_DISABLE_FONT_FACE_IGNORED` at most once per thread (normally once per process). Do not forward the caller's value to pdf.js or the workers.
 
 Hard limits are also centralized in `src/const.ts` (`MAX_INPUT_BYTES` is only the default of the overridable `maxInputBytes`, which bounds input bytes, not pdf.js memory):
 

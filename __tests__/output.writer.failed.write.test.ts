@@ -108,6 +108,48 @@ test('rethrows the original error even when removing the leftover file also fail
     expect(unlink).toHaveBeenCalledExactlyOnceWith(join(baseDir, 'page.png'));
 });
 
+// The removal is a pathname operation. If a directory component is swapped for a symlink while the write is failing, the
+// path names someone else's file by the time the cleanup runs, and the cleanup must leave that file alone.
+test.skipIf(process.platform === 'win32')(
+    'never removes a file it did not create when the output folder is swapped during the failing write',
+    async () => {
+        const outDir = join(baseDir, 'out');
+        const victimDir = join(baseDir, 'victim');
+        await fsPromises.mkdir(victimDir);
+        await fsPromises.writeFile(join(victimDir, 'page.png'), 'victim data');
+        const swappable = await prepareOutputFolder(resolveOutputFolder(outDir));
+        breakNextExclusiveHandle((handle) => {
+            vi.spyOn(handle, 'writeFile').mockImplementation(async () => {
+                await handle.write(PARTIAL_BYTES);
+                await fsPromises.rename(outDir, `${outDir}.moved`);
+                await fsPromises.symlink(victimDir, outDir, 'dir');
+                throw WRITE_ERROR;
+            });
+        });
+
+        await expect(savePNGfile('page.png', PNG_BYTES, swappable)).rejects.toBe(WRITE_ERROR);
+
+        await expect(fsPromises.readFile(join(victimDir, 'page.png'), 'utf8')).resolves.toBe('victim data');
+        // The file this call created stays in the moved folder: skipping the removal is the safe outcome.
+        await expect(fsPromises.readdir(`${outDir}.moved`)).resolves.toEqual(['page.png']);
+    },
+);
+
+// Without the identity of the created file there is no proof that the path still names it, so the safe outcome is to
+// leave the (empty) file in place and report the original error.
+test('leaves the file alone when its identity could not be read after the open', async () => {
+    const statError = Object.assign(new Error('EIO: i/o error, fstat'), { code: 'EIO' });
+    breakNextExclusiveHandle((handle) => {
+        vi.spyOn(handle, 'stat').mockRejectedValue(statError);
+    });
+    const unlink = vi.spyOn(fsPromises, 'unlink');
+
+    await expect(savePNGfile('page.png', PNG_BYTES, folder)).rejects.toBe(statError);
+
+    expect(unlink).not.toHaveBeenCalled();
+    await expect(fsPromises.readdir(baseDir)).resolves.toEqual(['page.png']);
+});
+
 test('never removes a pre-existing file when the exclusive open fails with EEXIST', async () => {
     const existingPath = join(baseDir, 'page.png');
     await fsPromises.writeFile(existingPath, 'owned by someone else');

@@ -97,6 +97,34 @@ test('applies maxInputBytes to a cross-realm SharedArrayBuffer', async () => {
     await expect(getPdfFileBuffer(foreign, 8)).rejects.toThrow(/exceeds maxInputBytes/);
 });
 
+// A cross-realm buffer is recognised by its Object.prototype.toString tag, and an object can forge that tag with
+// Symbol.toStringTag (JSON cannot, code in the same process can). A forged object has no genuine byte length, so it must
+// be rejected before any copy: `new Uint8Array(forged)` would read `length` elements, far past maxInputBytes.
+test.each([['ArrayBuffer'], ['SharedArrayBuffer']])('rejects an object that forges the %s tag without copying it', async (tag) => {
+    let elementReads = 0;
+    const forged = new Proxy(
+        { [Symbol.toStringTag]: tag, length: 2 ** 20 },
+        {
+            get(target, key, receiver): unknown {
+                if (typeof key === 'string' && /^\d+$/.test(key)) {
+                    elementReads += 1;
+                }
+                return Reflect.get(target, key, receiver);
+            },
+        },
+    );
+
+    await expect(getPdfFileBuffer(asInput(forged), 1024)).rejects.toThrow(`Unsupported buffer type: [object ${tag}]`);
+    expect(elementReads).toBe(0);
+});
+
+test('applies maxInputBytes to the real size of a cross-realm buffer whose byteLength property is shadowed', async () => {
+    const foreign = runInNewContext('new ArrayBuffer(64)') as ArrayBuffer;
+    Object.defineProperty(foreign, 'byteLength', { value: 0 });
+
+    await expect(getPdfFileBuffer(foreign, 8)).rejects.toThrow(/exceeds maxInputBytes/);
+});
+
 // A detached buffer is a supported shape in a dead state, not an unsupported shape: V8's own error
 // names the real cause, which "Unsupported buffer type: [object ArrayBuffer]" would hide.
 test.each<[string, () => ArrayBufferLike | Uint8Array]>([

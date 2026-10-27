@@ -20,8 +20,9 @@ export interface PdfToPngOptions {
      * Always `true` at runtime. pdf.js has no Font Loading API in Node.js, and with `false` it would draw text in
      * embedded fonts as missing-glyph boxes, so the library passes `true`, which makes pdf.js draw glyph outlines as
      * paths (embedded fonts are still used). An explicit `false` is accepted but ignored, on the main thread and in
-     * worker threads, and a process warning with code `PDF_TO_PNG_DISABLE_FONT_FACE_IGNORED` is emitted once per
-     * process; silence only that warning with `node --disable-warning=PDF_TO_PNG_DISABLE_FONT_FACE_IGNORED`.
+     * worker threads, and a process warning with code `PDF_TO_PNG_DISABLE_FONT_FACE_IGNORED` is emitted at most once per
+     * thread (normally once per process); silence only that warning with
+     * `node --disable-warning=PDF_TO_PNG_DISABLE_FONT_FACE_IGNORED`.
      * Default: `true`.
      */
     disableFontFace?: boolean;

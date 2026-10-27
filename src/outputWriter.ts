@@ -1,4 +1,5 @@
 import { promises as fsPromises } from 'node:fs';
+import type { BigIntStats } from 'node:fs';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { MAX_FILENAME_LENGTH } from './const.js';
 
@@ -124,6 +125,28 @@ export async function prepareOutputFolder(resolvedOutputFolder: string): Promise
 }
 
 /**
+ * Best-effort removal of a file this call created, run after its write failed. The path is unlinked only while it still
+ * names that same file (device and inode taken from the open handle), which narrows the window in which a directory
+ * component swapped in after the exclusive open makes the unlink delete a file this call never created. It does not
+ * close it: `lstat()` and `unlink()` resolve the pathname separately, so a swap between them still reaches another
+ * file. Only a private output directory rules that out. Errors are swallowed so the original failure is the one
+ * reported.
+ */
+async function removeCreatedFile(path: string, created: BigIntStats | undefined): Promise<void> {
+    if (created === undefined) {
+        return;
+    }
+    try {
+        const current = await fsPromises.lstat(path, { bigint: true });
+        if (current.dev === created.dev && current.ino === created.ino) {
+            await fsPromises.unlink(path);
+        }
+    } catch {
+        // Nothing more can be done here; the caller rethrows the original error.
+    }
+}
+
+/**
  * Writes a rendered PNG page to disk using an exclusive-create open (`'wx'`) and returns the final path.
  *
  * Flat filenames remove attacker-controlled intermediate path components. The fresh `realpath`
@@ -135,10 +158,13 @@ export async function prepareOutputFolder(resolvedOutputFolder: string): Promise
  *
  * The exclusive-create (`'wx'`) open prevents overwriting an existing final target and refuses a
  * pre-existing target symlink under normal local-filesystem semantics. If the write or close fails
- * after that open succeeded, the file this call created is removed (best effort, by pathname, under
- * the same private-directory assumption as the open) and the original error is rethrown; a target
- * that already existed is never removed. Callers should clear the output folder before re-running a
- * conversion if they expect to reuse the same names.
+ * after that open succeeded, the file this call created is removed (best effort) and the original
+ * error is rethrown; a target that already existed is never removed. The removal is skipped unless
+ * the path still names the file this call created (same device and inode). That narrows, but does not
+ * close, the window in which a directory swapped in after the open could make it delete someone else's
+ * file: the check and the unlink resolve the pathname separately, so the private-directory requirement
+ * above covers this removal too. If the handle's identity could not be read, the file is left in place.
+ * Callers should clear the output folder before re-running a conversion if they expect to reuse the same names.
  */
 export async function savePNGfile(name: string, content: Buffer, folder: OutputFolderHandle): Promise<string> {
     const { resolvedOutputFolder, realOutputFolder } = folder;
@@ -160,7 +186,9 @@ export async function savePNGfile(name: string, content: Buffer, folder: OutputF
     }
 
     const fd = await fsPromises.open(resolvedFilePath, 'wx');
+    let created: BigIntStats | undefined;
     try {
+        created = await fd.stat({ bigint: true });
         await fd.writeFile(content);
         await fd.close();
     } catch (error: unknown) {
@@ -169,7 +197,7 @@ export async function savePNGfile(name: string, content: Buffer, folder: OutputF
         // the handle (a repeated close() is a no-op) and remove the file, best effort so cleanup errors never
         // mask the original one. A failed open() never reaches this block, so an EEXIST target is not unlinked.
         await fd.close().catch(() => undefined);
-        await fsPromises.unlink(resolvedFilePath).catch(() => undefined);
+        await removeCreatedFile(resolvedFilePath, created);
         throw error;
     }
 
