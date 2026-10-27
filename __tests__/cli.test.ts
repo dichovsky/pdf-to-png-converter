@@ -186,6 +186,8 @@ describe('CLI', () => {
             '2',
             '--render-in-worker-threads',
         );
+        // `--disable-font-face false` is ignored: the validation pass coerces it to true and warns once per process.
+        vi.spyOn(process, 'emitWarning').mockImplementation(() => undefined);
         await run();
 
         expect(pdfToPng).toHaveBeenCalledTimes(1);
@@ -194,7 +196,7 @@ describe('CLI', () => {
             outputFileMaskFunc: undefined,
             viewportScale: 2,
             useSystemFonts: true,
-            disableFontFace: false,
+            disableFontFace: true,
             enableXfa: true,
             pdfFilePassword: 'secret',
             pagesToProcess: [1, 2],
