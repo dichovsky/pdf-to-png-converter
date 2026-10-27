@@ -3,7 +3,8 @@ import { expect, test } from 'vitest';
 import type { PngPageOutput } from '../src';
 import { pdfToPng } from '../src';
 import { toPixelDimension } from '../src/pageRenderer.js';
-import { MAX_CANVAS_PIXELS } from '../src/const.js';
+import { MAX_CANVAS_PIXELS, MAX_CANVAS_SIDE } from '../src/const.js';
+import { blankPdf } from './wasmFixtures';
 
 test('toPixelDimension floors fractional viewport lengths to match canvas truncation', () => {
     expect(toPixelDimension(892.5)).toBe(892);
@@ -12,6 +13,42 @@ test('toPixelDimension floors fractional viewport lengths to match canvas trunca
     // A sub-pixel viewport floors to 0; both the render and metadata paths reject this with a
     // clear "Increase viewportScale" error (see the non-renderable-dimensions tests below).
     expect(toPixelDimension(0.9)).toBe(0);
+});
+
+// `dpi / 72` is not exactly representable, so the product of a page length and such a scale can land a hair
+// below the integer the caller meant: 612 pt at 350 dpi is 2974.9999999999995, which a bare Math.floor turned into
+// 2974 px instead of 2975. toPixelDimension absorbs that noise (a 1e-6 px tolerance) and still floors real fractions.
+test('toPixelDimension snaps float noise just below an integer up to that integer', () => {
+    expect(612 * (350 / 72)).toBeLessThan(2975);
+    expect(Math.floor(612 * (350 / 72))).toBe(2974);
+    expect(toPixelDimension(612 * (350 / 72))).toBe(2975);
+    expect(toPixelDimension(792 * (350 / 72))).toBe(3850);
+    expect(toPixelDimension(612 * (220 / 72))).toBe(1870);
+    expect(toPixelDimension(612 * (110 / 72))).toBe(935);
+    expect(toPixelDimension(100 * 0.29)).toBe(29);
+});
+
+// The common "fit to N pixels" scale (N / page length) hits the same noise: about 6 % of the targets from 1 to
+// 1,000,000 px came out one pixel short for each of these page lengths.
+test('toPixelDimension reproduces the target of every fit-to-size scale up to the side limit', () => {
+    for (const pageLength of [595, 612, 792, 842]) {
+        const misses: number[] = [];
+        for (let target = 1; target <= MAX_CANVAS_SIDE; target += 1) {
+            if (toPixelDimension(pageLength * (target / pageLength)) !== target) misses.push(target);
+        }
+        expect(misses, `page length ${pageLength}`).toEqual([]);
+    }
+});
+
+test('toPixelDimension keeps flooring lengths that are genuinely below an integer', () => {
+    // 5e-7 px short is inside the tolerance and counts as the integer; 2e-6 px short is a real fraction.
+    expect(toPixelDimension(2975 - 5e-7)).toBe(2975);
+    expect(toPixelDimension(2975 - 2e-6)).toBe(2974);
+    // Truncated decimal scales really are below 350 / 72: 612 * 4.8611 = 2974.9932 and 612 * 4.8611111 = 2974.9999932.
+    expect(toPixelDimension(612 * 4.8611)).toBe(2974);
+    expect(toPixelDimension(612 * 4.8611111)).toBe(2974);
+    expect(toPixelDimension(0.999)).toBe(0);
+    expect(toPixelDimension(0)).toBe(0);
 });
 
 // A 612 pt US-Letter page at scale 0.001 floors to 0×0 px. Both code paths must surface the same
@@ -201,4 +238,44 @@ test('pixel-limit error reports the floored canvas dimensions, not the rounded v
     const error = await pdfToPng(pdfFilePath, { viewportScale: scale, pagesToProcess: [1] }).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(Error);
     expect((error as Error).message).toContain(`Canvas ${flooredWidth}×${flooredHeight} px`);
+});
+
+// Integer-exact scaled sizes must come out exact. A US-Letter page (612×792 pt) at N dpi is 8.5N × 11N px with
+// viewportScale = N / 72, and the ratios for 110, 220 and 350 dpi multiply to a hair below the integer, which a bare
+// Math.floor turned into a bitmap one pixel short (350 dpi gave 2974×3849 instead of 2975×3850).
+test.each([72, 96, 110, 144, 150, 200, 220, 300, 350, 400, 600])('a US-Letter page at %i dpi reports its exact pixel size', async (dpi) => {
+    const [page] = await pdfToPng(resolve(PIXEL_LIMIT_PDF), { viewportScale: dpi / 72, pagesToProcess: [1], returnMetadataOnly: true });
+
+    expect([page.width, page.height]).toEqual([8.5 * dpi, 11 * dpi]);
+});
+
+// The same noise appears with plain decimal scales: 100 × 0.29 is 28.999999999999996.
+test.each([
+    [0.29, 29],
+    [0.57, 57],
+    [0.58, 58],
+])('a 100 pt square page at viewportScale %f reports %i px, not one pixel short', async (viewportScale, expected) => {
+    const [page] = await pdfToPng(blankPdf(100, 100), { viewportScale, returnMetadataOnly: true });
+
+    expect([page.width, page.height]).toEqual([expected, expected]);
+});
+
+// A fit-to-size scale (target / page length) hits the same noise: 612 × (630 / 612) and 792 × (1000 / 792) both fall just short.
+test('a fit-to-size viewportScale reports exactly the requested width or height', async () => {
+    const pdfFilePath = resolve(PIXEL_LIMIT_PDF);
+    const [byWidth] = await pdfToPng(pdfFilePath, { viewportScale: 630 / 612, pagesToProcess: [1], returnMetadataOnly: true });
+    const [byHeight] = await pdfToPng(pdfFilePath, { viewportScale: 1000 / 792, pagesToProcess: [1], returnMetadataOnly: true });
+
+    expect(byWidth.width).toBe(630);
+    expect(byHeight.height).toBe(1000);
+});
+
+test('a render at 350 dpi produces the 2975×3850 bitmap that returnMetadataOnly reports', async () => {
+    const options = { viewportScale: 350 / 72, pagesToProcess: [1] };
+    const [rendered] = await pdfToPng(resolve(PIXEL_LIMIT_PDF), { ...options, returnPageContent: true });
+    const [metadata] = await pdfToPng(resolve(PIXEL_LIMIT_PDF), { ...options, returnMetadataOnly: true });
+
+    expect([rendered.width, rendered.height]).toEqual([2975, 3850]);
+    expect(readPngDimensions(rendered.content as Buffer)).toEqual({ width: 2975, height: 3850 });
+    expect([metadata.width, metadata.height]).toEqual([2975, 3850]);
 });

@@ -12,8 +12,8 @@ Options:
   --output-folder <dir>             Folder path where PNG files will be written (required unless --return-metadata-only)
   --viewport-scale <number>         Scale factor applied to each page viewport
   --use-system-fonts                Attempt to use fonts installed on the host system
-  --disable-font-face <true|false>  Do not load embedded fonts (true/false)
-  --enable-xfa <true|false>         Process XFA form data (true/false)
+  --disable-font-face <true|false>  Draw glyphs as paths (true/false/1/0, default true; false is coerced to true with a process warning)
+  --enable-xfa <true|false>         Process XFA form data (true/false/1/0)
   --pdf-file-password <pwd>         Password for encrypted PDFs
   --pages-to-process <n,m,...>      Comma-separated list of 1-based page numbers
   --verbosity-level <number>        pdfjs verbosity level (0=errors, 1=warnings, 5=infos)
@@ -21,9 +21,12 @@ Options:
   --process-pages-in-parallel       Process pages concurrently
   --concurrency-limit <number>      Max concurrent pages (parallel) / worker-pool size (worker threads)
   --render-in-worker-threads        Rasterize pages in a pool of worker threads (multi-core)
-  --silent                          Suppress output unless there is an error
+  --silent                          Suppress progress and success messages (metadata JSON and errors are still printed)
   --version                         Show version
-  --help                            Show this help message`;
+  --help                            Show this help message
+
+Environment:
+  PDF_TO_PNG_PASSWORD               Password for encrypted PDFs, used when --pdf-file-password is not given (other local users cannot read it)`;
 
 const CLI_OPTIONS = {
     'output-folder': { type: 'string' },
@@ -94,12 +97,22 @@ function parseNumber(value: string | undefined, errorMessage: string, integer = 
     return parsed;
 }
 
+/** The password from `PDF_TO_PNG_PASSWORD`, which unlike `--pdf-file-password` other local users cannot read from a process listing. Empty means unset. */
+function passwordFromEnvironment(): string | undefined {
+    const password = process.env.PDF_TO_PNG_PASSWORD;
+    return password === '' ? undefined : password;
+}
+
 function buildConversion(
     values: ParsedValues,
     positionals: string[],
 ): { pdfFilePath: string; options: CliConversionOptions; silent: boolean } {
     const pdfFilePath = positionals[0];
     if (!pdfFilePath) throw new UsageError('<pdf-file-path> is required.', true);
+    if (positionals.length > 1) {
+        const received = positionals.map((argument) => JSON.stringify(argument)).join(', ');
+        throw new UsageError(`Expected exactly one <pdf-file-path> but received ${positionals.length} arguments: ${received}.`, true);
+    }
 
     const rawOptions: PdfToPngOptions = {
         outputFolder: values['output-folder'],
@@ -107,7 +120,7 @@ function buildConversion(
         useSystemFonts: values['use-system-fonts'],
         disableFontFace: parseBoolean(values['disable-font-face']),
         enableXfa: parseBoolean(values['enable-xfa']),
-        pdfFilePassword: values['pdf-file-password'],
+        pdfFilePassword: values['pdf-file-password'] ?? passwordFromEnvironment(),
         pagesToProcess: parseNumberList(values['pages-to-process']),
         verbosityLevel: parseNumber(values['verbosity-level'], '--verbosity-level must be a valid integer.', true),
         returnMetadataOnly: values['return-metadata-only'],
@@ -148,6 +161,23 @@ function fail(error: unknown): void {
     }
     if (error instanceof UsageError && error.showHelp) console.error(HELP_TEXT);
     process.exit(1);
+}
+
+/**
+ * Runs `task` with `console.log` and `console.info` writing to stderr. pdf.js reports Info lines (verbosity 5) with
+ * `console.info`, which is stdout and would corrupt the `--return-metadata-only` JSON; the CLI prints its own output
+ * after the task. Worker threads have their own console, which this does not change.
+ */
+async function withConsoleOnStderr<T>(task: () => Promise<T>): Promise<T> {
+    const { log, info } = console;
+    console.log = console.error;
+    console.info = console.error;
+    try {
+        return await task();
+    } finally {
+        console.log = log;
+        console.info = info;
+    }
 }
 
 /** Parses argv, delegates conversion to the public library interface, and prints CLI output. */
@@ -199,7 +229,7 @@ export async function run(): Promise<void> {
 
         let results;
         try {
-            results = await pdfToPng(pdfFilePath, options);
+            results = await withConsoleOnStderr(() => pdfToPng(pdfFilePath, options));
         } catch (error: unknown) {
             throw new ConversionError(error);
         }
@@ -214,7 +244,8 @@ export async function run(): Promise<void> {
 }
 
 try {
-    if (fs.realpathSync(process.argv[1]) === fs.realpathSync(__filename)) void run();
+    // `node out/cli` runs `out/cli.js` but leaves argv[1] without the extension; require.resolve completes it as Node did.
+    if (fs.realpathSync(require.resolve(process.argv[1])) === fs.realpathSync(__filename)) void run();
 } catch {
-    // A missing argv path means this module was not invoked as the CLI entry.
+    // No argv path (`node -e`, a REPL) or one that does not resolve means this module was not invoked as the CLI entry.
 }

@@ -19,7 +19,6 @@ test(`should convert PDF To PNG buffer (without saving to file)`, async () => {
         const compareResult: number = await comparePNG({
             actualFile: pngPage.content!,
             expectedFile: expectedFilePath,
-            createExpectedFileIfMissing: false,
         });
 
         expect(existsSync(pngPage.path)).toBe(false);

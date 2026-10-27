@@ -8,14 +8,15 @@ import { parseSingleNpmJsonResult } from './npm-json';
 // to confirm the publish actually landed with provenance and is consumable. The publish
 // has already happened by this point, so a failure here is an alarm, not a gate — it
 // surfaces a broken OIDC/provenance/propagation pipeline loudly. Registry reads are
-// retried to absorb propagation lag.
+// retried only while the package or version is not visible yet (propagation lag); any
+// other failure is reported at once with npm's own message.
 
 interface PackageManifest {
     name: string;
     version: string;
 }
 
-interface Attestations {
+export interface Attestations {
     url?: string;
     provenance?: unknown;
 }
@@ -30,8 +31,14 @@ interface PackumentVersion {
 
 const NPM: string = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const REPO_ROOT: string = join(__dirname, '..');
-const RETRY_ATTEMPTS = 10;
-const RETRY_DELAY_MS = 3000;
+export const RETRY_ATTEMPTS = 10;
+export const RETRY_DELAY_MS = 3000;
+
+// What one registry read found. `absent` (E404 or no result yet) is the only outcome worth retrying: the
+// release may still be propagating. An `error` (network, auth, unexpected output) will not fix itself.
+export type Lookup<T> = { status: 'ok'; value: T } | { status: 'absent'; reason: string } | { status: 'error'; message: string };
+
+type NpmRunner = (args: string[]) => string;
 
 function readManifest(): PackageManifest {
     const raw: string = readFileSync(join(REPO_ROOT, 'package.json'), 'utf-8');
@@ -50,55 +57,78 @@ function sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// Retry a registry read until it returns a non-null value, absorbing propagation lag.
-async function retry<T>(label: string, fn: () => T | null): Promise<T> {
+function errorText(err: unknown): string {
+    return err instanceof Error ? err.message : String(err);
+}
+
+// Retry a registry read while it is `absent`, absorbing propagation lag. An `error` is thrown at once with
+// npm's own message, and running out of attempts reports the last thing npm said.
+export async function retry<T>(label: string, fn: () => Lookup<T>, wait: (ms: number) => Promise<void> = sleep): Promise<T> {
+    let lastReason = '';
     for (let attempt = 1; attempt <= RETRY_ATTEMPTS; attempt += 1) {
-        const value = fn();
-        if (value !== null) {
-            return value;
+        const result = fn();
+        if (result.status === 'ok') {
+            return result.value;
         }
+        if (result.status === 'error') {
+            throw new Error(`${label}: ${result.message}`);
+        }
+        lastReason = result.reason;
         if (attempt < RETRY_ATTEMPTS) {
-            await sleep(RETRY_DELAY_MS);
+            await wait(RETRY_DELAY_MS);
         }
     }
-    throw new Error(`${label}: still unavailable after ${RETRY_ATTEMPTS} attempts`);
+    throw new Error(`${label}: still unavailable after ${RETRY_ATTEMPTS} attempts (last npm response: ${lastReason})`);
+}
+
+// Runs one `npm view` and sorts the outcome. A missing package or version (E404) or an empty result is
+// `absent`; any other failure, or output that is not the expected JSON, is an `error`.
+function readNpmValue<T>(run: NpmRunner, args: string[], accept: (value: unknown) => Lookup<T>): Lookup<T> {
+    let output: string;
+    try {
+        output = run(args);
+    } catch (err) {
+        const message = errorText(err);
+        return message.includes('E404') ? { status: 'absent', reason: message } : { status: 'error', message };
+    }
+    let value: unknown;
+    try {
+        value = parseSingleNpmJsonResult(output);
+    } catch (err) {
+        return { status: 'error', message: `unexpected npm output: ${errorText(err)}` };
+    }
+    return value === null ? { status: 'absent', reason: 'npm printed no result' } : accept(value);
+}
+
+function acceptString(value: unknown): Lookup<string> {
+    return typeof value === 'string'
+        ? { status: 'ok', value }
+        : { status: 'error', message: `npm returned a non-string value: ${JSON.stringify(value)}` };
 }
 
 // Q1 — the exact version is resolvable on the registry.
-function fetchPublishedVersion(name: string, version: string): string | null {
-    try {
-        const out = runNpm(['view', `${name}@${version}`, 'version', '--json']).trim();
-        const parsed = parseSingleNpmJsonResult(out);
-        return typeof parsed === 'string' ? parsed : null;
-    } catch {
-        return null;
-    }
+export function fetchPublishedVersion(name: string, version: string, run: NpmRunner = runNpm): Lookup<string> {
+    return readNpmValue(run, ['view', `${name}@${version}`, 'version', '--json'], acceptString);
 }
 
 // Q2 — the `latest` dist-tag points at the new version.
-function fetchLatestDistTag(name: string): string | null {
-    try {
-        const out = runNpm(['view', name, 'dist-tags.latest', '--json']).trim();
-        const parsed = parseSingleNpmJsonResult(out);
-        return typeof parsed === 'string' ? parsed : null;
-    } catch {
-        return null;
-    }
+export function fetchLatestDistTag(name: string, run: NpmRunner = runNpm): Lookup<string> {
+    return readNpmValue(run, ['view', name, 'dist-tags.latest', '--json'], acceptString);
 }
 
-// Q3 — the published version carries a provenance attestation.
-function fetchAttestations(name: string, version: string): Attestations | null {
-    try {
-        const out = runNpm(['view', `${name}@${version}`, '--json']).trim();
-        const parsed = parseSingleNpmJsonResult(out);
-        if (parsed === null || typeof parsed !== 'object') {
-            return null;
-        }
-        const packument = parsed as PackumentVersion;
-        return packument.dist?.attestations ?? null;
-    } catch {
-        return null;
-    }
+// Q3 — the published version carries a provenance attestation. A version npm can show without a
+// `dist.attestations` is `ok` with no attestation: the caller rejects it rather than retrying a field
+// that is not coming.
+export function fetchAttestations(name: string, version: string, run: NpmRunner = runNpm): Lookup<Attestations | undefined> {
+    return readNpmValue<Attestations | undefined>(run, ['view', `${name}@${version}`, '--json'], (value) =>
+        typeof value === 'object'
+            ? { status: 'ok', value: (value as PackumentVersion).dist?.attestations }
+            : { status: 'error', message: `npm returned a non-object manifest: ${JSON.stringify(value)}` },
+    );
+}
+
+export function hasProvenance(attestations: Attestations | undefined): boolean {
+    return attestations !== undefined && (attestations.url !== undefined || attestations.provenance !== undefined);
 }
 
 // Installs the published version into a throwaway project and runs `fn` against it. Q4 and Q5
@@ -223,6 +253,7 @@ function smokeTestRender(name: string, dir: string): void {
         if (error !== null && typeof error === 'object' && (error as { signal?: string }).signal === 'SIGKILL') {
             throw new Error(
                 `Q5 render smoke timed out after ${RENDER_SMOKE_TIMEOUT_MS / 1000}s — the worker pool never settled (a present but unusable ${'`pageRenderWorker.js`'} can hang instead of failing)`,
+                { cause: error },
             );
         }
         throw error;
@@ -246,7 +277,7 @@ async function main(): Promise<void> {
     console.log(`  Q2 dist-tag latest:        OK (${latest})`);
 
     const attestations = await retry('Q3 provenance attestation', () => fetchAttestations(name, version));
-    if (attestations.url === undefined && attestations.provenance === undefined) {
+    if (!hasProvenance(attestations)) {
         throw new Error('Q3 published version has no provenance attestation');
     }
     console.log('  Q3 provenance attestation: OK');
@@ -262,8 +293,11 @@ async function main(): Promise<void> {
     console.log('\nrelease:postcheck PASSED');
 }
 
-main().catch((err: unknown) => {
-    console.error('\nrelease:postcheck FAILED:');
-    console.error(`  x ${err instanceof Error ? err.message : String(err)}`);
-    process.exit(1);
-});
+// Only when run as the script: the registry-read helpers above are imported by tests, which must not shell out to npm.
+if (require.main === module) {
+    main().catch((err: unknown) => {
+        console.error('\nrelease:postcheck FAILED:');
+        console.error(`  x ${err instanceof Error ? err.message : String(err)}`);
+        process.exit(1);
+    });
+}

@@ -22,7 +22,6 @@ test(`should convert PDF To PNG files`, async () => {
         const compareResult: number = await comparePNG({
             actualFile: actualFileContent,
             expectedFile: expectedFilePath,
-            createExpectedFileIfMissing: true,
         });
 
         expect(compareResult).toBeLessThan(RELAXED_COMPARE_DIFFERENCE_THRESHOLD);
@@ -52,7 +51,6 @@ test(`should convert PDF To PNG files in parallel mode`, async () => {
         const compareResult: number = await comparePNG({
             actualFile: actualFileContent,
             expectedFile: expectedFilePath,
-            createExpectedFileIfMissing: true,
         });
 
         expect(compareResult).toBeLessThan(RELAXED_COMPARE_DIFFERENCE_THRESHOLD);

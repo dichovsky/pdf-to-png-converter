@@ -1,5 +1,6 @@
 import { constants as fsConstants, promises as fsPromises } from 'node:fs';
 import type { FileHandle } from 'node:fs/promises';
+import { FILE_READ_MAX_CHUNK_BYTES, MAX_INPUT_PATH_LENGTH } from './const.js';
 
 const FILE_READ_GROWTH_BYTES = 64 * 1024;
 
@@ -9,9 +10,8 @@ function rejectOversized(byteLength: number, maxInputBytes: number): void {
     }
 }
 
-/** An object exposing a finite numeric `length` — the shape pdf.js itself accepts as byte data. */
-function isByteArrayLike(value: unknown): value is ArrayLike<number> {
-    return typeof value === 'object' && value !== null && Number.isFinite((value as { length?: unknown }).length);
+function unsupportedBufferError(value: unknown): Error {
+    return new Error(`Unsupported buffer type: ${Object.prototype.toString.call(value)}`);
 }
 
 function toTransferableView(buffer: Buffer, byteLength: number): Uint8Array {
@@ -59,7 +59,8 @@ async function readBoundedFile(fileHandle: FileHandle, reportedSize: number, max
             continue;
         }
 
-        const { bytesRead } = await fileHandle.read(buffer, totalBytesRead, buffer.byteLength - totalBytesRead, totalBytesRead);
+        const requestLength = Math.min(buffer.byteLength - totalBytesRead, FILE_READ_MAX_CHUNK_BYTES);
+        const { bytesRead } = await fileHandle.read(buffer, totalBytesRead, requestLength, totalBytesRead);
         if (bytesRead === 0) {
             return toTransferableView(buffer, totalBytesRead);
         }
@@ -75,6 +76,12 @@ async function readBoundedFile(fileHandle: FileHandle, reportedSize: number, max
  */
 export async function getPdfFileBuffer(pdfFile: string | ArrayBufferLike | Uint8Array, maxInputBytes: number): Promise<Uint8Array> {
     if (typeof pdfFile === 'string') {
+        // Checked before any filesystem call, and the value is deliberately not echoed.
+        if (pdfFile.length > MAX_INPUT_PATH_LENGTH) {
+            throw new Error(
+                `Input PDF path is too long (over ${MAX_INPUT_PATH_LENGTH} characters). A string is read as a file path; pass PDF bytes as a Buffer or Uint8Array.`,
+            );
+        }
         // Open once, then inspect and read through that same descriptor. A path replacement after
         // open() cannot make validation apply to one file while bytes come from another.
         // O_NONBLOCK avoids waiting on special paths such as FIFOs on platforms that honor the
@@ -90,6 +97,12 @@ export async function getPdfFileBuffer(pdfFile: string | ArrayBufferLike | Uint8
         } finally {
             await fileHandle.close();
         }
+    }
+
+    // Not a path, so it must be a byte container. null, undefined and other primitives are not one:
+    // reject them here rather than let the `byteLength` read below fail as an engine TypeError.
+    if (typeof pdfFile !== 'object' || pdfFile === null) {
+        throw unsupportedBufferError(pdfFile);
     }
 
     if (Buffer.isBuffer(pdfFile)) {
@@ -121,7 +134,8 @@ export async function getPdfFileBuffer(pdfFile: string | ArrayBufferLike | Uint8
     // above — but `instanceof` is realm-bound, so genuine byte containers created in another realm
     // land here. pdf.js accepted all of these before this seam closed the union (`getDataProp`
     // takes anything satisfying `ArrayBuffer.isView` or having a numeric `length`, and the old
-    // loader coerced the rest with `new Uint8Array(value)`), so they must keep converting.
+    // loader coerced the rest with `new Uint8Array(value)`), so they must keep converting — except
+    // an object that merely claims a numeric `length`, which only a real Array may do (see below).
     const candidate: unknown = pdfFile;
 
     // Cross-realm typed arrays and `DataView`s — e.g. built inside `node:vm` or `isolated-vm`,
@@ -130,21 +144,25 @@ export async function getPdfFileBuffer(pdfFile: string | ArrayBufferLike | Uint8
         return Uint8Array.from(new Uint8Array(candidate.buffer, candidate.byteOffset, candidate.byteLength));
     }
 
-    // Cross-realm `ArrayBuffer`, for the same reason.
-    if (Object.prototype.toString.call(candidate) === '[object ArrayBuffer]') {
+    // Cross-realm `ArrayBuffer` and `SharedArrayBuffer`, for the same reason. `Uint8Array.from`
+    // copies, so a shared buffer also leaves here as unshared memory.
+    const tag = Object.prototype.toString.call(candidate);
+    if (tag === '[object ArrayBuffer]' || tag === '[object SharedArrayBuffer]') {
         return Uint8Array.from(new Uint8Array(candidate as ArrayBuffer));
     }
 
-    // Array-likes of byte values — most commonly a Node `Buffer` that round-tripped through JSON
-    // as `{ type: 'Buffer', data: number[] }` and reaches us as that `data` array. `byteLength` is
-    // `undefined` on these, so the size cap above skipped them; apply it to `length` here.
-    if (isByteArrayLike(candidate)) {
+    // Arrays of byte values — most commonly a Node `Buffer` that round-tripped through JSON as
+    // `{ type: 'Buffer', data: number[] }` and reaches us as that `data` array. `byteLength` is
+    // `undefined` on these, so the size cap above skipped them; apply it to `length` here. Only a
+    // genuine Array qualifies (`Array.isArray` is realm-independent): the cap bounds the length an
+    // object CLAIMS, not the work of copying it, and `Uint8Array.from({ length: n })` performs n
+    // property reads, so a 20-byte `{"length":268435456}` would block the event loop for seconds.
+    if (Array.isArray(candidate)) {
         rejectOversized(candidate.length, maxInputBytes);
         return Uint8Array.from(candidate);
     }
 
-    // Genuinely unsupported. Reject here with the same message the file-path branch uses, rather
-    // than passing the value through for pdfjs to reject: this module owns the input contract, so
-    // an unsupported shape must not escape it.
-    throw new Error(`Unsupported buffer type: ${Object.prototype.toString.call(pdfFile)}`);
+    // Genuinely unsupported. Reject here rather than passing the value through for pdfjs to reject:
+    // this module owns the input contract, so an unsupported shape must not escape it.
+    throw unsupportedBufferError(pdfFile);
 }

@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, posix } from 'node:path';
 import { parseSingleNpmJsonResult } from './npm-json';
 
 // Preventive release gate. Run by `publish.yml` immediately before `npm publish`
@@ -8,9 +8,15 @@ import { parseSingleNpmJsonResult } from './npm-json';
 // packaged contents are wrong. All checks accumulate; the process exits non-zero
 // listing every failure rather than stopping at the first.
 
-interface PackageManifest {
+// The fields of package.json the checks read. The entry-point fields stay `unknown`: they are parsed JSON and
+// are narrowed where they are used.
+export interface PackageManifest {
     name: string;
     version: string;
+    main?: unknown;
+    types?: unknown;
+    bin?: unknown;
+    exports?: unknown;
 }
 
 interface PackedFile {
@@ -39,7 +45,7 @@ function readManifest(): PackageManifest {
     if (typeof parsed.name !== 'string' || typeof parsed.version !== 'string') {
         throw new Error('package.json is missing a string "name" or "version"');
     }
-    return { name: parsed.name, version: parsed.version };
+    return { ...parsed, name: parsed.name, version: parsed.version };
 }
 
 function runNpm(args: string[]): string {
@@ -97,8 +103,79 @@ function checkChangelogEntry(version: string, failures: string[]): void {
     console.log(`  P3 CHANGELOG entry exists: OK ([${version}])`);
 }
 
-// P4 — the published tarball must ship the build output and nothing else (no source, tests, or tsbuildinfo).
-function checkTarballContents(failures: string[]): void {
+// P4 — the published tarball must ship the build output and every file package.json points consumers at,
+// and nothing else (no source, tests, or tsbuildinfo). A manifest-only typo in main, types, bin or exports,
+// or a lost bin shebang, still packs and publishes cleanly and is only caught by the post-publish smoke test.
+
+// Every string in an entry-point value: a plain path, the values of a `bin` map, and the conditions,
+// subpaths and fallback arrays of `exports`.
+function stringLeaves(value: unknown): string[] {
+    if (typeof value === 'string') {
+        return [value];
+    }
+    if (Array.isArray(value)) {
+        return value.flatMap(stringLeaves);
+    }
+    if (value !== null && typeof value === 'object') {
+        return Object.values(value).flatMap(stringLeaves);
+    }
+    return [];
+}
+
+// `./out/x.js` in package.json is `out/x.js` in the `npm pack` file list.
+function toPackedPath(target: string): string {
+    return posix.normalize(target.replace(/\\/g, '/'));
+}
+
+function binFiles(manifest: PackageManifest): string[] {
+    return stringLeaves(manifest.bin).map(toPackedPath);
+}
+
+export function requiredTarballFiles(manifest: PackageManifest): string[] {
+    const declared = [manifest.main, manifest.types, manifest.bin, manifest.exports]
+        .flatMap(stringLeaves)
+        // A subpath pattern such as "./*" names a set of files, not one file that must be listed.
+        .filter((target) => !target.includes('*'))
+        .map(toPackedPath);
+    return [...new Set([...REQUIRED_TARBALL_FILES, ...declared])];
+}
+
+// npm links a bin file as it is, so without the shebang the installed command fails to start (ENOEXEC) instead of running under node.
+export function hasNodeShebang(source: string): boolean {
+    return /^#!\/usr\/bin\/env node(\r?\n|$)/.test(source);
+}
+
+// The pure part of P4: what is wrong with a packed file list. `readSource` returns the text of a packed file.
+export function tarballProblems(files: readonly string[], manifest: PackageManifest, readSource: (file: string) => string): string[] {
+    const problems: string[] = [];
+    const missing = requiredTarballFiles(manifest).filter((required) => !files.includes(required));
+    if (missing.length > 0) {
+        problems.push(`P4 tarball is missing required files: ${missing.join(', ')}`);
+    }
+    const forbidden = files.filter(
+        (file) =>
+            file.startsWith('src/') ||
+            file.includes('__tests__/') ||
+            file.endsWith('.tsbuildinfo') ||
+            (file.endsWith('.ts') && !file.endsWith('.d.ts')),
+    );
+    if (forbidden.length > 0) {
+        problems.push(`P4 tarball contains files that should not ship: ${forbidden.join(', ')}`);
+    }
+    // A bin file that is not in the tarball is already reported as missing above.
+    for (const file of binFiles(manifest).filter((bin) => files.includes(bin))) {
+        try {
+            if (!hasNodeShebang(readSource(file))) {
+                problems.push(`P4 bin file ${file} does not start with "#!/usr/bin/env node"`);
+            }
+        } catch (err) {
+            problems.push(`P4 could not read bin file ${file} to check its shebang: ${err instanceof Error ? err.message : String(err)}`);
+        }
+    }
+    return problems;
+}
+
+function checkTarballContents(manifest: PackageManifest, failures: string[]): void {
     let files: string[];
     try {
         const out = runNpm(['pack', '--dry-run', '--ignore-scripts', '--json']);
@@ -121,21 +198,9 @@ function checkTarballContents(failures: string[]): void {
         failures.push(`P4 could not inspect the tarball: ${err instanceof Error ? err.message : String(err)}`);
         return;
     }
-    const missing = REQUIRED_TARBALL_FILES.filter((required) => !files.includes(required));
-    if (missing.length > 0) {
-        failures.push(`P4 tarball is missing required files: ${missing.join(', ')}`);
-    }
-    const forbidden = files.filter(
-        (file) =>
-            file.startsWith('src/') ||
-            file.includes('__tests__/') ||
-            file.endsWith('.tsbuildinfo') ||
-            (file.endsWith('.ts') && !file.endsWith('.d.ts')),
-    );
-    if (forbidden.length > 0) {
-        failures.push(`P4 tarball contains files that should not ship: ${forbidden.join(', ')}`);
-    }
-    if (missing.length === 0 && forbidden.length === 0) {
+    const problems = tarballProblems(files, manifest, (file) => readFileSync(join(REPO_ROOT, file), 'utf-8'));
+    failures.push(...problems);
+    if (problems.length === 0) {
         console.log(`  P4 tarball contents:       OK (${files.length} files)`);
     }
 }
@@ -178,13 +243,14 @@ function checkUnreleasedIsEmpty(failures: string[]): void {
 }
 
 function main(): void {
-    const { name, version } = readManifest();
+    const manifest = readManifest();
+    const { name, version } = manifest;
     console.log(`release:precheck for ${name}@${version}`);
     const failures: string[] = [];
     checkTagMatchesVersion(version, failures);
     checkNotAlreadyPublished(name, version, failures);
     checkChangelogEntry(version, failures);
-    checkTarballContents(failures);
+    checkTarballContents(manifest, failures);
     checkUnreleasedIsEmpty(failures);
     if (failures.length > 0) {
         console.error('\nrelease:precheck FAILED:');
@@ -196,4 +262,7 @@ function main(): void {
     console.log('\nrelease:precheck PASSED');
 }
 
-main();
+// Only when run as the script: the pure checks above are imported by tests, which must not shell out to npm.
+if (require.main === module) {
+    main();
+}

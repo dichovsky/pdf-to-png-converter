@@ -35,6 +35,7 @@ describe('CLI', () => {
     afterEach(() => {
         process.argv = originalArgv;
         vi.restoreAllMocks();
+        vi.unstubAllEnvs();
     });
 
     it('prints help and does not invoke conversion', async () => {
@@ -86,6 +87,23 @@ describe('CLI', () => {
         setArgv();
         await run();
         expect(errorSpy).toHaveBeenCalledWith('Error: <pdf-file-path> is required.');
+        expect(errorSpy).toHaveBeenCalledWith(HELP_TEXT);
+        expect(exitSpy).toHaveBeenCalledWith(1);
+        expect(pdfToPng).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        [['a.pdf', 'b.pdf', '--output-folder', '/out'], 'received 2 arguments: "a.pdf", "b.pdf".'],
+        [['a.pdf', 'b.pdf', 'c.pdf', '--output-folder', '/out'], 'received 3 arguments: "a.pdf", "b.pdf", "c.pdf".'],
+        // Valueless flags take no argument, so a stray "false" is a second positional and not a way to switch the flag off.
+        [['test.pdf', '--output-folder', '/out', '--use-system-fonts', 'false'], 'received 2 arguments: "test.pdf", "false".'],
+        [['--silent', 'false', 'test.pdf', '--output-folder', '/out'], 'received 2 arguments: "false", "test.pdf".'],
+        // An unquoted space in an option value splits it into a second positional.
+        [['test.pdf', '--output-folder', 'My', 'Out'], 'received 2 arguments: "test.pdf", "Out".'],
+    ])('rejects more than one positional argument and names every one of them', async (args, received) => {
+        setArgv(...args);
+        await run();
+        expect(errorSpy).toHaveBeenCalledWith(`Error: Expected exactly one <pdf-file-path> but ${received}`);
         expect(errorSpy).toHaveBeenCalledWith(HELP_TEXT);
         expect(exitSpy).toHaveBeenCalledWith(1);
         expect(pdfToPng).not.toHaveBeenCalled();
@@ -168,6 +186,8 @@ describe('CLI', () => {
             '2',
             '--render-in-worker-threads',
         );
+        // `--disable-font-face false` is ignored: the validation pass coerces it to true and warns once per process.
+        vi.spyOn(process, 'emitWarning').mockImplementation(() => undefined);
         await run();
 
         expect(pdfToPng).toHaveBeenCalledTimes(1);
@@ -176,7 +196,7 @@ describe('CLI', () => {
             outputFileMaskFunc: undefined,
             viewportScale: 2,
             useSystemFonts: true,
-            disableFontFace: false,
+            disableFontFace: true,
             enableXfa: true,
             pdfFilePassword: 'secret',
             pagesToProcess: [1, 2],
@@ -189,6 +209,51 @@ describe('CLI', () => {
             maxInputBytes: 256 * 1024 * 1024,
         });
         expect(logSpy).toHaveBeenCalledWith('Successfully processed 0 page(s).');
+    });
+
+    it('reads the PDF password from PDF_TO_PNG_PASSWORD when --pdf-file-password is absent', async () => {
+        vi.stubEnv('PDF_TO_PNG_PASSWORD', 'env-password');
+        setArgv('test.pdf', '--output-folder', '/out');
+        await run();
+
+        expect(pdfToPng).toHaveBeenCalledWith('test.pdf', expect.objectContaining({ pdfFilePassword: 'env-password' }));
+    });
+
+    it('prefers --pdf-file-password over PDF_TO_PNG_PASSWORD', async () => {
+        vi.stubEnv('PDF_TO_PNG_PASSWORD', 'env-password');
+        setArgv('test.pdf', '--output-folder', '/out', '--pdf-file-password', 'flag-password');
+        await run();
+
+        expect(pdfToPng).toHaveBeenCalledWith('test.pdf', expect.objectContaining({ pdfFilePassword: 'flag-password' }));
+    });
+
+    it.each([
+        ['empty', ''],
+        ['unset', undefined],
+    ])('passes no password when PDF_TO_PNG_PASSWORD is %s', async (_state, value) => {
+        vi.stubEnv('PDF_TO_PNG_PASSWORD', value);
+        setArgv('test.pdf', '--output-folder', '/out');
+        await run();
+
+        expect(pdfToPng).toHaveBeenCalledWith('test.pdf', expect.objectContaining({ pdfFilePassword: undefined }));
+    });
+
+    it('never prints a password it was given, on success or on failure', async () => {
+        vi.stubEnv('PDF_TO_PNG_PASSWORD', 'env-secret');
+        setArgv('test.pdf', '--output-folder', '/out', '--pdf-file-password', 'flag-secret');
+        await run();
+        vi.mocked(pdfToPng).mockRejectedValueOnce(new Error('render failed'));
+        await run();
+
+        const printed = JSON.stringify([...logSpy.mock.calls, ...errorSpy.mock.calls]);
+        expect(printed).toContain('Successfully processed');
+        expect(printed).toContain('render failed');
+        expect(printed).not.toContain('env-secret');
+        expect(printed).not.toContain('flag-secret');
+    });
+
+    it('documents the password environment variable in the help text', () => {
+        expect(HELP_TEXT).toContain('PDF_TO_PNG_PASSWORD');
     });
 
     it('normalizes an omitted metadata flag to file mode before applying CLI policy', async () => {
@@ -223,6 +288,36 @@ describe('CLI', () => {
         await run();
         expect(pdfToPng).toHaveBeenCalledTimes(1);
         expect(logSpy).not.toHaveBeenCalled();
+    });
+
+    it('routes console output written during the conversion to stderr and restores the console afterwards', async () => {
+        const consoleBefore = { log: console.log, info: console.info };
+        vi.mocked(pdfToPng).mockImplementationOnce(async () => {
+            // pdf.js writes Info lines (verbosity 5) with console.info and deprecation notices with console.log.
+            console.info('Info: (while reading XRef): FormatError');
+            console.log('Deprecated API usage: example');
+            return [];
+        });
+        setArgv('test.pdf', '--return-metadata-only', '--verbosity-level', '5');
+        await run();
+
+        expect(errorSpy).toHaveBeenCalledWith('Info: (while reading XRef): FormatError');
+        expect(errorSpy).toHaveBeenCalledWith('Deprecated API usage: example');
+        // Only the metadata document reaches stdout.
+        expect(logSpy.mock.calls).toEqual([['[]']]);
+        expect(console.log).toBe(consoleBefore.log);
+        expect(console.info).toBe(consoleBefore.info);
+    });
+
+    it('restores the console when the conversion fails', async () => {
+        const consoleBefore = { log: console.log, info: console.info };
+        vi.mocked(pdfToPng).mockRejectedValueOnce(new Error('render failed'));
+        setArgv('test.pdf', '--output-folder', '/out');
+        await run();
+
+        expect(exitSpy).toHaveBeenCalledWith(1);
+        expect(console.log).toBe(consoleBefore.log);
+        expect(console.info).toBe(consoleBefore.info);
     });
 
     it('prints public conversion errors and exits 1', async () => {
@@ -329,6 +424,25 @@ describe('CLI', () => {
             expect(logSpy).toHaveBeenCalledWith(HELP_TEXT);
             expect(exitSpy).toHaveBeenCalledWith(0);
             expect(pdfToPng).not.toHaveBeenCalled();
+        } finally {
+            vi.resetModules();
+        }
+    });
+
+    it.each([
+        ['a path that does not exist', '/nonexistent/pdf-to-png-converter-entry'],
+        ['missing', undefined],
+        ['a different existing file', __filename],
+    ])('does not run when the module is loaded while argv[1] is %s', async (_label, entry) => {
+        vi.resetModules();
+        process.argv = entry === undefined ? ['node'] : ['node', entry, '--help'];
+
+        try {
+            await import('../src/cli.js');
+
+            expect(logSpy).not.toHaveBeenCalled();
+            expect(errorSpy).not.toHaveBeenCalled();
+            expect(exitSpy).not.toHaveBeenCalled();
         } finally {
             vi.resetModules();
         }

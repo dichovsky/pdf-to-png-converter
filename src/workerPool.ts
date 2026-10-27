@@ -44,12 +44,19 @@ interface RenderErrorMessage {
     type: 'render-error';
     index: number;
     error: unknown;
+    /**
+     * `error.name` when it is not "Error". Structured clone resets any name outside the standard error classes to "Error",
+     * so the pool restores it from here.
+     */
+    errorName?: string;
 }
 
 /** Worker → main: this worker cannot serve any page. */
 interface FatalErrorMessage {
     type: 'fatal';
     error: unknown;
+    /** See `RenderErrorMessage.errorName`. */
+    errorName?: string;
 }
 
 export type WorkerResponse = RenderedPageMessage | RenderErrorMessage | FatalErrorMessage;
@@ -63,12 +70,34 @@ export function throwLowestIndexedError(errorsByIndex: ReadonlyMap<number, unkno
 }
 
 /**
+ * Re-applies the name that structured clone reset while an error crossed the thread boundary. The received error is this call's
+ * own object, so setting its name is safe, and a rebuilt copy would lose the stack. A name the clone kept is left alone.
+ */
+function restoreErrorName(error: unknown, errorName: string | undefined): unknown {
+    if (errorName !== undefined && error instanceof Error && error.name !== errorName) {
+        error.name = errorName;
+    }
+    return error;
+}
+
+/**
  * Locates the compiled worker entry. In the published package (and any `out/` build) it sits
  * next to this file. When this module runs from `src/` (vitest transforms TypeScript in-place,
  * so `__dirname` is `src/`), fall back to the repo's `out/` build — the integration tests
  * compile it first. Workers can only execute plain JavaScript, never `.ts` sources.
+ *
+ * An ESM bundle that inlines this module shims `require` but leaves `__dirname` undefined, and a bundle cannot carry the worker
+ * file anyway, so that case gets a descriptive error rather than a bare ReferenceError.
  */
 function resolveWorkerEntryPath(): string {
+    if (typeof __dirname !== 'string') {
+        throw new Error(
+            'renderInWorkerThreads cannot locate pageRenderWorker.js because __dirname is not defined, which happens when ' +
+                'pdf-to-png-converter is bundled into ESM code. Worker mode loads that compiled file from beside this module, so it needs ' +
+                'the unbundled out/ directory of the installed package: import the package from node_modules instead of bundling it, ' +
+                'or turn renderInWorkerThreads off.',
+        );
+    }
     const compiled = join(__dirname, 'pageRenderWorker.js');
     if (existsSync(compiled)) {
         return compiled;
@@ -198,12 +227,12 @@ export async function renderPagesInWorkerPool(
                     return;
                 }
                 if (response.type === 'fatal') {
-                    recordFatal(response.error);
+                    recordFatal(restoreErrorName(response.error, response.errorName));
                     finish();
                     return;
                 }
                 if (response.type === 'render-error') {
-                    errorsByIndex.set(response.index, response.error);
+                    errorsByIndex.set(response.index, restoreErrorName(response.error, response.errorName));
                     dispatchNext();
                     return;
                 }

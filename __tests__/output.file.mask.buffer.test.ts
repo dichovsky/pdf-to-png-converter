@@ -35,3 +35,14 @@ test('should preserve disk-only invalid characters in an in-memory result name',
     expect(page.name).toBe('memory\0:page.png');
     expect(page.path).toBe('');
 });
+
+test('should preserve a name longer than any filesystem allows in an in-memory result', async () => {
+    const name = `${'x'.repeat(300)}.png`;
+    const [page] = await pdfToPng(pdfBuffer, {
+        outputFileMaskFunc: () => name,
+        pagesToProcess: [1],
+    });
+
+    expect(page.name).toBe(name);
+    expect(page.path).toBe('');
+});

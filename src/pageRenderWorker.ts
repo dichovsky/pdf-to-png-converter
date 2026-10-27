@@ -1,3 +1,4 @@
+import { types } from 'node:util';
 import { parentPort, workerData } from 'node:worker_threads';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { renderPdfPage } from './pageRenderer.js';
@@ -25,15 +26,26 @@ const init = workerData as WorkerInitData;
 let documentPromise: Promise<PDFDocumentProxy> | undefined;
 
 /**
- * Posts a response that carries a thrown value. Error instances retain their useful standard
- * fields through structured clone; values that cannot be cloned (functions, exotic objects some
- * libraries throw) are downgraded to a plain Error so the response always gets through.
+ * Rebuilds an Error that is not a native error as a native one. pdf.js exceptions are `instanceof Error` (their prototype is an
+ * Error instance) without being native errors, so structured clone, which `postMessage` applies, would flatten them into plain
+ * objects and the pool would reject with a non-Error. Only the message and the cause carry over; the name travels separately.
  */
-function postErrorResponse(build: (error: unknown) => WorkerResponse, error: unknown): void {
+function toNativeError(error: Error): Error {
+    return new Error(error.message, Object.hasOwn(error, 'cause') ? { cause: error.cause } : undefined);
+}
+
+/**
+ * Posts a response that carries a thrown value. Native Errors retain their message, stack and cause through structured clone, and
+ * non-native Errors (pdf.js exceptions) are rebuilt as native ones first. Structured clone resets any name that is not "Error" or
+ * one of the standard subclasses to "Error", so the original name travels in `errorName` and the pool re-applies it. Values that
+ * cannot be cloned (functions, exotic objects some libraries throw) are downgraded to a plain Error so the response always gets through.
+ */
+function postErrorResponse(build: (error: unknown, errorName: string | undefined) => WorkerResponse, error: unknown): void {
+    const errorName = error instanceof Error && error.name !== 'Error' ? error.name : undefined;
     try {
-        port.postMessage(build(error));
+        port.postMessage(build(error instanceof Error && !types.isNativeError(error) ? toNativeError(error) : error, errorName));
     } catch {
-        port.postMessage(build(new Error(error instanceof Error ? error.message : String(error))));
+        port.postMessage(build(new Error(error instanceof Error ? error.message : String(error)), errorName));
     }
 }
 
@@ -47,7 +59,7 @@ async function handleRender(request: RenderPageRequest): Promise<void> {
         documentPromise ??= getPdfDocument(init.pdfBuffer, init.renderOptions);
         pdfDocument = await documentPromise;
     } catch (error: unknown) {
-        postErrorResponse((cause) => ({ type: 'fatal', error: cause }), error);
+        postErrorResponse((cause, errorName) => ({ type: 'fatal', error: cause, errorName }), error);
         return;
     }
 
@@ -68,7 +80,7 @@ async function handleRender(request: RenderPageRequest): Promise<void> {
         // next to the render work this mode parallelizes.
         port.postMessage(response);
     } catch (error: unknown) {
-        postErrorResponse((cause) => ({ type: 'render-error', index: request.index, error: cause }), error);
+        postErrorResponse((cause, errorName) => ({ type: 'render-error', index: request.index, error: cause, errorName }), error);
     }
 }
 

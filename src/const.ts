@@ -1,7 +1,6 @@
 /**
- * Maximum allowed value for `viewportScale`. Values above this limit would produce canvases
- * so large (an A4 page at scale 100 already yields ~5×10⁹ pixels) that they risk OOM crashes
- * before the pixel-count guard in `processPdfPage` can fire.
+ * Maximum allowed value for `viewportScale`. Larger scales are rejected up front: an A4 page at
+ * scale 100 already yields ~5×10⁹ pixels, far above `MAX_CANVAS_PIXELS`, so no such page could be rendered.
  */
 export const MAX_VIEWPORT_SCALE = 100;
 
@@ -14,8 +13,20 @@ export const MAX_VIEWPORT_SCALE = 100;
 export const MAX_CANVAS_PIXELS = 100_000_000;
 
 /**
- * Default upper bound on input PDF size in bytes. 256 MiB is a generous ceiling for legitimate
- * PDFs while keeping a single conversion well below typical service container memory limits.
+ * Maximum canvas width or height in pixels: libpng's default per-side limit (PNG_USER_WIDTH_MAX and
+ * PNG_USER_HEIGHT_MAX). The PNG encoder behind `@napi-rs/canvas` refuses a wider or taller bitmap with an opaque
+ * "Get png data from surface failed" and raw libpng output on stderr, only after the page has been rendered.
+ * `MAX_CANVAS_PIXELS` bounds the area alone, so a very thin page passes it: 10,001 × 0.5 pt at scale 100 is a
+ * 1,000,100 × 50 px bitmap. A page whose floored width or height exceeds this limit is rejected before any canvas
+ * is allocated.
+ */
+export const MAX_CANVAS_SIDE = 1_000_000;
+
+/**
+ * Default upper bound on input PDF size in bytes. 256 MiB is a generous ceiling for legitimate PDFs.
+ * It bounds the input bytes only, not the memory pdf.js needs to parse them: a non-PDF payload that is one long run of a
+ * single byte value costs about 32 to 64 heap bytes per input byte in pdf.js's recovery scan and can abort the process on
+ * heap exhaustion even below this cap, so this value is not a service memory limit.
  * The path branch of `getPdfFileBuffer()` opens once, verifies that same handle is a regular file,
  * and reads it with a bounded allocation, so devices, FIFOs, sockets, and unbounded growth cannot
  * bypass the cap through a pathname race.
@@ -24,8 +35,31 @@ export const MAX_CANVAS_PIXELS = 100_000_000;
 export const MAX_INPUT_BYTES = 256 * 1024 * 1024;
 
 /**
+ * Longest string accepted as a file path input: POSIX PATH_MAX on Linux. A longer string cannot be a usable path, it
+ * is document content passed by mistake, and the filesystem error for it would copy the whole value into its message.
+ * Windows extended-length paths (up to 32,767 characters) are therefore not accepted as string input; raise this if that
+ * is ever needed.
+ */
+export const MAX_INPUT_PATH_LENGTH = 4096;
+
+/**
+ * Largest single `FileHandle.read()` request when an input PDF is read from a path. `read()` takes an int32 `length`, so
+ * a request of 2 GiB or more is unsafe: depending on the Node version it aborts the process (a failed C++ CHECK) or
+ * throws ERR_OUT_OF_RANGE, and a multiple of 4 GiB wraps to a zero-length read that the read loop would take for EOF and
+ * return a silently short buffer. No single request may exceed this; the loop already assembles a file from short reads.
+ */
+export const FILE_READ_MAX_CHUNK_BYTES = 2 ** 30;
+
+/**
+ * NAME_MAX: one path segment holds at most 255 units on every common filesystem. APFS, HFS+ and NTFS count UTF-16 code
+ * units; ext4, xfs, btrfs and most other hosts count UTF-8 bytes, which are never fewer than the code units. Node
+ * exposes no pathconf, so `assertValidOutputFilename()` lets the host family stand in for the filesystem.
+ */
+export const MAX_FILENAME_LENGTH = 255;
+
+/**
  * Upper bound on `concurrencyLimit` for local parallel and worker rendering. At this cap,
- * worst-case in-flight canvas memory alone is roughly 6.4 GiB, so the limit bounds rather than
+ * worst-case in-flight canvas memory alone is roughly 6.4 GB, so the limit bounds rather than
  * prevents memory exhaustion. Callers should choose a substantially lower value in containers.
  */
 export const MAX_CONCURRENCY_LIMIT = 16;
@@ -33,7 +67,7 @@ export const MAX_CONCURRENCY_LIMIT = 16;
 /**
  * Sliding-window size used for sequential (non-parallel) conversions. The window lets the
  * off-thread PNG encode and disk write of finished pages overlap the main-thread render of the
- * next page. Result order is preserved by the window helper; rendered pixels are unaffected.
+ * next page. Result order is preserved by `mapLimitOrdered()`; rendered pixels are unaffected.
  *
  * Sized 3 by paired A/B measurement: on text-heavy documents PNG encode costs ~2× render, and a
  * second in-flight encode recovers a small but consistent margin (TAMReview.pdf: −2…−5% median
@@ -44,8 +78,10 @@ export const MAX_CONCURRENCY_LIMIT = 16;
 export const SEQUENTIAL_PIPELINE_WINDOW = 3;
 
 /**
- * Default values applied to `PdfToPngOptions` fields that are not explicitly set by the caller.
- * These are also used as the source of truth for documented defaults in JSDoc comments on the type.
+ * Shared default values for `PdfToPngOptions` fields that the caller does not set. The verbosity and
+ * mode flags (`verbosityLevel`, `returnPageContent`, `returnMetadataOnly`, `processPagesInParallel`,
+ * `renderInWorkerThreads`) default inside `normalizeOptions()` in `src/pdfToPng.ts`. The JSDoc on the
+ * type states every default, so keep it in sync with both places.
  */
 export const PDF_TO_PNG_OPTIONS_DEFAULTS = {
     viewportScale: 1,

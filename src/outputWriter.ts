@@ -1,5 +1,6 @@
 import { promises as fsPromises } from 'node:fs';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { MAX_FILENAME_LENGTH } from './const.js';
 
 // Reject only characters the host OS treats as path separators. On Windows both "\\" and "/"
 // are separators; on POSIX only "/" is. A backslash therefore remains a valid POSIX filename
@@ -30,7 +31,9 @@ function isEscapingRelativePath(rel: string): boolean {
  *
  * Call this while preflighting page names so invalid names fail before output-folder creation,
  * and call it again at the write boundary as defense in depth. The target must be one plain path
- * segment: no empty name, current/parent directory aliases, absolute path, or host separator.
+ * segment: no empty name, current/parent directory aliases, absolute path, or host separator, and
+ * at most 255 units (UTF-16 code units on darwin and Windows, UTF-8 bytes on other hosts). The
+ * length rule estimates the target filesystem from the host family; it does not probe the folder.
  */
 export function assertValidOutputFilename(name: string): void {
     if (name === '') {
@@ -41,6 +44,15 @@ export function assertValidOutputFilename(name: string): void {
     // callers get the filename-contract error instead of an environment-dependent fs error.
     if (name.includes('\0')) {
         throw new Error('Output file name must not contain a NUL byte.');
+    }
+
+    // An over-long name would only fail at open() with a raw ENAMETOOLONG that carries the absolute
+    // path, after the output folder exists and pages were rendered. Report counts, not the name.
+    const countsBytes = !IS_WINDOWS_PATH && process.platform !== 'darwin';
+    const length = countsBytes ? Buffer.byteLength(name) : name.length;
+    if (length > MAX_FILENAME_LENGTH) {
+        const unit = countsBytes ? 'UTF-8 bytes' : 'UTF-16 code units';
+        throw new Error(`Output file name must be at most ${MAX_FILENAME_LENGTH} ${unit}, received ${length}.`);
     }
 
     if (containsHostPathSeparator(name)) {
@@ -122,8 +134,11 @@ export async function prepareOutputFolder(resolvedOutputFolder: string): Promise
  * is not writable by untrusted users.
  *
  * The exclusive-create (`'wx'`) open prevents overwriting an existing final target and refuses a
- * pre-existing target symlink under normal local-filesystem semantics. Callers should clear the
- * output folder before re-running a conversion if they expect to reuse the same names.
+ * pre-existing target symlink under normal local-filesystem semantics. If the write or close fails
+ * after that open succeeded, the file this call created is removed (best effort, by pathname, under
+ * the same private-directory assumption as the open) and the original error is rethrown; a target
+ * that already existed is never removed. Callers should clear the output folder before re-running a
+ * conversion if they expect to reuse the same names.
  */
 export async function savePNGfile(name: string, content: Buffer, folder: OutputFolderHandle): Promise<string> {
     const { resolvedOutputFolder, realOutputFolder } = folder;
@@ -147,8 +162,15 @@ export async function savePNGfile(name: string, content: Buffer, folder: OutputF
     const fd = await fsPromises.open(resolvedFilePath, 'wx');
     try {
         await fd.writeFile(content);
-    } finally {
         await fd.close();
+    } catch (error: unknown) {
+        // The exclusive open succeeded, so this call created the file and owns it. A failed write or close
+        // leaves it empty or truncated under its final name, and 'wx' would then refuse every retry. Release
+        // the handle (a repeated close() is a no-op) and remove the file, best effort so cleanup errors never
+        // mask the original one. A failed open() never reaches this block, so an EEXIST target is not unlinked.
+        await fd.close().catch(() => undefined);
+        await fsPromises.unlink(resolvedFilePath).catch(() => undefined);
+        throw error;
     }
 
     return resolvedFilePath;

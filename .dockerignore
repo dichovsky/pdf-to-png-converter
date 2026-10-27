@@ -3,10 +3,12 @@ test-results
 out
 .vscode
 .env*
+.npmrc
 .claude
 output
 tmp
-TASKS.md
+bench-results
+coverage
 CLAUDE.md
 *.tgz
 .git

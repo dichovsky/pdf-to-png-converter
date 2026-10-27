@@ -77,6 +77,8 @@ typings/
 # dotenv environment variables file
 .env
 .env.test
+.env.*
+!.env.example
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
@@ -113,3 +115,8 @@ dist
 .idea
 *.iml
 bench-results
+
+# Local scratch output (CLI --output-folder ./output, ad-hoc tmp/) and local npm credentials
+/output/
+/tmp/
+.npmrc

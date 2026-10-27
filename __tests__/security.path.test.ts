@@ -110,14 +110,20 @@ test('should reject invalid verbosity levels before reaching pdfjs', async () =>
     await expect(pdfToPng(SAMPLE_PDF, invalidOptions)).rejects.toThrow('verbosityLevel must be 0, 1, or 5');
 });
 
-test('should fail with EEXIST when the target filename path is a symlink pointing outside outputFolder', async () => {
-    const outputFolder = await fsPromises.mkdtemp(join(tmpdir(), 'pdf-to-png-symlink-'));
-    const symlinkTarget = SAMPLE_PDF;
-    const targetFilePath = join(outputFolder, 'sample_page_1.png');
-
-    await fsPromises.symlink(symlinkTarget, targetFilePath);
+test('should fail with EEXIST and leave the file untouched when the target filename path is a symlink pointing outside outputFolder', async () => {
+    const baseDir = await fsPromises.mkdtemp(join(tmpdir(), 'pdf-to-png-symlink-'));
+    const outputFolder = join(baseDir, 'out');
+    // The symlink must never point at a tracked fixture: if the exclusive-create open regressed into a
+    // symlink-following write, this decoy would be overwritten instead of test-data/sample.pdf.
+    const decoyPath = join(baseDir, 'decoy.bin');
+    const decoyBytes = Buffer.from('decoy bytes that an exclusive-create refusal must leave alone');
+    const symlinkPath = join(outputFolder, 'sample_page_1.png');
 
     try {
+        await fsPromises.mkdir(outputFolder);
+        await fsPromises.writeFile(decoyPath, decoyBytes);
+        await fsPromises.symlink(decoyPath, symlinkPath);
+
         await expect(
             pdfToPng(SAMPLE_PDF, {
                 outputFolder,
@@ -125,7 +131,11 @@ test('should fail with EEXIST when the target filename path is a symlink pointin
                 returnPageContent: false,
             }),
         ).rejects.toMatchObject({ code: 'EEXIST' });
+
+        await expect(fsPromises.readFile(decoyPath)).resolves.toEqual(decoyBytes);
+        // A refused open created nothing, so the cleanup after a failed write must not touch the entry either.
+        await expect(fsPromises.readlink(symlinkPath)).resolves.toBe(decoyPath);
     } finally {
-        await fsPromises.rm(outputFolder, { recursive: true, force: true });
+        await fsPromises.rm(baseDir, { recursive: true, force: true });
     }
 });

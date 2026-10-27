@@ -1,6 +1,6 @@
 import type { Canvas, SKRSContext2D } from '@napi-rs/canvas';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
-import { MAX_CANVAS_PIXELS } from './const.js';
+import { MAX_CANVAS_PIXELS, MAX_CANVAS_SIDE } from './const.js';
 import type { PageRotation } from './types.js';
 
 /** The renderer-owned data for one page; observable identity is attached on the main thread. */
@@ -49,6 +49,9 @@ function isCanvasFactory(factory: unknown): factory is CanvasFactory {
     );
 }
 
+/** Pixels of float noise `toPixelDimension` forgives below an integer; see its documentation for why 1e-6. */
+const PIXEL_DIMENSION_TOLERANCE = 1e-6;
+
 /**
  * Converts a (possibly fractional) viewport length into the integer pixel count the canvas
  * will actually allocate. `@napi-rs/canvas` truncates fractional dimensions toward zero when a
@@ -57,10 +60,16 @@ function isCanvasFactory(factory: unknown): factory is CanvasFactory {
  * non-negative, so `Math.floor` is equivalent to that truncation. Flooring here keeps the
  * render path and the `returnMetadataOnly` path reporting identical, image-accurate pixel sizes.
  *
+ * A length up to {@link PIXEL_DIMENSION_TOLERANCE} below an integer counts as that integer. Scales such as
+ * `350 / 72` are not exactly representable, so 612 pt at that scale is `2974.9999999999995`, not `2975`, and a
+ * bare floor would lose a pixel on integer-exact sizes. Floating-point error stays below about 1e-9 px for any side
+ * the canvas limits allow, so the tolerance is orders of magnitude above the noise it absorbs and far too small
+ * to swallow a fraction a caller asked for (a 7-decimal scale, 4.8611111, still floors 612 pt to 2974 px).
+ *
  * @internal Exported for unit testing only; not part of the public API (`src/index.ts`).
  */
 export function toPixelDimension(viewportLength: number): number {
-    return Math.floor(viewportLength);
+    return Math.floor(viewportLength + PIXEL_DIMENSION_TOLERANCE);
 }
 
 /**
@@ -102,6 +111,22 @@ export function canvasPixelLimitError(canvasWidth: number, canvasHeight: number)
     );
 }
 
+/**
+ * Builds the error thrown when a page's floored canvas is wider or taller than `MAX_CANVAS_SIDE`.
+ *
+ * The area limit does not bound a thin page, and the PNG encoder rejects any side above libpng's limit only after the
+ * page has been rendered, with an opaque encoder error. Both `renderPdfPage` and the `returnMetadataOnly` path therefore
+ * reject such a page up front with this message, before a canvas is allocated. Same shape as
+ * {@link canvasPixelLimitError}, with the same pinned locale for the thousands separator.
+ *
+ * @internal
+ */
+export function canvasSideLimitError(canvasWidth: number, canvasHeight: number): Error {
+    return new Error(
+        `Canvas ${canvasWidth}×${canvasHeight} px exceeds the ${MAX_CANVAS_SIDE.toLocaleString('en-US')} pixel per-side limit. Reduce viewportScale.`,
+    );
+}
+
 export function normalizeRotation(raw: number): PageRotation {
     const normalized = ((raw % 360) + 360) % 360;
     switch (normalized) {
@@ -129,6 +154,9 @@ export async function getPageMetadata(pdf: PDFDocumentProxy, pageNumber: number,
         const height = toPixelDimension(viewport.height);
         if (width * height > MAX_CANVAS_PIXELS) {
             throw canvasPixelLimitError(width, height);
+        }
+        if (width > MAX_CANVAS_SIDE || height > MAX_CANVAS_SIDE) {
+            throw canvasSideLimitError(width, height);
         }
         if (width <= 0 || height <= 0) {
             throw nonRenderableDimensionsError(width, height);
@@ -164,6 +192,9 @@ export async function renderPdfPage(
         if (canvasWidth * canvasHeight > MAX_CANVAS_PIXELS) {
             throw canvasPixelLimitError(canvasWidth, canvasHeight);
         }
+        if (canvasWidth > MAX_CANVAS_SIDE || canvasHeight > MAX_CANVAS_SIDE) {
+            throw canvasSideLimitError(canvasWidth, canvasHeight);
+        }
         if (canvasWidth <= 0 || canvasHeight <= 0) {
             throw nonRenderableDimensionsError(canvasWidth, canvasHeight);
         }
@@ -180,7 +211,7 @@ export async function renderPdfPage(
             throw new Error('pdf.js canvas factory returned a null canvas or context.');
         }
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore — upstream pdfjs-dist@~6.3.x expects DOM CanvasRenderingContext2D, but @napi-rs/canvas exposes SKRSContext2D here. @ts-ignore (not @ts-expect-error) is required because build:test runs with skipLibCheck:true, which hides this error and would make @ts-expect-error report as unused.
+        // @ts-ignore — upstream pdfjs-dist@~6.4.x expects DOM CanvasRenderingContext2D, but @napi-rs/canvas exposes SKRSContext2D here. @ts-ignore (not @ts-expect-error) is required because build:test runs with skipLibCheck:true, which hides this error and would make @ts-expect-error report as unused.
         await page.render({ canvasContext: context, viewport, canvas }).promise;
         return {
             // Async encode() runs on the libuv threadpool (byte-identical to the synchronous

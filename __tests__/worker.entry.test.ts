@@ -1,3 +1,4 @@
+import { types } from 'node:util';
 import { beforeEach, expect, test, vi } from 'vitest';
 import type { RenderPageRequest, WorkerResponse } from '../src/workerPool';
 
@@ -176,4 +177,109 @@ test('preserves an Error message when a fatal response needs clone-safe fallback
     });
 
     expect(context.posted[0]).toEqual({ type: 'fatal', error: new Error('uncloneable load error') });
+});
+
+/**
+ * Mirrors a pdf.js exception (its BaseException): `instanceof Error`, but not a native error. Structured clone, which is what
+ * `postMessage` applies, flattens such an object into a plain `{ message, name }` object that is no longer an Error.
+ */
+function pdfJsException(message: string, name: string): Error {
+    return Object.assign(Object.create(Error.prototype) as Error, { message, name });
+}
+
+/** A value after the structured clone that `postMessage` applies; Node runs the same algorithm for `structuredClone`. */
+function throughPostMessage<T>(value: T): T {
+    return globalThis.structuredClone(value);
+}
+
+/** The response at `position` as the pool receives it. */
+function received(position: number): { type: string; error: Error; errorName?: string } {
+    return throughPostMessage(context.posted[position]) as { type: string; error: Error; errorName?: string };
+}
+
+test('posts a pdf.js exception as a native Error that survives structured clone, with its name in a separate field', async () => {
+    getPdfDocumentMock.mockResolvedValue({} as never);
+    const exception = pdfJsException('Page dictionary kid reference points to wrong type of object.', 'UnknownErrorException');
+    // The premise of the fix: unlike a native Error, this is flattened into a plain object by the clone that postMessage performs.
+    expect(exception).toBeInstanceOf(Error);
+    expect(types.isNativeError(exception)).toBe(false);
+    expect(throughPostMessage(exception)).not.toBeInstanceOf(Error);
+    renderPdfPageMock.mockRejectedValueOnce(exception);
+
+    send(renderRequest(2));
+    await vi.waitFor(() => {
+        expect(context.posted).toHaveLength(1);
+    });
+
+    const response = received(0);
+    expect(response).toMatchObject({ type: 'render-error', index: 2, errorName: 'UnknownErrorException' });
+    expect(response.error).toBeInstanceOf(Error);
+    expect(response.error.message).toBe('Page dictionary kid reference points to wrong type of object.');
+    // No cause is invented for an exception that has none.
+    expect(Object.hasOwn(response.error, 'cause')).toBe(false);
+});
+
+test('keeps the cause of a non-native Error when it is rebuilt as a native one', async () => {
+    getPdfDocumentMock.mockResolvedValue({} as never);
+    const exception = Object.assign(pdfJsException('outer failure', 'UnknownErrorException'), { cause: new Error('underlying failure') });
+    renderPdfPageMock.mockRejectedValueOnce(exception);
+
+    send(renderRequest(0));
+    await vi.waitFor(() => {
+        expect(context.posted).toHaveLength(1);
+    });
+
+    const { error } = received(0);
+    expect(error).toBeInstanceOf(Error);
+    expect(error.cause).toBeInstanceOf(Error);
+    expect((error.cause as Error).message).toBe('underlying failure');
+});
+
+test('posts a fatal pdf.js exception the same way', async () => {
+    getPdfDocumentMock.mockRejectedValue(pdfJsException('Incorrect Password', 'PasswordException'));
+
+    send(renderRequest(0));
+    await vi.waitFor(() => {
+        expect(context.posted).toHaveLength(1);
+    });
+
+    const response = received(0);
+    expect(response).toMatchObject({ type: 'fatal', errorName: 'PasswordException' });
+    expect(response.error).toBeInstanceOf(Error);
+    expect(response.error.message).toBe('Incorrect Password');
+});
+
+test('posts a native Error as is and sends its custom name separately, because structured clone resets it', async () => {
+    class DocumentError extends Error {
+        public override name = 'DocumentError';
+    }
+    getPdfDocumentMock.mockResolvedValue({} as never);
+    const failure = new DocumentError('custom failure');
+    expect(throughPostMessage(failure).name).toBe('Error');
+    renderPdfPageMock.mockRejectedValueOnce(failure);
+
+    send(renderRequest(1));
+    await vi.waitFor(() => {
+        expect(context.posted).toHaveLength(1);
+    });
+
+    expect(context.posted[0]).toEqual({ type: 'render-error', index: 1, error: failure, errorName: 'DocumentError' });
+});
+
+test('keeps the name of an Error that needs the clone-safe fallback', async () => {
+    getPdfDocumentMock.mockResolvedValue({} as never);
+    renderPdfPageMock.mockRejectedValue(pdfJsException('cannot be cloned', 'UnknownErrorException'));
+    context.postFailuresRemaining = 1;
+
+    send(renderRequest(5));
+    await vi.waitFor(() => {
+        expect(context.posted).toHaveLength(1);
+    });
+
+    expect(context.posted[0]).toEqual({
+        type: 'render-error',
+        index: 5,
+        error: new Error('cannot be cloned'),
+        errorName: 'UnknownErrorException',
+    });
 });
