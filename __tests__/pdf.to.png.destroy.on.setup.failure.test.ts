@@ -20,3 +20,15 @@ test('pdfDocument.loadingTask.destroy() runs when output-folder preparation fail
     );
     expect(destroy).toHaveBeenCalledOnce();
 });
+
+test('a failing loadingTask.destroy() is not swallowed: the main-thread teardown error is the conversion error', async () => {
+    // Pins the main-thread policy: a pdf.js teardown failure surfaces, exactly as a page.cleanup() failure does
+    // (page.renderer.cleanup.test.ts). Only Worker.terminate() is tolerated, because that is a Node resource whose
+    // failure says nothing about the pages (worker.pool.test.ts). pdfjs-dist cannot reject destroy() in Node today.
+    const teardownError = new Error('loadingTask.destroy failed');
+    const destroy = vi.fn().mockRejectedValue(teardownError);
+    vi.spyOn(pdfjsLoader, 'getPdfDocument').mockResolvedValue({ numPages: 1, loadingTask: { destroy } } as unknown as PDFDocumentProxy);
+
+    await expect(pdfToPng(new Uint8Array([1]), { pagesToProcess: [] })).rejects.toBe(teardownError);
+    expect(destroy).toHaveBeenCalledOnce();
+});
