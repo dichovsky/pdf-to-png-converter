@@ -21,7 +21,6 @@ test(`should convert protected PDF To PNG`, async () => {
         const compareResult: number = await comparePNG({
             actualFile: pngPage.content!,
             expectedFile: expectedFilePath,
-            createExpectedFileIfMissing: true,
         });
 
         expect(compareResult).toBeLessThan(RELAXED_COMPARE_DIFFERENCE_THRESHOLD);
