@@ -23,3 +23,7 @@ When you send the details, include:
 **Expected response time:** You will receive an acknowledgement within 5 business days and a status update within 14 business days.
 
 Once a fix is ready and a new release is published, the advisory will be made public.
+
+## Passwords on the Command Line
+
+`--pdf-file-password` puts the password in the process arguments, so other local users can read it in a process listing, and shell history and audit logs keep it. Prefer the `PDF_TO_PNG_PASSWORD` environment variable, which the CLI reads when the flag is not given and which does not appear in process listings, or the `pdfFilePassword` option of the library. Supply the variable from a secret store or CI secret instead of typing it in front of the command, because shell history records that too.
