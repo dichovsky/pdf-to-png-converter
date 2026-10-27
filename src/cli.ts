@@ -100,6 +100,10 @@ function buildConversion(
 ): { pdfFilePath: string; options: CliConversionOptions; silent: boolean } {
     const pdfFilePath = positionals[0];
     if (!pdfFilePath) throw new UsageError('<pdf-file-path> is required.', true);
+    if (positionals.length > 1) {
+        const received = positionals.map((argument) => JSON.stringify(argument)).join(', ');
+        throw new UsageError(`Expected exactly one <pdf-file-path> but received ${positionals.length} arguments: ${received}.`, true);
+    }
 
     const rawOptions: PdfToPngOptions = {
         outputFolder: values['output-folder'],
@@ -214,7 +218,8 @@ export async function run(): Promise<void> {
 }
 
 try {
-    if (fs.realpathSync(process.argv[1]) === fs.realpathSync(__filename)) void run();
+    // `node out/cli` runs `out/cli.js` but leaves argv[1] without the extension; require.resolve completes it as Node did.
+    if (fs.realpathSync(require.resolve(process.argv[1])) === fs.realpathSync(__filename)) void run();
 } catch {
-    // A missing argv path means this module was not invoked as the CLI entry.
+    // No argv path (`node -e`, a REPL) or one that does not resolve means this module was not invoked as the CLI entry.
 }

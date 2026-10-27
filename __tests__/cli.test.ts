@@ -91,6 +91,23 @@ describe('CLI', () => {
         expect(pdfToPng).not.toHaveBeenCalled();
     });
 
+    it.each([
+        [['a.pdf', 'b.pdf', '--output-folder', '/out'], 'received 2 arguments: "a.pdf", "b.pdf".'],
+        [['a.pdf', 'b.pdf', 'c.pdf', '--output-folder', '/out'], 'received 3 arguments: "a.pdf", "b.pdf", "c.pdf".'],
+        // Valueless flags take no argument, so a stray "false" is a second positional and not a way to switch the flag off.
+        [['test.pdf', '--output-folder', '/out', '--use-system-fonts', 'false'], 'received 2 arguments: "test.pdf", "false".'],
+        [['--silent', 'false', 'test.pdf', '--output-folder', '/out'], 'received 2 arguments: "false", "test.pdf".'],
+        // An unquoted space in an option value splits it into a second positional.
+        [['test.pdf', '--output-folder', 'My', 'Out'], 'received 2 arguments: "test.pdf", "Out".'],
+    ])('rejects more than one positional argument and names every one of them', async (args, received) => {
+        setArgv(...args);
+        await run();
+        expect(errorSpy).toHaveBeenCalledWith(`Error: Expected exactly one <pdf-file-path> but ${received}`);
+        expect(errorSpy).toHaveBeenCalledWith(HELP_TEXT);
+        expect(exitSpy).toHaveBeenCalledWith(1);
+        expect(pdfToPng).not.toHaveBeenCalled();
+    });
+
     it('requires output folder except in metadata mode', async () => {
         setArgv('test.pdf');
         await run();
@@ -329,6 +346,25 @@ describe('CLI', () => {
             expect(logSpy).toHaveBeenCalledWith(HELP_TEXT);
             expect(exitSpy).toHaveBeenCalledWith(0);
             expect(pdfToPng).not.toHaveBeenCalled();
+        } finally {
+            vi.resetModules();
+        }
+    });
+
+    it.each([
+        ['a path that does not exist', '/nonexistent/pdf-to-png-converter-entry'],
+        ['missing', undefined],
+        ['a different existing file', __filename],
+    ])('does not run when the module is loaded while argv[1] is %s', async (_label, entry) => {
+        vi.resetModules();
+        process.argv = entry === undefined ? ['node'] : ['node', entry, '--help'];
+
+        try {
+            await import('../src/cli.js');
+
+            expect(logSpy).not.toHaveBeenCalled();
+            expect(errorSpy).not.toHaveBeenCalled();
+            expect(exitSpy).not.toHaveBeenCalled();
         } finally {
             vi.resetModules();
         }
