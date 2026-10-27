@@ -122,8 +122,11 @@ export async function prepareOutputFolder(resolvedOutputFolder: string): Promise
  * is not writable by untrusted users.
  *
  * The exclusive-create (`'wx'`) open prevents overwriting an existing final target and refuses a
- * pre-existing target symlink under normal local-filesystem semantics. Callers should clear the
- * output folder before re-running a conversion if they expect to reuse the same names.
+ * pre-existing target symlink under normal local-filesystem semantics. If the write or close fails
+ * after that open succeeded, the file this call created is removed (best effort, by pathname, under
+ * the same private-directory assumption as the open) and the original error is rethrown; a target
+ * that already existed is never removed. Callers should clear the output folder before re-running a
+ * conversion if they expect to reuse the same names.
  */
 export async function savePNGfile(name: string, content: Buffer, folder: OutputFolderHandle): Promise<string> {
     const { resolvedOutputFolder, realOutputFolder } = folder;
@@ -147,8 +150,15 @@ export async function savePNGfile(name: string, content: Buffer, folder: OutputF
     const fd = await fsPromises.open(resolvedFilePath, 'wx');
     try {
         await fd.writeFile(content);
-    } finally {
         await fd.close();
+    } catch (error: unknown) {
+        // The exclusive open succeeded, so this call created the file and owns it. A failed write or close
+        // leaves it empty or truncated under its final name, and 'wx' would then refuse every retry. Release
+        // the handle (a repeated close() is a no-op) and remove the file, best effort so cleanup errors never
+        // mask the original one. A failed open() never reaches this block, so an EEXIST target is not unlinked.
+        await fd.close().catch(() => undefined);
+        await fsPromises.unlink(resolvedFilePath).catch(() => undefined);
+        throw error;
     }
 
     return resolvedFilePath;
