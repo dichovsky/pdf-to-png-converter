@@ -75,7 +75,7 @@
         ".prettierrc": "prettier --write"
     },
     "dependencies": {
-        "@napi-rs/canvas": "~1.0.13",
+        "@napi-rs/canvas": "~1.1.0",
         "pdfjs-dist": "~6.4.299"
     },
     "devDependencies": {
