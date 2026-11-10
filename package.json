@@ -76,7 +76,7 @@
     },
     "dependencies": {
         "@napi-rs/canvas": "~1.1.0",
-        "pdfjs-dist": "~6.4.299"
+        "pdfjs-dist": "~6.5.438"
     },
     "devDependencies": {
         "@eslint/js": "^10.0.1",
