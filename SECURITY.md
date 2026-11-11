@@ -10,20 +10,24 @@
 
 ## Reporting a Vulnerability
 
-Please **do not** put the details of a security vulnerability in a public GitHub issue.
+**Do not** put security vulnerability details in a public GitHub issue.
 
-Private vulnerability reporting through GitHub Security Advisories is not currently enabled for this repository. Until it is, open a [GitHub issue](https://github.com/dichovsky/pdf-to-png-converter/issues/new) that only asks the maintainers for a private way to send a security report, and leave out any details of the vulnerability. Send the details only once the maintainers have given you that private channel.
+GitHub Security Advisories private reporting is not enabled for this repository. Open a [GitHub issue](https://github.com/dichovsky/pdf-to-png-converter/issues/new) and ask the maintainers for a private reporting channel. Do not include vulnerability details in that issue. Send the details only after the maintainers provide a private channel.
 
-When you send the details, include:
+Include these items in your report:
 
-- A description of the vulnerability and its potential impact
-- Steps to reproduce (proof-of-concept code or a minimal test case)
-- The affected version(s)
+- A description of the vulnerability and its possible impact
+- Steps to reproduce the issue (proof-of-concept code or a minimal test case)
+- The affected versions
 
-**Expected response time:** You will receive an acknowledgement within 5 business days and a status update within 14 business days.
+**Response time:** The maintainers acknowledge reports within 5 business days and send a status update within 14 business days.
 
-Once a fix is ready and a new release is published, the advisory will be made public.
+After the maintainers publish a fix in a new release, they publish the security advisory.
 
 ## Passwords on the Command Line
 
-`--pdf-file-password` puts the password in the process arguments, so other local users can read it in a process listing, and shell history and audit logs keep it. Prefer the `PDF_TO_PNG_PASSWORD` environment variable, which the CLI reads when the flag is not given and which other local users cannot read from a process listing, or the `pdfFilePassword` option of the library. Quote a password that contains spaces: the CLI's usage error for a second path lists every stray argument. Supply the variable from a secret store or CI secret instead of typing it in front of the command, because shell history records that too.
+The `--pdf-file-password` flag puts the password in the process arguments. Other local users can read the password from a process list. Shell history and audit logs also record the command line.
+
+Use the `PDF_TO_PNG_PASSWORD` environment variable or the library `pdfFilePassword` option instead. The CLI reads `PDF_TO_PNG_PASSWORD` when you omit `--pdf-file-password`. Other local users cannot read environment variables from a process list.
+
+Put quotes around a password that contains spaces. If you do not quote it, the CLI treats the extra words as positional arguments and prints them in the usage error. Load `PDF_TO_PNG_PASSWORD` from a secret store or CI secret. Do not type the variable assignment directly on the command line, because shell history records it.

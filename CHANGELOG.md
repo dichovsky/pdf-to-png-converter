@@ -1,17 +1,24 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+This file records all notable changes to this project.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
 ## [Unreleased]
 
+### Changed
+
+- Raised the minimum Node.js runtime version to `>=24` (removed Node.js 22 support). Migrated the contributor toolchain (`.nvmrc`, `Dockerfile`, and Windows CI) to Node.js 26, and updated the Ubuntu CI test matrix to Node.js 24 and 26.
+- Updated `pdfjs-dist` to `~6.5.438` and `@napi-rs/canvas` to `~1.1.0`. Added the two QuickJS license files from `pdfjs-dist` 6.5.438 to the WebAssembly asset check.
+- Updated devDependencies to Vitest and `@vitest/coverage-v8` 5.1.0, ESLint 10.14.0, typescript-eslint 8.72.2, `@types/node` 26.6.6, and rimraf 6.1.4. Pinned npm 12.2.2 in the publish workflow and added `overrides` for `glob` (`^14.0.4`) and `minimatch` (`^11.0.6`) to resolve moderate audit advisories in development dependencies.
+- Rewrote project documentation in Simplified Technical English (ASD-STE100).
+
 ### Fixed
 
-- Development tooling only, with no change to the published package. `release:postcheck` now waits up to 5 minutes (21 attempts, 15 s apart) for a new version to appear on the registry, instead of about 27 seconds. npm processes a publish asynchronously, and 4.3.0 became visible about 75 seconds after `npm publish` succeeded, so the publish workflow failed its post-release checks although the release was fine.
+- Development tooling only (no change to the published package): `release:postcheck` now retries registry lookups for up to 5 minutes (21 attempts, 15 seconds apart) instead of 27 seconds while waiting for npm to index a newly published version.
 
 ## [4.3.0] — 2026-10-27
 

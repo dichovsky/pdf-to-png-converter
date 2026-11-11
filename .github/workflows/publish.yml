@@ -24,7 +24,7 @@ jobs:
                   cache: 'npm'
                   registry-url: 'https://registry.npmjs.org'
             # Trusted Publishing (OIDC) needs npm >= 11.5.1; pin the verified npm release used for publishing.
-            - run: npm install -g npm@12.0.2
+            - run: npm install -g npm@12.2.2
             - run: npm ci
             - run: npm audit --audit-level=high
             - run: npm run build
