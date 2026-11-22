@@ -1,5 +1,5 @@
 import { existsSync, promises as fsPromises } from 'node:fs';
-import { dirname } from 'node:path';
+import { dirname, join } from 'node:path';
 import pixelmatch from 'pixelmatch';
 import { PNG } from 'pngjs';
 
@@ -31,11 +31,20 @@ export async function comparePNG({ actualFile, expectedFile }: { actualFile: str
     const actualBytes = typeof actualFile === 'string' ? await fsPromises.readFile(actualFile) : actualFile;
     const actual = PNG.sync.read(actualBytes);
     if (missingGolden) {
-        await fsPromises.mkdir(dirname(expectedFile), { recursive: true });
+        const directory = dirname(expectedFile);
+        await fsPromises.mkdir(directory, { recursive: true });
+        const staging = await fsPromises.mkdtemp(join(directory, '.golden-'));
         try {
-            await fsPromises.writeFile(expectedFile, actualBytes, { flag: 'wx' });
-        } catch (error) {
-            if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+            const complete = join(staging, 'page.png');
+            await fsPromises.writeFile(complete, actualBytes);
+            // Publish a complete PNG in one step. A concurrent creator keeps its own golden.
+            try {
+                await fsPromises.link(complete, expectedFile);
+            } catch (error) {
+                if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+            }
+        } finally {
+            await fsPromises.rm(staging, { recursive: true, force: true });
         }
     }
     const expected = PNG.sync.read(await fsPromises.readFile(expectedFile));

@@ -10,12 +10,20 @@ interface LockedPackage {
 const approvedLicenses = ['ISC', 'MIT', '0BSD', 'BSD-2-Clause', 'BSD-3-Clause', 'BSD-4-Clause', 'Apache-2.0', 'Unlicense'];
 
 export function isApprovedLicense(license: string | undefined): boolean {
-    if (license === 'BSD') return true;
     if (!license) return false;
     try {
         return satisfies(license, approvedLicenses);
     } catch {
-        return false;
+        // Older manifests use names such as "MIT License" and "Apache License, Version 2.0".
+        // Compare the entire normalized name so malformed expressions and unknown licenses still fail.
+        const name = license
+            .trim()
+            .toLowerCase()
+            .replace(/^the\s+/, '')
+            .replace(/\b(?:license|licence|version)\b/g, '')
+            .trim()
+            .replace(/[\s,-]+/g, '-');
+        return name === 'bsd' || approvedLicenses.some((id) => id.toLowerCase() === name);
     }
 }
 

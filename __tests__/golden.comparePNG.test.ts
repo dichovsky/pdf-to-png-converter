@@ -1,5 +1,5 @@
 import { createCanvas } from '@napi-rs/canvas';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, promises as fsPromises, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
@@ -155,4 +155,29 @@ test.each([
 ])('preserves the golden comparison mismatch count for %s against mid-gray', async (color, differences) => {
     const expectedFile = existingGolden(solidPng('rgb(128, 128, 128)'));
     await expect(comparePNG({ actualFile: solidPng(color), expectedFile })).resolves.toBe(differences);
+});
+
+test('concurrent creators see a complete golden while another writer is still writing', async () => {
+    vi.stubEnv('UPDATE_GOLDENS', '1');
+    const expectedFile = goldenPath();
+    const actualFile = solidPng('white');
+    const writing = Promise.withResolvers<void>();
+    const resume = Promise.withResolvers<void>();
+    const writeFile = fsPromises.writeFile.bind(fsPromises);
+    const write = vi.spyOn(fsPromises, 'writeFile').mockImplementationOnce(async (path, _data, options) => {
+        await writeFile(path, actualFile.subarray(0, 8), options);
+        writing.resolve();
+        await resume.promise;
+        await fsPromises.appendFile(path, actualFile.subarray(8));
+    });
+    const first = comparePNG({ actualFile, expectedFile });
+    try {
+        await writing.promise;
+        await expect(comparePNG({ actualFile, expectedFile })).resolves.toBe(0);
+    } finally {
+        resume.resolve();
+        write.mockRestore();
+        await first;
+    }
+    expect(readFileSync(expectedFile)).toEqual(actualFile);
 });
