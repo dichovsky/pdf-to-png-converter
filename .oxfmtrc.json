@@ -8,12 +8,5 @@
     "useTabs": false,
     "arrowParens": "always",
     "sortPackageJson": false,
-    "ignorePatterns": [
-        "out/**",
-        "test-results/**",
-        "bench-results/**",
-        "coverage/**",
-        ".claude/**",
-        "package-lock.json"
-    ]
+    "ignorePatterns": ["out/**", "test-results/**", "bench-results/**", "coverage/**", ".claude/**", "package-lock.json"]
 }

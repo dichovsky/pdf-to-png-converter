@@ -1,6 +1,6 @@
 import { parse, resolve } from 'node:path';
 import { expect, test } from 'vitest';
-import type { PngPageOutput} from '../src';
+import type { PngPageOutput } from '../src';
 import { pdfToPng } from '../src';
 
 const pdfFilePath: string = resolve('./test-data/large_pdf.pdf');

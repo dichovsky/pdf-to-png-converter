@@ -22,16 +22,6 @@ jobs:
               with:
                   node-version: ${{ matrix.node-version }}
                   cache: 'npm'
-            - name: Resolve formatter and preview the migration diff
-              if: matrix.node-version == '26'
-              run: |
-                  npm install --save-dev oxfmt@latest
-                  npm run format
-                  git diff | gzip -c | base64 -w 0 > "$RUNNER_TEMP/format.patch.gz.b64"
-                  echo "FORMAT_PATCH_BEGIN"
-                  fold -w 512 "$RUNNER_TEMP/format.patch.gz.b64"
-                  echo
-                  echo "FORMAT_PATCH_END"
             - name: Install dependencies
               run: npm ci
             - name: Audit dependencies

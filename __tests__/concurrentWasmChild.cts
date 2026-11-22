@@ -11,8 +11,8 @@
  * Without the fix the scanned conversion never settles; nothing else keeps the process alive, so it exits with no output.
  */
 
-const { readFileSync } = require('node:fs');
-const { join } = require('node:path');
+const { readFileSync } = require('node:fs') as typeof import('node:fs');
+const { join } = require('node:path') as typeof import('node:path');
 
 const [outDirectory, scannedPdf, concurrent] = process.argv.slice(2);
 const { pdfToPng } = require(join(outDirectory, 'index.js')) as typeof import('../src/index.js');
@@ -25,6 +25,11 @@ const other =
         ? pdfToPng(scanned, { returnMetadataOnly: true })
         : pdfToPng(new Uint8Array(Buffer.from('%PDF-1.7\nnot a pdf\n%%EOF\n')));
 
-Promise.allSettled([scannedConversion, other]).then((results) => {
+async function report(): Promise<void> {
+    const results = await Promise.allSettled([scannedConversion, other]);
     process.stdout.write(`${JSON.stringify(results.map((result) => result.status))}\n`);
+}
+report().catch((error: unknown) => {
+    console.error(error);
+    process.exitCode = 1;
 });

@@ -16,11 +16,7 @@ afterEach(() => {
 });
 
 function deferred(): { promise: Promise<void>; resolve: () => void } {
-    let resolve!: () => void;
-    const promise = new Promise<void>((accept) => {
-        resolve = accept;
-    });
-    return { promise, resolve };
+    return Promise.withResolvers<void>();
 }
 
 test('should return metadata without rendering when returnMetadataOnly is true', async () => {

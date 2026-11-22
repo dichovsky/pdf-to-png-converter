@@ -1,20 +1,10 @@
 {
     "$schema": "./node_modules/oxlint/configuration_schema.json",
-    "plugins": [
-        "typescript",
-        "oxc",
-        "unicorn"
-    ],
+    "plugins": ["typescript", "oxc", "unicorn"],
     "categories": {
         "correctness": "error"
     },
-    "ignorePatterns": [
-        "out/**",
-        "test-results/**",
-        "bench-results/**",
-        "coverage/**",
-        ".claude/**"
-    ],
+    "ignorePatterns": ["out/**", "test-results/**", "bench-results/**", "coverage/**", ".claude/**"],
     "rules": {
         "no-var": "error",
         "prefer-const": "error",
@@ -70,24 +60,27 @@
                 "varsIgnorePattern": "^_",
                 "caughtErrorsIgnorePattern": "^_"
             }
-        ]
+        ],
+        "no-case-declarations": "error",
+        "no-empty": "error",
+        "no-fallthrough": "error",
+        "no-prototype-builtins": "error",
+        "no-regex-spaces": "error",
+        "no-unexpected-multiline": "error",
+        "no-useless-assignment": "error",
+        "preserve-caught-error": "error",
+        "no-array-constructor": "error",
+        "no-unused-expressions": "error",
+        "typescript/no-namespace": "error"
     },
     "overrides": [
         {
-            "files": [
-                "__tests__/**"
-            ],
+            "files": ["__tests__/**"],
             "rules": {
                 "typescript/no-explicit-any": "off",
                 "typescript/no-require-imports": "off",
                 "typescript/explicit-function-return-type": "off",
                 "typescript/explicit-member-accessibility": "off",
-                "typescript/no-floating-promises": "off",
-                "typescript/no-misused-promises": "off",
-                "typescript/await-thenable": "off",
-                "typescript/prefer-optional-chain": "off",
-                "typescript/prefer-nullish-coalescing": "off",
-                "no-shadow": "off",
                 "typescript/consistent-type-imports": [
                     "error",
                     {

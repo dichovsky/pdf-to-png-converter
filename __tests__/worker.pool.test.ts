@@ -24,10 +24,10 @@ const harness = vi.hoisted(() => {
             public entryPath: string,
             public options: unknown,
         ) {
-            if (harness.constructorError !== undefined) {
-                throw harness.constructorError;
+            if (state.constructorError !== undefined) {
+                throw state.constructorError;
             }
-            harness.instances.push(this);
+            state.instances.push(this);
         }
 
         public on(event: string, handler: Handler): this {
@@ -38,9 +38,9 @@ const harness = vi.hoisted(() => {
         }
 
         public postMessage(message: unknown): void {
-            if (harness.postMessageError !== undefined) {
-                const error = harness.postMessageError;
-                harness.postMessageError = undefined;
+            if (state.postMessageError !== undefined) {
+                const error = state.postMessageError;
+                state.postMessageError = undefined;
                 throw error;
             }
             this.posted.push(message);
@@ -61,14 +61,14 @@ const harness = vi.hoisted(() => {
         }
     }
 
-    const harness = {
+    const state = {
         FakeWorker,
         instances: [] as InstanceType<typeof FakeWorker>[],
         compiledEntryExists: false,
         constructorError: undefined as unknown,
         postMessageError: undefined as unknown,
     };
-    return harness;
+    return state;
 });
 
 vi.mock('node:fs', () => ({ existsSync: (): boolean => harness.compiledEntryExists }));

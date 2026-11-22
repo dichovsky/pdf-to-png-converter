@@ -17,8 +17,8 @@
 const Module = require('node:module') as {
     _resolveFilename: (request: string, parent: NodeModule | undefined, ...rest: unknown[]) => string;
 };
-const { writeFileSync } = require('node:fs');
-const { join } = require('node:path');
+const { writeFileSync } = require('node:fs') as typeof import('node:fs');
+const { join } = require('node:path') as typeof import('node:path');
 
 const [outDirectory, fakeRoot, resultDirectory, codecPdf, controlPdf] = process.argv.slice(2);
 
@@ -31,7 +31,9 @@ Module._resolveFilename = function resolveFilenameWithFakePdfjsRoot(request, par
 };
 
 const warnings: { name: string; code?: string; message: string }[] = [];
-process.on('warning', (warning) => warnings.push({ name: warning.name, code: (warning as NodeJS.ErrnoException).code, message: warning.message }));
+process.on('warning', (warning) =>
+    warnings.push({ name: warning.name, code: (warning as NodeJS.ErrnoException).code, message: warning.message }),
+);
 
 async function main(): Promise<void> {
     const { pdfToPng } = require(join(outDirectory, 'index.js')) as typeof import('../src/index.js');

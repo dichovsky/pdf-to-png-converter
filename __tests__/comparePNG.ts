@@ -14,13 +14,7 @@ import { decodePng } from './decodePng';
  * @param expectedFile - The path of the expected (golden) PNG image.
  * @returns A promise that resolves to the comparison result.
  */
-export async function comparePNG({
-    actualFile,
-    expectedFile,
-}: {
-    actualFile: string | Buffer;
-    expectedFile: string;
-}) {
+export async function comparePNG({ actualFile, expectedFile }: { actualFile: string | Buffer; expectedFile: string }) {
     if (!existsSync(expectedFile)) {
         if (process.env.CI) {
             throw new Error(
@@ -42,7 +36,9 @@ export async function comparePNG({
         decodePng(await fsPromises.readFile(expectedFile)),
     ]);
     if (actual.width !== expected.width || actual.height !== expected.height) {
-        throw new Error(`Golden PNG dimensions differ for ${expectedFile}: expected ${expected.width}x${expected.height}, got ${actual.width}x${actual.height}`);
+        throw new Error(
+            `Golden PNG dimensions differ for ${expectedFile}: expected ${expected.width}x${expected.height}, got ${actual.width}x${actual.height}`,
+        );
     }
     return pixelmatch(actual.data, expected.data, null, actual.width, actual.height);
 }

@@ -26,15 +26,14 @@ function mockFile(bytes: Buffer, reportedSize = bytes.byteLength): MockFile {
     const result: MockFile = {
         handle: undefined as unknown as FileHandle,
         stat: vi.fn().mockResolvedValue({ isFile: (): boolean => true, size: reportedSize }),
-        read: vi.fn(),
+        read: vi.fn(async (target: Buffer, offset: number, length: number, position: number) => {
+            result.firstReadBuffer ??= target;
+            const bytesRead = Math.min(length, Math.max(0, bytes.byteLength - position));
+            bytes.copy(target, offset, position, position + bytesRead);
+            return { bytesRead, buffer: target };
+        }),
         close: vi.fn().mockResolvedValue(undefined),
     };
-    result.read.mockImplementation(async (target: Buffer, offset: number, length: number, position: number) => {
-        result.firstReadBuffer ??= target;
-        const bytesRead = Math.min(length, Math.max(0, bytes.byteLength - position));
-        bytes.copy(target, offset, position, position + bytesRead);
-        return { bytesRead, buffer: target };
-    });
     Object.assign(result, { handle: { stat: result.stat, read: result.read, close: result.close } as unknown as FileHandle });
     openMock.mockResolvedValueOnce(result.handle);
     return result;

@@ -21,6 +21,8 @@ test('Oxlint discovers all maintained TypeScript files', () => {
 test('the lint gate includes type-aware rules and fails on warnings', () => {
     const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as { scripts: { lint: string } };
     expect(manifest.scripts.lint.split(' ')).toEqual(expect.arrayContaining(['--type-aware', '--deny-warnings']));
-    const config = JSON.parse(execFileSync(process.execPath, [lintCli, '--print-config', 'src/pdfToPng.ts'], { cwd: root, encoding: 'utf8' }));
+    const config = JSON.parse(
+        execFileSync(process.execPath, [lintCli, '--print-config', 'src/pdfToPng.ts'], { cwd: root, encoding: 'utf8' }),
+    );
     expect(config.rules['typescript/no-floating-promises']).toContain('deny');
 });

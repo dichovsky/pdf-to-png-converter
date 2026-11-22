@@ -1,17 +1,10 @@
 {
     "$schema": "https://json.schemastore.org/tsconfig",
     "compilerOptions": {
-        "lib": [
-            "ES2024",
-            "ESNext.Array",
-            "ESNext.Collection",
-            "ESNext.Iterator"
-        ],
+        "lib": ["ES2024", "ESNext.Array", "ESNext.Collection", "ESNext.Iterator"],
         "module": "nodenext",
         "target": "ES2024",
-        "types": [
-            "node"
-        ],
+        "types": ["node"],
         "rootDir": ".",
         "strict": true,
         "esModuleInterop": true,
@@ -19,17 +12,9 @@
         "declaration": false,
         "noEmit": true,
         "allowUnreachableCode": false,
-        "allowImportingTsExtensions": true,
-        "paths": {
-            "pdf-to-png-converter": [
-                "./src/index.ts"
-            ]
-        }
+        "rewriteRelativeImportExtensions": true,
+        "noUnusedLocals": true,
+        "noUnusedParameters": true
     },
-    "include": [
-        "src",
-        "__tests__",
-        "scripts",
-        "vitest.config.mts"
-    ]
+    "include": ["src", "__tests__", "scripts", "vitest.config.mts"]
 }
