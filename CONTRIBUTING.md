@@ -43,7 +43,7 @@ UPDATE_GOLDENS=1 npx vitest run __tests__/<filename>.test.ts
 
 Review the new image and commit it. The helper refuses `UPDATE_GOLDENS=1` when `CI` is set, and it never overwrites an existing golden file. To replace an existing golden PNG, delete the file first, run the test with `UPDATE_GOLDENS=1`, review the image, and commit it.
 
-The visual tests accept less than `RELAXED_COMPARE_DIFFERENCE_THRESHOLD` (6) different pixels (`__tests__/test-data-constants.ts`). This tolerance handles small platform rendering differences. The Ubuntu CI jobs verify that golden files match on Linux. The Ubuntu CI jobs also fail if a test run adds or modifies any file in `test-data/`.
+The visual tests require the number of different pixels to be below `RELAXED_COMPARE_DIFFERENCE_THRESHOLD` (6) (`__tests__/test-data-constants.ts`). This tolerance handles small platform rendering differences. The Ubuntu CI jobs verify that golden files match on Linux. The Ubuntu CI jobs also fail if a test run adds or modifies any file in `test-data/`.
 
 ## Strict type-check
 
@@ -97,7 +97,7 @@ Do not bypass `build:strict` failures with `continue-on-error` in CI workflows o
 
 ## Writing documentation
 
-Write repository prose with the writing rules of [ASD-STE100 Simplified Technical English, Issue 9 (January 2025)](https://www.asd-ste100.org/assets/files/ASD-STE100_ISSUE9.pdf). Part 1 of the standard gives the writing rules. Part 2 gives the dictionary. The standard is copyrighted by ASD. Do not copy dictionary entries into this repository.
+Write repository prose with the writing rules of [ASD-STE100 Simplified Technical English, Issue 9 (January 2025)](https://asd-ste100.org/STE_downloads.html). Part 1 of the standard gives the writing rules. Part 2 gives the dictionary. The standard is copyrighted by ASD. Do not copy dictionary entries into this repository.
 
 **Scope:** `README.md`, `CONTRIBUTING.md`, `SECURITY.md`, `docs/ARCHITECTURE.md`, `BACKLOG.md`, and the public JSDoc in `src/types.ts`.
 

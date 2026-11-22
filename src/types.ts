@@ -189,8 +189,9 @@ export interface PdfToPngOptions {
      * Maximum allowed input PDF size in bytes. Larger inputs throw immediately, before rendering work starts.
      * This limit applies to these inputs:
      * - File paths. The file is opened one time, then verified and read through one handle with bounded allocation.
-     * - Buffer / `Uint8Array` inputs, validated through `byteLength`. A byte `Array` counts by its `length`.
-     * Non-regular files such as FIFOs, sockets and devices are rejected. Must be a positive integer.
+     * - Byte containers, including `Buffer`, `Uint8Array`, `ArrayBuffer`, and `SharedArrayBuffer`. The limit applies to their byte length.
+     * - Arrays of bytes. The limit applies to the array length.
+     * Non-regular files such as FIFOs, sockets, and devices are rejected. The limit must be a positive integer.
      * The cap bounds the input bytes only, not the memory that pdf.js needs to parse them.
      * A non-PDF payload can be one long sequence of a single byte value (zeros, for example). In the pdf.js recovery
      * scan, this payload uses approximately 32 to 64 heap bytes for each input byte. It can abort the process on heap

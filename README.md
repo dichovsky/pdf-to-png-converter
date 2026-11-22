@@ -135,11 +135,11 @@ npx pdf-to-png-converter my-document.pdf --output-folder ./output
 The CLI supports two output modes:
 
 - **Image conversion:** Writes PNG files to `--output-folder`.
-- **Metadata inspection:** Prints JSON metadata to `stdout` when `--return-metadata-only` is set. The CLI also prints this JSON when `--silent` or `--verbosity-level 5` is set.
+- **Metadata inspection:** Prints JSON metadata to `stdout` when `--return-metadata-only` is set. In this mode, `--silent` and `--verbosity-level 5` preserve the JSON output.
 
 To get PNG buffers in memory, use the library API (`returnPageContent`), not the CLI.
 
-Pass one `<pdf-file-path>` and no other positional arguments to the CLI. Use a shell loop to convert multiple files. A second positional argument causes a usage error with exit code 1. Examples of a second positional argument are `--use-system-fonts false` and an unquoted path with spaces. The CLI always enforces the 256 MiB input limit. For a different limit, use the library `maxInputBytes` option.
+Pass one `<pdf-file-path>` and no other positional arguments to the CLI. Use a shell loop to convert multiple files. A second positional argument causes a usage error with exit code 1. For example, `--use-system-fonts` takes no value. If you add `false` after it, the CLI treats `false` as a positional argument. Quote paths that contain spaces. The CLI always enforces the 256 MiB input limit. For a different limit, use the library `maxInputBytes` option.
 
 ---
 

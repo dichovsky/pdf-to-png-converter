@@ -31,7 +31,7 @@ All library conversions start in `pdfToPng()` (`src/pdfToPng.ts`):
     - Each disk filename must be a flat host name of 255 units or less.
     - No two names can collide under `outputNameKey()` Unicode folding (see [Output](#output)).
 
-    Metadata-only requests skip disk-filename checks and skip folder creation. All other requests call `warnIfWasmDecodersMissing()` before `prepareOutputFolder()` creates the directory. This call occurs a maximum of one time for each thread, on the main thread.
+    Metadata-only requests skip disk-filename checks, the decoder-file check, and folder creation. Each conversion that reaches the rendering step calls `warnIfWasmDecodersMissing()` on the calling thread. The helper checks the files once per thread. Only disk output calls `prepareOutputFolder()`.
 
 5. The selected execution path generates `PageRenderResult` objects:
     - Metadata-only mode calls `getPageMetadata()` without creating canvases or files.
@@ -54,7 +54,7 @@ The CLI calls this same public `pdfToPng()` function.
 
 All modes return pages in the requested order. When a page error occurs, the scheduler does these steps:
 
-1. It stops the start of new tasks.
+1. It stops scheduling new tasks.
 2. It waits for in-flight tasks to finish.
 3. It throws the error with the lowest page index.
 
@@ -133,7 +133,7 @@ Custom filenames must be non-empty and must not contain host path separators in 
 - `pdfjsAssetDirectory()` resolves the installed `pdfjs-dist` package one time through `require.resolve('pdfjs-dist/package.json')` and appends the folder names from `PDFJS_ASSET_DIRECTORIES` (`cmaps`, `standard_fonts`, `wasm`). It never uses `process.cwd()`.
 - `getPdfDocument()` passes `cMapUrl`, `standardFontDataUrl`, and `wasmUrl` as forward-slash directory paths ending in `/`.
 - The `wasm` directory contains `jbig2.wasm` (CCITT/JBIG2) and `openjpeg.wasm` (JPEG 2000). Without `wasmUrl`, pdf.js renders those images blank without throwing an error (issue #278). `warnIfWasmDecodersMissing()` checks that the two `.wasm` files are present. If a file is missing, it emits process warning `PDF_TO_PNG_WASM_MISSING` a maximum of one time for each thread.
-- `pdfToPng()` awaits `warmUpWasmDecoders()` one time for each thread, before it opens main-thread documents (issue #288, mozilla/pdf.js#22131; remove under `BACKLOG.md` ARCH-018). The warm-up decodes a tiny built-in PDF that contains 8×8 CCITT G4 and JPEG 2000 images. Thus, pdf.js caches the two WebAssembly decoders. The warm-up has a `WASM_WARM_UP_TIMEOUT_MS` (10 s) timeout.
+- Each conversion awaits the same per-thread warm-up promise from `warmUpWasmDecoders()` before it opens the input document (issue #288, mozilla/pdf.js#22131; remove under `BACKLOG.md` ARCH-018). The warm-up decodes a tiny built-in PDF that contains 8×8 CCITT G4 and JPEG 2000 images. A successful warm-up lets pdf.js cache both WebAssembly decoders. Conversion can proceed if the warm-up fails or the `WASM_WARM_UP_TIMEOUT_MS` (10 s) wait expires.
 - When pdf.js decodes an image, it allocates a temporary canvas on the rendering thread. This canvas uses approximately 8 bytes for each declared pixel.
 - In `@napi-rs/canvas` 1.0.12+, a canvas of approximately 537 million pixels or more (> 2 GiB) is created, but it silently ignores drawing calls. Thus, Flate, JPEG, CCITT, or JBIG2 images are blank, and no error occurs. JPEG 2000 images above pdf.js's internal limit decode at reduced resolution, with a warning.
 - Each WebAssembly decoder instance also caps its heap at 2 GiB for each thread.
@@ -169,7 +169,7 @@ Custom filenames must be non-empty and must not contain host path separators in 
 - `npm test` runs Vitest with V8 coverage and enforces 98% thresholds for statements, lines, functions, and branches.
 - `npm run build:test` and `npm run build:strict` type-check `src/`, `__tests__/`, and `scripts/` (except `scripts/benchmark.ts`). `build:strict` sets `skipLibCheck: false` and uses `__tests__/pngjs.d.ts` to resolve `png-visual-compare` declarations.
 - `__tests__/pdfjs.assets.test.ts` verifies the installed `cmaps`, `standard_fonts`, `wasm`, and top-level `pdfjs-dist` directories.
-- `comparePNG()` in `__tests__/comparePNG.ts` fails when a golden PNG is missing. It creates missing goldens only when `UPDATE_GOLDENS=1` and `CI` is unset. It never overwrites existing golden files.
+- `comparePNG()` in `__tests__/comparePNG.ts` fails when a golden PNG is missing. It creates missing goldens only when `UPDATE_GOLDENS=1` and `CI` is unset or empty. It never overwrites existing golden files.
 - `__tests__/cli.compiled.test.ts` compiles `src/` to `test-results/cli-compiled-out` and tests the CLI in child processes.
 - Worker tests in `__tests__/pdf.to.png.worker.threads.test.ts` use `pdfToPngInWorkers()` to spy on `renderPagesInWorkerPool` and `renderPdfPage`.
 - `__tests__/loader.document.open.call.sites.test.ts` verifies that all main-thread document opens go through `getPdfDocument()` after `warmUpWasmDecoders()`.
