@@ -188,24 +188,21 @@ export async function run(): Promise<void> {
     } catch (error: unknown) {
         console.error(error instanceof Error ? error.message : String(error));
         console.error(HELP_TEXT);
-        process.exit(1);
-        return;
+        return process.exit(1);
     }
 
     if (parsed.values.help) {
         console.log(HELP_TEXT);
-        process.exit(0);
-        return;
+        return process.exit(0);
     }
     if (parsed.values.version) {
         try {
             console.log(`v${getVersion()}`);
-            process.exit(0);
+            return process.exit(0);
         } catch (error: unknown) {
             console.error(error instanceof Error ? error.message : String(error));
-            process.exit(1);
+            return process.exit(1);
         }
-        return;
     }
 
     try {

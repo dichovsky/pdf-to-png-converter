@@ -13,6 +13,3 @@ CLAUDE.md
 *.tgz
 .git
 .github
-.prettierrc
-.prettierignore
-eslint.config.mjs

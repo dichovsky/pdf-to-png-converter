@@ -1,8 +1,9 @@
 import { execFileSync } from 'node:child_process';
+import { isMainModule } from './is-main-module.ts';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { parseSingleNpmJsonResult } from './npm-json';
+import { parseSingleNpmJsonResult } from './npm-json.ts';
 
 // Detective release verification. Run by `publish.yml` immediately after `npm publish`
 // to confirm the publish actually landed with provenance and is consumable. The publish
@@ -30,7 +31,7 @@ interface PackumentVersion {
 }
 
 const NPM: string = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-const REPO_ROOT: string = join(__dirname, '..');
+const REPO_ROOT: string = join(import.meta.dirname, '..');
 // npm processes a publish asynchronously ("may take a few minutes to become available"): 4.3.0 took about
 // 75 s to appear. 20 waits of 15 s give it 5 minutes.
 export const RETRY_ATTEMPTS = 21;
@@ -174,7 +175,7 @@ function smokeTestInstall(name: string, version: string, dir: string): void {
 // The render comparison alone is NOT sufficient, because it only infers that worker mode ran.
 // `renderInWorkerThreads` is a plain optional field and the library ignores unknown option keys,
 // so if the option ever stops being honoured — renamed, dropped from the normalizer, or typoed in
-// this template, none of which `tsc`/ESLint/the test suite can see inside a generated JS string —
+// this template, none of which `tsc`/Oxlint/the test suite can see inside a generated JS string —
 // both calls would take the main-thread path and produce byte-identical output. Q5 would then pass
 // with `out/pageRenderWorker.js` absent from the tarball, the exact break it exists to catch. The
 // explicit `existsSync` assertion below tests that packaging property directly, so the guard
@@ -296,7 +297,7 @@ async function main(): Promise<void> {
 }
 
 // Only when run as the script: the registry-read helpers above are imported by tests, which must not shell out to npm.
-if (require.main === module) {
+if (isMainModule(import.meta)) {
     main().catch((err: unknown) => {
         console.error('\nrelease:postcheck FAILED:');
         console.error(`  x ${err instanceof Error ? err.message : String(err)}`);

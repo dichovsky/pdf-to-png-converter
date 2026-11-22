@@ -167,12 +167,12 @@ Custom filenames must be non-empty and must not contain host path separators in 
 - Runtime requirement: Node.js 24 or newer; `.nvmrc` specifies Node.js 26 and CI tests Node.js 24 and 26.
 - Package format: CommonJS compiled from `src/` to `out/` with `.js` relative import specifiers.
 - `npm test` runs Vitest with V8 coverage and enforces 98% thresholds for statements, lines, functions, and branches.
-- `npm run build:test` and `npm run build:strict` type-check `src/`, `__tests__/`, and `scripts/` (except `scripts/benchmark.ts`). `build:strict` sets `skipLibCheck: false` and uses `__tests__/pngjs.d.ts` to resolve `png-visual-compare` declarations.
+- TypeScript 7 checks the source, tests, scripts, and Vitest configuration. The strict check also verifies dependency declarations.
 - `__tests__/pdfjs.assets.test.ts` verifies the installed `cmaps`, `standard_fonts`, `wasm`, and top-level `pdfjs-dist` directories.
 - `comparePNG()` in `__tests__/comparePNG.ts` fails when a golden PNG is missing. It creates missing goldens only when `UPDATE_GOLDENS=1` and `CI` is unset or empty. It never overwrites existing golden files.
 - `__tests__/cli.compiled.test.ts` compiles `src/` to `test-results/cli-compiled-out` and tests the CLI in child processes.
 - Worker tests in `__tests__/pdf.to.png.worker.threads.test.ts` use `pdfToPngInWorkers()` to spy on `renderPagesInWorkerPool` and `renderPdfPage`.
 - `__tests__/loader.document.open.call.sites.test.ts` verifies that all main-thread document opens go through `getPdfDocument()` after `warmUpWasmDecoders()`.
-- `npm run check` runs clean, both type-checks, Prettier check, ESLint (`--max-warnings 0`), license check, and coverage tests.
-- The Husky pre-commit hook runs `lint-staged` with ESLint (`--max-warnings 0`) and Prettier.
+- `npm run check` runs clean, both type-checks, Oxfmt check, Oxlint (`--deny-warnings`), license check, and coverage tests.
+- The Husky pre-commit hook runs `lint-staged` with Oxlint (`--deny-warnings`) and Oxfmt.
 - `npm run build` cleans `out/` and `test-results/` and compiles production output to `out/`.

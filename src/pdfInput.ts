@@ -23,9 +23,9 @@ const SHARED_ARRAY_BUFFER_BYTE_LENGTH = Object.getOwnPropertyDescriptor(SharedAr
 
 /** The genuine byte length of a cross-realm buffer with the given tag, or `undefined` for an object that only forges the tag. */
 function genuineBufferByteLength(candidate: unknown, tag: string): number | undefined {
-    const { get } = tag === '[object SharedArrayBuffer]' ? SHARED_ARRAY_BUFFER_BYTE_LENGTH : ARRAY_BUFFER_BYTE_LENGTH;
+    const descriptor = tag === '[object SharedArrayBuffer]' ? SHARED_ARRAY_BUFFER_BYTE_LENGTH : ARRAY_BUFFER_BYTE_LENGTH;
     try {
-        return get.call(candidate);
+        return descriptor.get.call(candidate);
     } catch {
         return undefined;
     }

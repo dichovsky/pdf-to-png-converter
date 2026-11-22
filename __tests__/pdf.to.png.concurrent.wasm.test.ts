@@ -35,7 +35,7 @@ test.each([
     ['JPEG 2000', 'invalid', JPX_FLAT_GRAY_PDF, ['fulfilled', 'rejected']],
     ['CCITT', 'metadata', codecPdf('ccitt-g4'), ['fulfilled', 'fulfilled']],
 ])('a %s conversion settles when a concurrent %s conversion settles first', (_codec, concurrent, pdf, expected) => {
-    const result = spawnSync(process.execPath, [join(__dirname, 'concurrentWasmChild.cjs'), compiledDirectory, pdf, concurrent], {
+    const result = spawnSync(process.execPath, [join(__dirname, 'concurrentWasmChild.cts'), compiledDirectory, pdf, concurrent], {
         encoding: 'utf8',
         timeout: 60_000,
     });

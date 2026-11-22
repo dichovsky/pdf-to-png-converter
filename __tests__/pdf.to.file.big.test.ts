@@ -1,6 +1,7 @@
 import { resolve } from 'node:path';
 import { expect, test } from 'vitest';
-import { PngPageOutput, pdfToPng } from '../src';
+import type { PngPageOutput } from '../src';
+import { pdfToPng } from '../src';
 
 test(`should convert BIG sample`, async () => {
     const pdfFilePath: string = resolve('./test-data/10-page-sample.pdf');

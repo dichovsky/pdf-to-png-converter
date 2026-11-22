@@ -82,7 +82,7 @@ export function toPixelDimension(viewportLength: number): number {
  *
  * @internal
  */
-export function nonRenderableDimensionsError(width: number, height: number): Error {
+function nonRenderableDimensionsError(width: number, height: number): Error {
     return new Error(
         `Page dimensions floor to ${width}×${height} px at this viewportScale, which cannot produce a valid image. Increase viewportScale.`,
     );
@@ -101,7 +101,7 @@ export function nonRenderableDimensionsError(width: number, height: number): Err
  *
  * @internal
  */
-export function canvasPixelLimitError(canvasWidth: number, canvasHeight: number): Error {
+function canvasPixelLimitError(canvasWidth: number, canvasHeight: number): Error {
     // Callers pass the already-floored bitmap dimensions, so the reported "Canvas W×H" matches the
     // canvas the guard actually enforces against. Pin the locale so the thousands separator is
     // stable across runtimes (an unqualified toLocaleString() varies — comma, space, or narrow
@@ -121,7 +121,7 @@ export function canvasPixelLimitError(canvasWidth: number, canvasHeight: number)
  *
  * @internal
  */
-export function canvasSideLimitError(canvasWidth: number, canvasHeight: number): Error {
+function canvasSideLimitError(canvasWidth: number, canvasHeight: number): Error {
     return new Error(
         `Canvas ${canvasWidth}×${canvasHeight} px exceeds the ${MAX_CANVAS_SIDE.toLocaleString('en-US')} pixel per-side limit. Reduce viewportScale.`,
     );
@@ -210,7 +210,7 @@ export async function renderPdfPage(
         if (!canvas || !context) {
             throw new Error('pdf.js canvas factory returned a null canvas or context.');
         }
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // oxlint-disable-next-line typescript/ban-ts-comment
         // @ts-ignore — upstream pdfjs-dist@~6.4.x expects DOM CanvasRenderingContext2D, but @napi-rs/canvas exposes SKRSContext2D here. @ts-ignore (not @ts-expect-error) is required because build:test runs with skipLibCheck:true, which hides this error and would make @ts-expect-error report as unused.
         await page.render({ canvasContext: context, viewport, canvas }).promise;
         return {

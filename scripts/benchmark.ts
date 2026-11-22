@@ -18,12 +18,15 @@
  */
 import { fork } from 'node:child_process';
 import { promises as fsPromises } from 'node:fs';
+import { createRequire } from 'node:module';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 import { performance } from 'node:perf_hooks';
-import type { PdfToPngOptions } from '../out/index.js';
-import { pdfToPng } from '../out/index.js';
+import type * as Converter from '../src/index.js';
 
-const REPO_ROOT = resolve(__dirname, '..');
+// Load the built package, but check its public types even after clean removes out/.
+const { pdfToPng }: typeof Converter = createRequire(import.meta.url)('..');
+
+const REPO_ROOT = resolve(import.meta.dirname, '..');
 const TEST_DATA_ROOT = join(REPO_ROOT, 'test-data');
 const RESULTS_ROOT = join(REPO_ROOT, 'bench-results');
 const TEMP_ROOT = join(RESULTS_ROOT, 'tmp');
@@ -147,9 +150,9 @@ function isFileMode(mode: BenchMode): boolean {
     return mode === 'file' || mode === 'file-parallel' || mode === 'file-worker';
 }
 
-function buildOptions(scenario: Scenario): PdfToPngOptions {
+function buildOptions(scenario: Scenario): Converter.PdfToPngOptions {
     let outputSequence = 0;
-    const options: PdfToPngOptions = {
+    const options: Converter.PdfToPngOptions = {
         pagesToProcess: Array.from({ length: scenario.requestedPages }, (_, index) => (index % scenario.fixturePages) + 1),
         returnPageContent: true,
     };
@@ -224,9 +227,8 @@ async function runScenario(scenario: Scenario): Promise<ScenarioResult> {
 
 function runScenarioInChild(scenario: Scenario): Promise<ScenarioResult> {
     return new Promise((resolveScenario, rejectScenario) => {
-        const child = fork(__filename, [], {
+        const child = fork(import.meta.filename, [], {
             cwd: REPO_ROOT,
-            execArgv: ['--require', require.resolve('ts-node/register')],
             stdio: ['inherit', 'inherit', 'inherit', 'ipc'],
         });
         let result: ScenarioResult | undefined;

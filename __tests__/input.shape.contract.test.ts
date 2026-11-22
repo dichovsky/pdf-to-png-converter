@@ -107,7 +107,7 @@ test('accepts a byte array-like, e.g. a Buffer that round-tripped through JSON',
 });
 
 test('applies maxInputBytes to a byte array-like, which carries no byteLength', async () => {
-    const oversized = new Array<number>(16).fill(0) as unknown as ArrayBufferLike;
+    const oversized = Array.from({ length: 16 }, () => 0) as unknown as ArrayBufferLike;
     await expect(getPdfFileBuffer(oversized, 8)).rejects.toThrow(/exceeds maxInputBytes/);
 });
 

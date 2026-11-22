@@ -5,7 +5,7 @@ Thank you for your contribution.
 ## Prerequisites
 
 - **Node.js 26+** for the contributor toolchain (`.nvmrc`: run `nvm use`). The published runtime supports Node.js 24+.
-- **npm 11.11+** for development. Older npm versions remove the `libc` fields from `package-lock.json` when they rewrite the file. The publish workflow pins npm 12.2.2.
+- **npm 11.11+** for development. Older npm versions remove the `libc` fields from `package-lock.json` when they rewrite the file. The publish workflow pins npm 12.2.3.
 
 ## Getting Started
 
@@ -21,8 +21,8 @@ npm ci
 npm run check         # Run the full validation gate: types, format, lint, licenses, and tests
 npm test              # Run tests with coverage only
 npm run test:fast     # Run Vitest without coverage
-npm run lint          # Run ESLint on src/, __tests__/, and scripts/ (--max-warnings 0)
-npm run build:test    # Type-check src/, __tests__/, and scripts/ (except scripts/benchmark.ts), no emit
+npm run lint          # Run Oxlint on src/, __tests__/, and scripts/ (--deny-warnings)
+npm run build:test    # Type-check src/, __tests__/, and scripts/ and the Vitest configuration, no emit
 npm run build:strict  # Run the strict dependency-boundary type-check on the same files
 npm run test:license  # Check production dependency licenses
 ```
@@ -43,11 +43,13 @@ UPDATE_GOLDENS=1 npx vitest run __tests__/<filename>.test.ts
 
 Review the new image and commit it. The helper refuses `UPDATE_GOLDENS=1` when `CI` is set, and it never overwrites an existing golden file. To replace an existing golden PNG, delete the file first, run the test with `UPDATE_GOLDENS=1`, review the image, and commit it.
 
+The tests decode PNGs with `pngjs` and count pixel differences with `pixelmatch` 7.2. Keep this version range until a change to the comparison algorithm has been reviewed against the golden images.
+
 The visual tests require the number of different pixels to be below `RELAXED_COMPARE_DIFFERENCE_THRESHOLD` (6) (`__tests__/test-data-constants.ts`). This tolerance handles small platform rendering differences. The Ubuntu CI jobs verify that golden files match on Linux. The Ubuntu CI jobs also fail if a test run adds or modifies any file in `test-data/`.
 
 ## Strict type-check
 
-`npm run build:strict` runs `tsc` with `tsconfig.strict.json`. This configuration sets `skipLibCheck: false` to find type errors in `pdfjs-dist`, `@napi-rs/canvas`, and `png-visual-compare`. The stub file `__tests__/pngjs.d.ts` resolves the `pngjs` type import in `png-visual-compare`. Strict mode fails without this stub. Read the header in `__tests__/pngjs.d.ts` before you change or delete it.
+`npm run build:strict` runs `tsc` with `tsconfig.strict.json`. This configuration sets `skipLibCheck: false` to check dependency declarations, including the PDF and canvas types.
 
 `build:strict` blocks CI and runs as part of `npm run check` and `prepublishOnly`. `npm test` runs only the test suite.
 
@@ -62,7 +64,7 @@ When an upstream update fixes the type, `tsc` reports the unused `@ts-expect-err
 **When to use `@ts-ignore` instead of `@ts-expect-error`:** `@ts-expect-error` fails if no type error occurs. Some upstream type errors occur only when `skipLibCheck` is `false` (`build:strict`). They do not occur when `skipLibCheck` is `true` (`build:test`). In that condition, `@ts-expect-error` breaks `build:test`. Thus, do not use `@ts-expect-error`. Use these two lines:
 
 ```ts
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// oxlint-disable-next-line typescript/ban-ts-comment
 // @ts-ignore <reason> — upstream <pkg>@<range>
 ```
 
@@ -93,7 +95,7 @@ Do not bypass `build:strict` failures with `continue-on-error` in CI workflows o
 - **Type imports:** Use `import type` for type-only imports.
 - **Return types:** Add explicit return type annotations to all functions in `src/`.
 - **Accessibility:** Add explicit `public` or `private` modifiers to class members (omit `public` on constructors).
-- **Pre-commit hook:** `npm ci` installs a Husky pre-commit hook that runs `lint-staged`. It runs ESLint (`--max-warnings 0`) and Prettier on staged TypeScript files in `src/`, `__tests__/`, and `scripts/`. It also runs Prettier on staged `js`, `mjs`, `cjs`, `json`, `md`, `yml`, `yaml`, and `.prettierrc` files.
+- **Pre-commit hook:** Husky runs lint-staged. Oxlint checks staged TypeScript and fails on warnings. Oxfmt formats staged TypeScript, JavaScript, JSON, Markdown, and YAML.
 
 ## Writing documentation
 
@@ -176,7 +178,7 @@ Allowed types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`, `ci`.
 
 ## Releasing
 
-The `.github/workflows/publish.yml` workflow publishes the package to npm when you publish a non-prerelease GitHub Release. The workflow pins npm 12.2.2 and uses npm **Trusted Publishing (OIDC)**. It does not use a long-lived `NPM_TOKEN`. GitHub Actions requests a short-lived OIDC token and attaches build [provenance](https://docs.npmjs.com/generating-provenance-statements) automatically.
+The `.github/workflows/publish.yml` workflow publishes the package to npm when you publish a non-prerelease GitHub Release. The workflow pins npm 12.2.3 and uses npm **Trusted Publishing (OIDC)**. It does not use a long-lived `NPM_TOKEN`. GitHub Actions requests a short-lived OIDC token and attaches build [provenance](https://docs.npmjs.com/generating-provenance-statements) automatically.
 
 **One-time setup (maintainer):** On npmjs.com, set the package _Trusted Publisher_ to GitHub Actions for `dichovsky/pdf-to-png-converter` and workflow `publish.yml`. Leave _Environment_ blank.
 

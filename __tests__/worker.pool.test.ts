@@ -24,10 +24,10 @@ const harness = vi.hoisted(() => {
             public entryPath: string,
             public options: unknown,
         ) {
-            if (harness.constructorError !== undefined) {
-                throw harness.constructorError;
+            if (state.constructorError !== undefined) {
+                throw state.constructorError;
             }
-            harness.instances.push(this);
+            state.instances.push(this);
         }
 
         public on(event: string, handler: Handler): this {
@@ -38,9 +38,9 @@ const harness = vi.hoisted(() => {
         }
 
         public postMessage(message: unknown): void {
-            if (harness.postMessageError !== undefined) {
-                const error = harness.postMessageError;
-                harness.postMessageError = undefined;
+            if (state.postMessageError !== undefined) {
+                const error = state.postMessageError;
+                state.postMessageError = undefined;
                 throw error;
             }
             this.posted.push(message);
@@ -61,14 +61,14 @@ const harness = vi.hoisted(() => {
         }
     }
 
-    const harness = {
+    const state = {
         FakeWorker,
         instances: [] as InstanceType<typeof FakeWorker>[],
         compiledEntryExists: false,
         constructorError: undefined as unknown,
         postMessageError: undefined as unknown,
     };
-    return harness;
+    return state;
 });
 
 vi.mock('node:fs', () => ({ existsSync: (): boolean => harness.compiledEntryExists }));
@@ -187,7 +187,7 @@ test('dispatches one task per worker, then the next task as each result arrives'
     workerB.emit('message', resultMessage(2));
     await poolPromise;
 
-    expect(rendered.map((entry) => entry.index).sort()).toEqual([0, 1, 2]);
+    expect(rendered.map((entry) => entry.index).sort((a, b) => a - b)).toEqual([0, 1, 2]);
     const withContent = rendered.find((entry) => entry.index === 1);
     expect(withContent?.page.content).toBeInstanceOf(Buffer);
     expect(Array.from(withContent?.page.content ?? [])).toEqual([7, 8]);
@@ -208,7 +208,7 @@ test('throws the LOWEST-index error when multiple in-flight pages fail, and stop
     await expect(poolPromise).rejects.toThrow('page 1 exploded');
     // No further tasks were dispatched after the first error (tasks 2 and 3 never started).
     const dispatched = harness.instances.flatMap((worker) => worker.posted as RenderPageRequest[]).map((request) => request.index);
-    expect(dispatched.sort()).toEqual([0, 1]);
+    expect(dispatched.sort((a, b) => a - b)).toEqual([0, 1]);
 });
 
 test('an onPageRendered failure (e.g. disk write) is attributed to that page index', async () => {

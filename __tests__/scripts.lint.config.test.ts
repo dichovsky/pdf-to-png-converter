@@ -1,41 +1,28 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { ESLint } from 'eslint';
-import { describe, expect, test } from 'vitest';
+import { execFileSync } from 'node:child_process';
+import { readdirSync, readFileSync } from 'node:fs';
+import { dirname, join, relative, resolve } from 'node:path';
+import { expect, test } from 'vitest';
 
-const REPO_ROOT = join(__dirname, '..');
-const eslint = new ESLint({ cwd: REPO_ROOT });
+const root = resolve(__dirname, '..');
+const lintCli = join(dirname(require.resolve('oxlint/package.json')), 'bin', 'oxlint');
 
-// `calculateConfigForFile` returns the resolved severity as `[0]`/`[2]` (or the string form), so normalise both.
-function severityOf(rule: unknown): unknown {
-    return Array.isArray(rule) ? rule[0] : rule;
-}
-
-// The Docker test image leaves eslint.config.mjs out of its build context (.dockerignore), so there is no lint gate to check there.
-describe.skipIf(!existsSync(join(REPO_ROOT, 'eslint.config.mjs')))('lint gate', () => {
-    test('every file in scripts/ gets a lint configuration instead of being silently skipped', async () => {
-        const scripts = readdirSync(join(REPO_ROOT, 'scripts')).filter((name) => name.endsWith('.ts'));
-        expect(scripts.length).toBeGreaterThan(0);
-        for (const name of scripts) {
-            expect(await eslint.calculateConfigForFile(`scripts/${name}`), `scripts/${name} is not linted`).toBeDefined();
+test('Oxlint discovers all maintained TypeScript files', () => {
+    const files = execFileSync(process.execPath, [lintCli, '--debug=files', '.'], { cwd: root, encoding: 'utf8' })
+        .split(/\r?\n/)
+        .map((name) => relative(root, resolve(root, name)));
+    for (const dir of ['src', '__tests__', 'scripts']) {
+        for (const name of readdirSync(join(root, dir)).filter((entry) => /\.[cm]?ts$/.test(entry))) {
+            expect(files).toContain(join(dir, name));
         }
-    });
+    }
+    expect(files).toContain('vitest.config.mts');
+});
 
-    test.each(['src/pdfToPng.ts', '__tests__/cli.test.ts', 'scripts/release-postcheck.ts', 'scripts/benchmark.ts'])(
-        'leaves undefined names and redeclarations to tsc in %s',
-        async (file) => {
-            const config = await eslint.calculateConfigForFile(file);
-            // tsc reports both, and the core rules reject valid Node globals (setTimeout, URL) and TypeScript overloads.
-            expect([0, 'off']).toContain(severityOf(config.rules['no-undef']));
-            expect([0, 'off']).toContain(severityOf(config.rules['no-redeclare']));
-            // The rest of typescript-eslint's `eslint-recommended` preset is applied, and unreachable code stays an error.
-            expect([2, 'error']).toContain(severityOf(config.rules['prefer-const']));
-            expect([2, 'error']).toContain(severityOf(config.rules['no-unreachable']));
-        },
+test('the lint gate includes type-aware rules and fails on warnings', () => {
+    const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as { scripts: { lint: string } };
+    expect(manifest.scripts.lint.split(' ')).toEqual(expect.arrayContaining(['--type-aware', '--deny-warnings']));
+    const config = JSON.parse(
+        execFileSync(process.execPath, [lintCli, '--print-config', 'src/pdfToPng.ts'], { cwd: root, encoding: 'utf8' }),
     );
-
-    test('the lint script fails on warnings', () => {
-        const manifest = JSON.parse(readFileSync(join(REPO_ROOT, 'package.json'), 'utf-8')) as { scripts: { lint: string } };
-        expect(manifest.scripts.lint).toMatch(/(^|\s)--max-warnings 0(\s|$)/);
-    });
+    expect(config.rules['typescript/no-floating-promises']).toContain('deny');
 });

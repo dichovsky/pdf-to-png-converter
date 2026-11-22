@@ -1,7 +1,8 @@
 import { execFileSync } from 'node:child_process';
+import { isMainModule } from './is-main-module.ts';
 import { readFileSync } from 'node:fs';
 import { join, posix } from 'node:path';
-import { parseSingleNpmJsonResult } from './npm-json';
+import { parseSingleNpmJsonResult } from './npm-json.ts';
 
 // Preventive release gate. Run by `publish.yml` immediately before `npm publish`
 // (and locally as a pre-flight) to block a release whose version, changelog, or
@@ -28,7 +29,7 @@ interface PackResult {
 }
 
 const NPM: string = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-const REPO_ROOT: string = join(__dirname, '..');
+const REPO_ROOT: string = join(import.meta.dirname, '..');
 const REQUIRED_TARBALL_FILES: readonly string[] = [
     'out/index.js',
     'out/index.d.ts',
@@ -263,6 +264,6 @@ function main(): void {
 }
 
 // Only when run as the script: the pure checks above are imported by tests, which must not shell out to npm.
-if (require.main === module) {
+if (isMainModule(import.meta)) {
     main();
 }

@@ -1,7 +1,8 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import ts from 'typescript';
-import { expect, test } from 'vitest';
+import { API } from 'typescript/unstable/sync';
+import { isCallExpression, isFunctionDeclaration, isIdentifier, isMethodDeclaration, type Node } from 'typescript/unstable/ast';
+import { afterAll, expect, test } from 'vitest';
 
 /**
  * Every main-thread document must open after the one-time wasm warm-up (CLAUDE.md invariant 11, issue #288): without it a
@@ -23,33 +24,31 @@ interface CallSite {
     caller: string;
 }
 
-function enclosingFunction(node: ts.Node): string {
-    for (let parent = node.parent; parent !== undefined; parent = parent.parent) {
-        if ((ts.isFunctionDeclaration(parent) || ts.isMethodDeclaration(parent)) && parent.name !== undefined) {
-            return parent.name.getText();
-        }
-    }
-    return '<module>';
-}
+const compiler = new API();
+afterAll(() => compiler.close());
+const config = resolve(SOURCE_DIRECTORY, '..', 'tsconfig.json');
+const project = compiler.updateSnapshot({ openProjects: [config] }).getProject(config);
 
-/** Names the function enclosing each call to `callee` in `sourceText`. Comments and string literals are not calls. */
-function callersOf(callee: string, sourceText: string): string[] {
-    const source = ts.createSourceFile('module.ts', sourceText, ts.ScriptTarget.Latest, true);
+function callersOf(callee: string, file: string): string[] {
+    const source = project?.program.getSourceFile(file);
+    if (!source) throw new Error(`TypeScript did not load ${file}`);
     const callers: string[] = [];
-    const visit = (node: ts.Node): void => {
-        if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === callee) {
-            callers.push(enclosingFunction(node));
+
+    function visit(node: Node, enclosing: string): void {
+        const caller = (isFunctionDeclaration(node) || isMethodDeclaration(node)) && node.name ? node.name.getText() : enclosing;
+        if (isCallExpression(node) && isIdentifier(node.expression) && node.expression.text === callee) {
+            callers.push(caller);
         }
-        ts.forEachChild(node, visit);
-    };
-    visit(source);
+        node.forEachChild((child) => visit(child, caller));
+    }
+    visit(source, '<module>');
     return callers;
 }
 
 function callSitesInSource(callee: string): CallSite[] {
     return readdirSync(SOURCE_DIRECTORY)
         .filter((file) => file.endsWith('.ts') && !file.endsWith('.d.ts'))
-        .flatMap((file) => callersOf(callee, readFileSync(join(SOURCE_DIRECTORY, file), 'utf8')).map((caller) => ({ file, caller })));
+        .flatMap((file) => callersOf(callee, join(SOURCE_DIRECTORY, file)).map((caller) => ({ file, caller })));
 }
 
 test('only pdfToPng.ts, pageRenderWorker.ts and the warm-up itself call getPdfDocument', () => {
@@ -64,12 +63,12 @@ test('getDocument is called only from getPdfDocument', () => {
 });
 
 test('the scanner reports a call from any function and ignores comments and strings', () => {
-    const sneaky = [
-        '// getPdfDocument(bytes, options) in a comment',
-        "const text = 'getPdfDocument(bytes, options)';",
-        'export async function openEarly() { return getPdfDocument(bytes, options); }',
-        'export const openLater = async () => getPdfDocument(bytes, options);',
-    ].join('\n');
-
-    expect(callersOf('getPdfDocument', sneaky)).toEqual(['openEarly', '<module>']);
+    // Both probe() in this comment and the string below must be ignored by the scanner.
+    const probe = () => 'probe()';
+    function openEarly(): string {
+        return probe();
+    }
+    const openLater = () => probe();
+    expect(openEarly()).toBe(openLater());
+    expect(callersOf('probe', __filename)).toEqual(['openEarly', '<module>']);
 });
