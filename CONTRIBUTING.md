@@ -128,7 +128,8 @@ STE Rules 1.5 and 1.12 let you use technical nouns and technical verbs that the 
 | pdf.js, `pdfjs-dist`           | Product name   | The PDF engine (pdf.js) and its npm package (`pdfjs-dist`)                     | PDF.js, pdfjs                             |
 | `@napi-rs/canvas`              | Product name   | The native canvas package                                                      | napi canvas                               |
 | render                         | Technical verb | Draw a PDF page into a canvas                                                  | paint, draw (for pages)                   |
-| convert, conversion            | Technical verb | Make PNG output or metadata from a PDF (one `pdfToPng()` call)                 | transform, export                         |
+| convert                        | Technical verb | Make PNG output or metadata from a PDF (one `pdfToPng()` call)                 | transform, export                         |
+| conversion                     | Technical noun | One call to `pdfToPng()`                                                       | transformation, export                    |
 | encode                         | Technical verb | Make PNG bytes from a canvas                                                   | compress, serialize                       |
 | decode                         | Technical verb | Make pixels from an embedded image                                             | unpack                                    |
 | run                            | Technical verb | Start and execute a command, test, script, or workflow                         | operate, launch                           |

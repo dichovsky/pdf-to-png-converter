@@ -76,6 +76,7 @@ export interface PdfToPngOptions {
      * - NUL and directory aliases.
      * - On Windows: invalid characters, alternate-data-stream syntax, reserved device basenames, and trailing
      *   dots/spaces.
+     *
      * For disk output, names that a filesystem may treat as one file are also rejected as duplicates before the output
      * folder is created. Names are compared after Unicode normalization (NFC and NFD forms) and case folding. Thus,
      * these pairs collide on all platforms: `Page.png` and `page.png`, `straße.png` and `STRASSE.png`, and two
@@ -93,6 +94,7 @@ export interface PdfToPngOptions {
      * - All other containers (a typed array, `Set`, string, or other array-like).
      * - An array with holes.
      * - Non-integer values, and values less than or equal to zero.
+     *
      * Pages above the document page count are silently ignored.
      * When omitted (or `null`), all pages in the document are processed.
      * @since 3.3.0
@@ -131,6 +133,7 @@ export interface PdfToPngOptions {
      * - Pages that floor to `0` px.
      * - Pages whose rendered (floored) canvas area is more than the internal canvas pixel limit.
      * - Pages whose floored width or height is more than 1,000,000 px (the per-side limit of the PNG encoder).
+     *
      * Default: `false`.
      * @since 3.14.0
      */
@@ -144,6 +147,7 @@ export interface PdfToPngOptions {
      * - The PNG encoding and disk writes of finished pages may overlap the rendering of the next page.
      *   Thus, files may finish writing out of page order.
      * - When a page fails, the pages that are in flight complete before the returned promise rejects.
+     *
      * Read output from the resolved `PngPageOutput[]` (ordered), not from directory-watch order.
      * Peak canvas memory in this mode is a maximum of three live canvases. For strict one-page-at-a-time
      * processing with a single live canvas, set `processPagesInParallel: true` with
@@ -191,6 +195,7 @@ export interface PdfToPngOptions {
      * - File paths. The file is opened one time, then verified and read through one handle with bounded allocation.
      * - Byte containers, including `Buffer`, `Uint8Array`, `ArrayBuffer`, and `SharedArrayBuffer`. The limit applies to their byte length.
      * - Arrays of bytes. The limit applies to the array length.
+     *
      * Non-regular files such as FIFOs, sockets, and devices are rejected. The limit must be a positive integer.
      * The cap bounds the input bytes only, not the memory that pdf.js needs to parse them.
      * A non-PDF payload can be one long sequence of a single byte value (zeros, for example). In the pdf.js recovery
