@@ -9,19 +9,20 @@ export interface PdfToPngOptions {
     /**
      * Scale factor applied to each page viewport before rendering.
      * Values above `1` produce larger, higher-resolution images; values below `1` produce smaller images.
-     * Must be a finite positive number. Maximum allowed value is `100`; values above this limit throw
-     * immediately. A page whose rendered size would still exceed the canvas limits is rejected before any canvas is
+     * Must be a finite positive number. The maximum value is `100`. Values above this limit throw immediately.
+     * If the rendered size of a page is more than the canvas limits, the page is rejected before a canvas is
      * allocated.
      * Default: `1`.
      */
     viewportScale?: number;
 
     /**
-     * Always `true` at runtime. pdf.js has no Font Loading API in Node.js, and with `false` it would draw text in
-     * embedded fonts as missing-glyph boxes, so the library passes `true`, which makes pdf.js draw glyph outlines as
-     * paths (embedded fonts are still used). An explicit `false` is accepted but ignored, on the main thread and in
-     * worker threads, and a process warning with code `PDF_TO_PNG_DISABLE_FONT_FACE_IGNORED` is emitted at most once per
-     * thread (normally once per process); silence only that warning with
+     * Always `true` at runtime. pdf.js has no Font Loading API in Node.js. With `false`, pdf.js would draw text in
+     * embedded fonts as missing-glyph boxes. Thus, the library passes `true`, and pdf.js draws glyph outlines as
+     * paths (pdf.js continues to use embedded fonts).
+     * An explicit `false` is accepted but ignored, on the main thread and in worker threads. The library then emits a
+     * process warning with code `PDF_TO_PNG_DISABLE_FONT_FACE_IGNORED` a maximum of one time for each thread (normally
+     * one time for each process). To stop only that warning, use
      * `node --disable-warning=PDF_TO_PNG_DISABLE_FONT_FACE_IGNORED`.
      * Default: `true`.
      */
@@ -49,45 +50,51 @@ export interface PdfToPngOptions {
 
     /**
      * Folder path (relative or absolute) where PNG files will be written.
-     * A relative path is resolved against `process.cwd()` when `pdfToPng()` is called, before any asynchronous work, so a
-     * later `process.chdir()` cannot redirect the output.
-     * The folder is created recursively if it does not exist.
-     * When omitted (or `null`), no files are written to disk. Any other non-string value throws before the input is read.
+     * A relative path is resolved against `process.cwd()` when `pdfToPng()` is called, before asynchronous work starts.
+     * Thus, a later `process.chdir()` cannot redirect the output.
+     * The folder is created recursively if it is not present.
+     * When omitted (or `null`), no files are written to disk. All other non-string values throw before the input is read.
      *
      * @remarks
-     * **Security (TOCTOU):** The write-containment guard rejects filenames that contain path
-     * separators (so the target is always a direct child of this folder), resolves symlinks,
-     * checks the folder's canonical pathname immediately before each write, and uses exclusive-
-     * create file opens to avoid overwriting pre-existing files or following a pre-planted target
-     * symlink at the final filename. Path checks cannot atomically bind the write to a directory
-     * inode, so this directory must be private and not writable by untrusted users.
+     * **Security (TOCTOU):** This directory must be private and not writable by untrusted users.
+     * Path checks cannot atomically bind the write to a directory inode. The write-containment guard does these steps:
+     * - It rejects filenames that contain path separators. Thus, the target is always a direct child of this folder.
+     * - It resolves symlinks.
+     * - It checks the canonical pathname of the folder immediately before each write.
+     * - It uses exclusive-create file opens. Thus, it does not overwrite pre-existing files or follow a pre-planted
+     *   target symlink at the final filename.
      */
     outputFolder?: string;
 
     /**
      * Custom naming function for output PNG files.
-     * Receives the 1-based page number and must return a filename string. The library neither adds nor checks a file
-     * extension: by convention, add `.png` yourself (e.g. `(pageNumber) => \`page_${pageNumber}.png\``).
-     * In every mode the value must be non-empty and contain no host path separator. For disk
-     * output it must also be a host-valid filename of at most 255 units (UTF-16 code units on macOS and Windows, UTF-8
-     * bytes on other hosts): NUL and directory aliases are rejected, and
-     * Windows additionally rejects invalid characters, alternate-data-stream syntax, reserved
-     * device basenames, and trailing dots/spaces before output I/O.
+     * Receives the 1-based page number and must return a filename string. The library does not add or check a file
+     * extension. By convention, add `.png` yourself (e.g. `(pageNumber) => \`page_${pageNumber}.png\``).
+     * In all modes, the value must be non-empty and contain no host path separator.
+     * For disk output, the value must also be a host-valid filename of 255 units or less. A unit is a UTF-16 code unit on
+     * macOS and Windows, and a UTF-8 byte on other hosts. Before output I/O, these values are rejected:
+     * - NUL and directory aliases.
+     * - On Windows: invalid characters, alternate-data-stream syntax, reserved device basenames, and trailing
+     *   dots/spaces.
+     *
      * For disk output, names that a filesystem may treat as one file are also rejected as duplicates before the output
-     * folder is created. Names are compared after Unicode normalization (NFC and NFD forms) and case folding, so
-     * `Page.png` and `page.png`, `straße.png` and `STRASSE.png`, or two spellings of one accented name collide on every
-     * platform.
-     * When omitted, names default to `<pdfBasename>_page_<pageNumber>.png`,
-     * or `buffer_page_<pageNumber>.png` when the PDF is supplied as bytes instead of a file path.
-     * `null` counts as omitted; any other non-function value throws before the input is read.
+     * folder is created. Names are compared after Unicode normalization (NFC and NFD forms) and case folding. Thus,
+     * these pairs collide on all platforms: `Page.png` and `page.png`, `straße.png` and `STRASSE.png`, and two
+     * spellings of one accented name.
+     * When omitted, names default to `<pdfBasename>_page_<pageNumber>.png`. When the PDF is supplied as bytes, not as a
+     * file path, names default to `buffer_page_<pageNumber>.png`.
+     * `null` counts as omitted. All other non-function values throw before the input is read.
      * @since 3.14.0
      */
     outputFileMaskFunc?: (pageNumber: number) => string;
 
     /**
-     * 1-based integer page numbers to convert. Must be an `Array` of positive integers: any other container (a typed
-     * array, `Set`, string or other array-like), an array with holes, non-integer values and values less than or equal
-     * to zero throw immediately, before any I/O.
+     * 1-based integer page numbers to convert. Must be an `Array` of positive integers. These values throw immediately,
+     * before I/O starts:
+     * - All other containers (a typed array, `Set`, string, or other array-like).
+     * - An array with holes.
+     * - Non-integer values, and values less than or equal to zero.
+     *
      * Pages above the document page count are silently ignored.
      * When omitted (or `null`), all pages in the document are processed.
      * @since 3.3.0
@@ -97,11 +104,11 @@ export interface PdfToPngOptions {
     /**
      * pdfjs verbosity level. Use the `VerbosityLevel` const for readable values:
      * `VerbosityLevel.ERRORS` (0), `VerbosityLevel.WARNINGS` (1), `VerbosityLevel.INFOS` (5).
-     * It changes pdf.js log lines only, never the output or errors. On the main thread the level is process-wide: pdf.js
-     * keeps one verbosity setting that every opened document overwrites, so conversions that overlap with different
-     * levels all log at the level of the document opened last. Page rendering in worker threads (`renderInWorkerThreads`)
-     * uses each worker's own level, but the main thread still opens every document, so its load-time log lines follow the
-     * process-wide level.
+     * It changes pdf.js log lines only, never the output or errors.
+     * On the main thread, the level is process-wide. pdf.js keeps one verbosity setting, and each opened document
+     * overwrites it. Thus, overlapping conversions with different levels all log at the level of the last opened document.
+     * Page rendering in worker threads (`renderInWorkerThreads`) uses the level of each worker. But the main thread
+     * also opens all documents. Thus, its load-time log lines follow the process-wide level.
      * Default: `VerbosityLevel.ERRORS` (0).
      */
     verbosityLevel?: VerbosityLevel;
@@ -117,31 +124,34 @@ export interface PdfToPngOptions {
      * When `true`, only page metadata is returned for each page without rendering any PNG image.
      * The returned `PngPageOutput` objects will have `pageNumber`, `name`, `width`, `height`, and
      * `rotation` populated, but `content` will always be `undefined` and `path` will always be `""`.
-     * No canvas is created, no rendering is performed, and no files are written to disk even if
-     * `outputFolder` is set.
-     * This is significantly faster than full rendering and useful for inspecting page dimensions
+     * No canvas is created, no rendering is performed, and no files are written to disk. This is
+     * also true when `outputFolder` is set.
+     * This mode is significantly faster than full rendering. Use it to inspect page dimensions
      * and rotation without generating images.
-     * To stay consistent with a real render, this path still rejects pages that could not be
-     * rendered at the requested `viewportScale` — those that floor to `0` px, those whose rendered
-     * (floored) canvas area exceeds the internal canvas pixel limit, and those whose floored width or
-     * height exceeds 1,000,000 px (the PNG encoder's per-side limit) — rather than reporting
-     * dimensions for a page that would throw on render.
+     * To stay consistent with a real render, this mode also rejects pages that cannot be rendered at the requested
+     * `viewportScale`. It does not report dimensions for a page that would throw on render. It rejects these pages:
+     * - Pages that floor to `0` px.
+     * - Pages whose rendered (floored) canvas area is more than the internal canvas pixel limit.
+     * - Pages whose floored width or height is more than 1,000,000 px (the per-side limit of the PNG encoder).
+     *
      * Default: `false`.
      * @since 3.14.0
      */
     returnMetadataOnly?: boolean;
 
     /**
-     * When `true`, selected pages are rendered concurrently through a sliding-window scheduler
-     * that keeps up to `concurrencyLimit` pages active. When `false`, pages are processed in
-     * a lightly pipelined sequence: results are always returned in page order, but the PNG
-     * encoding and disk writes of finished pages may overlap the rendering of the next page
-     * (at most three pages in flight), so files may finish writing out of page order and, when
-     * a page fails, pages already in flight still complete before the returned promise rejects.
-     * Consume output via the resolved `PngPageOutput[]` (ordered) rather than directory-watch order.
-     * Peak canvas memory in this mode is up to three live canvases; for strict one-page-at-a-time
+     * When `true`, selected pages are rendered concurrently through a sliding-window scheduler.
+     * This scheduler keeps a maximum of `concurrencyLimit` pages active.
+     * When `false`, pages are processed in a lightly pipelined sequence (a maximum of three pages in flight):
+     * - Results are always returned in page order.
+     * - The PNG encoding and disk writes of finished pages may overlap the rendering of the next page.
+     *   Thus, files may finish writing out of page order.
+     * - When a page fails, the pages that are in flight complete before the returned promise rejects.
+     *
+     * Read output from the resolved `PngPageOutput[]` (ordered), not from directory-watch order.
+     * Peak canvas memory in this mode is a maximum of three live canvases. For strict one-page-at-a-time
      * processing with a single live canvas, set `processPagesInParallel: true` with
-     * `concurrencyLimit: 1` (a sliding window of exactly one page).
+     * `concurrencyLimit: 1` (a sliding window of one page).
      * Default: `false`.
      * @since 3.7.0
      */
@@ -149,48 +159,51 @@ export interface PdfToPngOptions {
 
     /**
      * Maximum number of pages rendered simultaneously when `processPagesInParallel` is `true`.
-     * When `processPagesInParallel` or `renderInWorkerThreads` is enabled it must be a positive integer
-     * between `1` and `16` (inclusive); values outside that range throw immediately (before any I/O).
-     * Otherwise it is ignored. The upper bound caps peak in-flight canvas memory at roughly
-     * `16 × MAX_CANVAS_PIXELS × 4 bytes ≈ 6.4 GB`; this is a bound, not a guarantee against
-     * container exhaustion. Higher values increase throughput at the cost of memory. In worker-thread
-     * mode it sets the worker-pool size.
+     * When `processPagesInParallel` or `renderInWorkerThreads` is enabled, it must be a positive integer
+     * from `1` to `16` (inclusive). Values outside that range throw immediately (before I/O starts).
+     * In other modes, it is ignored.
+     * The upper bound caps peak in-flight canvas memory at approximately `16 × MAX_CANVAS_PIXELS × 4 bytes ≈ 6.4 GB`.
+     * This cap is a bound, not a guarantee against container exhaustion.
+     * Higher values increase throughput but use more memory. In worker-thread mode, it sets the worker-pool size.
      * Default: `4`.
      * @since 3.14.0
      */
     concurrencyLimit?: number;
 
     /**
-     * When `true`, pages are rasterized in a pool of Node.js worker threads (pool size =
-     * `concurrencyLimit`), giving true multi-core parallelism — unlike `processPagesInParallel`,
-     * which interleaves pages on one thread. Each worker loads its own copy of the document, so
-     * expect roughly one PDF copy plus one pdf.js instance of memory per worker and a pool
-     * startup cost of a few hundred milliseconds per conversion; it pays off on multi-page,
-     * render-heavy (e.g. image-heavy) documents and can be slower for small ones.
-     * Rendered pixels are identical to single-threaded mode; results are returned in page
-     * order; disk writes still happen on the main thread through the same path-security guards.
+     * When `true`, pages are rasterized in a pool of Node.js worker threads (pool size = `concurrencyLimit`).
+     * This mode gives true multi-core parallelism. `processPagesInParallel` only interleaves pages on one thread.
+     * Each worker loads its own copy of the document. For each worker, expect approximately the memory of one PDF copy
+     * plus one pdf.js instance. Expect also a pool startup cost of a few hundred milliseconds for each conversion.
+     * This mode is better for multi-page, render-heavy (e.g. image-heavy) documents. It can be slower for small documents.
+     * Rendered pixels are identical to single-threaded mode, and results are returned in page order.
+     * Disk writes continue to occur on the main thread through the same path-security guards.
      * Takes precedence over `processPagesInParallel`. Ignored when `returnMetadataOnly` is `true`
-     * (metadata extraction does not render). `outputFileMaskFunc` is fully supported — names are
+     * (metadata extraction does not render). `outputFileMaskFunc` is fully supported: names are
      * resolved on the main thread before dispatch.
-     * The workers run the compiled `pageRenderWorker.js` found beside the library's own modules, so this mode needs the
-     * installed, unbundled package: from an ESM bundle, where `__dirname` is undefined, a conversion that selects at least
-     * one page rejects with an error that says so.
+     * The workers run the compiled `pageRenderWorker.js` that is next to the library's own modules. Thus, this mode
+     * requires the installed, unbundled package. In an ESM bundle, `__dirname` is undefined. There, a conversion that
+     * selects one or more pages rejects with an error that gives this cause.
      * Default: `false`.
      * @since 4.2.0
      */
     renderInWorkerThreads?: boolean;
 
     /**
-     * Maximum allowed input PDF size in bytes. Inputs larger than this throw immediately,
-     * before any rendering work is started. Applies to both the file path branch (opened once,
-     * verified and read through one handle with bounded allocation) and buffer / `Uint8Array`
-     * inputs (validated via `byteLength`; a byte `Array` counts by its `length`). Non-regular files such as FIFOs,
-     * sockets and devices are rejected. Must be a positive integer.
-     * The cap bounds the input bytes only, not the memory pdf.js needs to parse them: a non-PDF payload that is one long
-     * run of a single byte value (zeros, for example) costs about 32 to 64 heap bytes per input byte in pdf.js's recovery
-     * scan and can abort the process on heap exhaustion even below this cap. Convert untrusted files in an isolated
-     * process (with `--max-old-space-size` set) or in a Node.js `Worker` that you start yourself with `resourceLimits`;
-     * `renderInWorkerThreads` does not help, because the main thread still opens every document.
+     * Maximum allowed input PDF size in bytes. Larger inputs throw immediately, before rendering work starts.
+     * This limit applies to these inputs:
+     * - File paths. The file is opened one time, then verified and read through one handle with bounded allocation.
+     * - Byte containers, including `Buffer`, `Uint8Array`, `ArrayBuffer`, and `SharedArrayBuffer`. The limit applies to their byte length.
+     * - Arrays of bytes. The limit applies to the array length.
+     *
+     * Non-regular files such as FIFOs, sockets, and devices are rejected. The limit must be a positive integer.
+     * The cap bounds the input bytes only, not the memory that pdf.js needs to parse them.
+     * A non-PDF payload can be one long sequence of a single byte value (zeros, for example). In the pdf.js recovery
+     * scan, this payload uses approximately 32 to 64 heap bytes for each input byte. It can abort the process on heap
+     * exhaustion. This can also occur when the input is below this cap.
+     * Convert untrusted files in an isolated process (with `--max-old-space-size` set), or in a Node.js `Worker` that you
+     * start yourself with `resourceLimits`. `renderInWorkerThreads` does not help, because the main thread also opens
+     * all documents.
      * Default: `256 * 1024 * 1024` (256 MiB).
      * @since 4.1.0
      */
