@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { isMainModule } from './is-main-module.ts';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -296,7 +297,7 @@ async function main(): Promise<void> {
 }
 
 // Only when run as the script: the registry-read helpers above are imported by tests, which must not shell out to npm.
-if (process.argv[1] === import.meta.filename) {
+if (isMainModule(import.meta)) {
     main().catch((err: unknown) => {
         console.error('\nrelease:postcheck FAILED:');
         console.error(`  x ${err instanceof Error ? err.message : String(err)}`);

@@ -132,3 +132,27 @@ test('still compares against an existing golden when CI is set', async () => {
     await expect(comparePNG({ actualFile: golden, expectedFile })).resolves.toBe(0);
     await expect(comparePNG({ actualFile: solidPng('red'), expectedFile })).resolves.toBeGreaterThan(0);
 });
+
+test('rejects JPEG data with the same pixels as a golden PNG', async () => {
+    const canvas = createCanvas(8, 8);
+    const context = canvas.getContext('2d');
+    context.fillStyle = 'white';
+    context.fillRect(0, 0, 8, 8);
+    const expectedFile = existingGolden(canvas.toBuffer('image/png'));
+    await expect(comparePNG({ actualFile: canvas.toBuffer('image/jpeg'), expectedFile })).rejects.toThrow();
+});
+
+test('invalid PNG data cannot create a golden', async () => {
+    vi.stubEnv('UPDATE_GOLDENS', '1');
+    const expectedFile = goldenPath();
+    await expect(comparePNG({ actualFile: Buffer.from('invalid'), expectedFile })).rejects.toThrow();
+    expect(existsSync(expectedFile)).toBe(false);
+});
+
+test.each([
+    ['rgb(20, 145, 155)', 64],
+    ['rgb(80, 125, 105)', 0],
+])('preserves the golden comparison mismatch count for %s against mid-gray', async (color, differences) => {
+    const expectedFile = existingGolden(solidPng('rgb(128, 128, 128)'));
+    await expect(comparePNG({ actualFile: solidPng(color), expectedFile })).resolves.toBe(differences);
+});

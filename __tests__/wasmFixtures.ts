@@ -1,5 +1,4 @@
-import { decodePng, type DecodedPng } from './decodePng';
-export { decodePng, type DecodedPng } from './decodePng';
+import { createCanvas, loadImage } from '@napi-rs/canvas';
 import { join, resolve } from 'node:path';
 import { expect } from 'vitest';
 import { describeFixturePairs, type PageInfo, type PairInfo } from '../scripts/generate-wasm-fixtures';
@@ -46,6 +45,21 @@ export const MIXED_PAIR_NAME = 'mixed-pages';
 
 /** RGB of the fill colour used by the image-mask fixture (`0.1 0.3 0.9 rg`). */
 export const MASK_PAINT_RGB = [26, 76, 230] as const;
+
+export interface DecodedPng {
+    width: number;
+    height: number;
+    /** RGBA bytes, row by row. */
+    data: Uint8ClampedArray;
+}
+
+export async function decodePng(png: Uint8Array): Promise<DecodedPng> {
+    const image = await loadImage(Buffer.from(png));
+    const canvas = createCanvas(image.width, image.height);
+    const context = canvas.getContext('2d');
+    context.drawImage(image, 0, 0);
+    return { width: image.width, height: image.height, data: context.getImageData(0, 0, image.width, image.height).data };
+}
 
 export function countPixels(image: DecodedPng, predicate: (r: number, g: number, b: number, a: number) => boolean): number {
     let count = 0;

@@ -1,7 +1,7 @@
-import { existsSync, promises as fsPromises, readFileSync } from 'node:fs';
-import { parse } from 'node:path';
+import { existsSync, promises as fsPromises } from 'node:fs';
+import { dirname } from 'node:path';
 import pixelmatch from 'pixelmatch';
-import { decodePng } from './decodePng';
+import { PNG } from 'pngjs';
 
 /**
  * Compares a PNG image with its golden (expected) PNG image.
@@ -15,7 +15,8 @@ import { decodePng } from './decodePng';
  * @returns A promise that resolves to the comparison result.
  */
 export async function comparePNG({ actualFile, expectedFile }: { actualFile: string | Buffer; expectedFile: string }) {
-    if (!existsSync(expectedFile)) {
+    const missingGolden = !existsSync(expectedFile);
+    if (missingGolden) {
         if (process.env.CI) {
             throw new Error(
                 `Golden PNG not found: ${expectedFile}. Goldens are never created when CI is set. Create it locally with UPDATE_GOLDENS=1 (CI unset), review the image and commit it.`,
@@ -26,19 +27,22 @@ export async function comparePNG({ actualFile, expectedFile }: { actualFile: str
                 `Golden PNG not found: ${expectedFile}. To create it from this render, run the test again with UPDATE_GOLDENS=1, review the image and commit it.`,
             );
         }
-        const expectedFileDir = parse(expectedFile).dir;
-        await fsPromises.mkdir(expectedFileDir, { recursive: true });
-        const actualBuffer = typeof actualFile === 'string' ? readFileSync(actualFile) : actualFile;
-        await fsPromises.writeFile(expectedFile, actualBuffer);
     }
-    const [actual, expected] = await Promise.all([
-        decodePng(typeof actualFile === 'string' ? await fsPromises.readFile(actualFile) : actualFile),
-        decodePng(await fsPromises.readFile(expectedFile)),
-    ]);
+    const actualBytes = typeof actualFile === 'string' ? await fsPromises.readFile(actualFile) : actualFile;
+    const actual = PNG.sync.read(actualBytes);
+    if (missingGolden) {
+        await fsPromises.mkdir(dirname(expectedFile), { recursive: true });
+        try {
+            await fsPromises.writeFile(expectedFile, actualBytes, { flag: 'wx' });
+        } catch (error) {
+            if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+        }
+    }
+    const expected = PNG.sync.read(await fsPromises.readFile(expectedFile));
     if (actual.width !== expected.width || actual.height !== expected.height) {
         throw new Error(
             `Golden PNG dimensions differ for ${expectedFile}: expected ${expected.width}x${expected.height}, got ${actual.width}x${actual.height}`,
         );
     }
-    return pixelmatch(actual.data, expected.data, null, actual.width, actual.height);
+    return pixelmatch(actual.data, expected.data, undefined, actual.width, actual.height);
 }

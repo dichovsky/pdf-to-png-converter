@@ -56,6 +56,7 @@
  * round-trip cleanly. The tables were typed twice independently and compared, and the real independent check is pdf.js
  * (jbig2.wasm) decoding the fixtures to exactly the Flate control.
  */
+import { isMainModule } from './is-main-module.ts';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { inflateSync } from 'node:zlib';
@@ -1663,7 +1664,7 @@ function main(): number {
     return 0;
 }
 
-if (process.argv[1] === import.meta.filename) {
+if (isMainModule(import.meta)) {
     try {
         process.exitCode = main();
     } catch (error) {

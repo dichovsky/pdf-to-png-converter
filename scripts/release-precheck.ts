@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { isMainModule } from './is-main-module.ts';
 import { readFileSync } from 'node:fs';
 import { join, posix } from 'node:path';
 import { parseSingleNpmJsonResult } from './npm-json.ts';
@@ -263,6 +264,6 @@ function main(): void {
 }
 
 // Only when run as the script: the pure checks above are imported by tests, which must not shell out to npm.
-if (process.argv[1] === import.meta.filename) {
+if (isMainModule(import.meta)) {
     main();
 }

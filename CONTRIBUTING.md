@@ -43,6 +43,8 @@ UPDATE_GOLDENS=1 npx vitest run __tests__/<filename>.test.ts
 
 Review the new image and commit it. The helper refuses `UPDATE_GOLDENS=1` when `CI` is set, and it never overwrites an existing golden file. To replace an existing golden PNG, delete the file first, run the test with `UPDATE_GOLDENS=1`, review the image, and commit it.
 
+The tests decode PNGs with `pngjs` and count pixel differences with `pixelmatch` 7.2. Keep this version range until a change to the comparison algorithm has been reviewed against the golden images.
+
 The visual tests require the number of different pixels to be below `RELAXED_COMPARE_DIFFERENCE_THRESHOLD` (6) (`__tests__/test-data-constants.ts`). This tolerance handles small platform rendering differences. The Ubuntu CI jobs verify that golden files match on Linux. The Ubuntu CI jobs also fail if a test run adds or modifies any file in `test-data/`.
 
 ## Strict type-check
@@ -93,7 +95,7 @@ Do not bypass `build:strict` failures with `continue-on-error` in CI workflows o
 - **Type imports:** Use `import type` for type-only imports.
 - **Return types:** Add explicit return type annotations to all functions in `src/`.
 - **Accessibility:** Add explicit `public` or `private` modifiers to class members (omit `public` on constructors).
-- **Pre-commit hook:** Husky runs lint-staged. Oxlint checks staged TypeScript and fails on warnings. Oxfmt formats staged TypeScript, JSON, Markdown, and YAML.
+- **Pre-commit hook:** Husky runs lint-staged. Oxlint checks staged TypeScript and fails on warnings. Oxfmt formats staged TypeScript, JavaScript, JSON, Markdown, and YAML.
 
 ## Writing documentation
 
