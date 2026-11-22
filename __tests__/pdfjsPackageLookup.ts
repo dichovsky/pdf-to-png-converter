@@ -16,7 +16,7 @@ const realResolveFilename = nodeModule._resolveFilename;
 export function interceptPdfjsPackageLookup(lookup: (searchedFrom: string) => string): void {
     vi.spyOn(nodeModule, '_resolveFilename').mockImplementation(function (this: unknown, request, parent, ...rest) {
         const searchedFrom = parent?.filename ?? '';
-        if (request === 'pdfjs-dist/package.json' && /pdfjsLoader\.ts$/.test(searchedFrom)) {
+        if (request === 'pdfjs-dist/package.json' && searchedFrom.endsWith('pdfjsLoader.ts')) {
             return lookup(searchedFrom);
         }
         return realResolveFilename.call(this, request, parent, ...rest);

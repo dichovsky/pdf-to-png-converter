@@ -541,7 +541,7 @@ describe('compiled library from a fresh process', () => {
         const result = spawnSync(
             process.execPath,
             [
-                join(__dirname, 'wasmMissingChild.cjs'),
+                join(__dirname, 'wasmMissingChild.cts'),
                 compiledDirectory,
                 fakeRoot,
                 resultDirectory,

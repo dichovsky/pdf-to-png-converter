@@ -5,13 +5,13 @@ Repository guidance for Claude Code.
 ## Commands
 
 ```bash
-npm run build:test                         # Type-check src, tests, and scripts (except scripts/benchmark.ts), no emit
+npm run build:test                         # Type-check src, tests, and scripts and the Vitest configuration, no emit
 npm run build:strict                       # Run strict dependency-boundary type-check
 npm run test:fast                          # Run Vitest without coverage
 npx vitest run __tests__/<file>.test.ts    # Run one test file
 npm test                                   # Run Vitest with V8 coverage only
-npm run lint                               # Run ESLint (--max-warnings 0)
-npm run format:check                       # Run Prettier check
+npm run lint                               # Run Oxlint (--deny-warnings)
+npm run format:check                       # Run Oxfmt check
 npm run check                              # Run the full CI and prepublish gate
 npm run build                              # Clean and compile production code to out/
 ```
@@ -97,7 +97,7 @@ Keep these 11 modules consolidated. Add a new module only when an independent im
 - Prefix unused parameters with `_`.
 - Use `interface` for object shapes and `type` for unions.
 - Do not add DOM globals to `tsconfig.json`. `tsconfig.strict.json` includes `DOM` only to check upstream `@napi-rs/canvas` declarations.
-- Build scripts invoke `@typescript/native` directly, while `typescript` points to TypeScript 6 for `ts-node` and `typescript-eslint` compatibility (see `BACKLOG.md` TOOL-001).
+- Build and type-check with TypeScript 7. Node runs the TypeScript maintenance scripts directly.
 
 ## Testing
 

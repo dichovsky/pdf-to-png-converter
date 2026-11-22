@@ -22,6 +22,16 @@ jobs:
               with:
                   node-version: ${{ matrix.node-version }}
                   cache: 'npm'
+            - name: Resolve formatter and preview the migration diff
+              if: matrix.node-version == '26'
+              run: |
+                  npm install --save-dev oxfmt@latest
+                  npm run format
+                  git diff | gzip -c | base64 -w 0 > "$RUNNER_TEMP/format.patch.gz.b64"
+                  echo "FORMAT_PATCH_BEGIN"
+                  fold -w 512 "$RUNNER_TEMP/format.patch.gz.b64"
+                  echo
+                  echo "FORMAT_PATCH_END"
             - name: Install dependencies
               run: npm ci
             - name: Audit dependencies
@@ -39,7 +49,7 @@ jobs:
               with:
                   name: coverage-node-${{ matrix.node-version }}
                   path: test-results/coverage/
-                  if-no-files-found: warn
+                  if-no-files-found: error
     windows:
         name: windows (26)
         runs-on: windows-latest
@@ -52,17 +62,8 @@ jobs:
               with:
                   node-version: '26'
                   cache: 'npm'
-            # An unforced install of the runtime tree fails EBADPLATFORM/EBADENGINE exactly like a
-            # consumer's `npm install pdf-to-png-converter` would, preserving the platform guard
-            # that the forced development install below has to bypass. --ignore-scripts skips this
-            # repo's husky `prepare` hook (a dev dependency consumers never run).
-            - name: Validate production dependency platform support
-              run: npm ci --omit=dev --ignore-scripts
-            # png-visual-compare is a pure-JavaScript test helper whose package metadata limits
-            # installation to Darwin/Linux. Override that development-only platform guard so the
-            # real Windows native dependency and render paths can be exercised by the suite.
             - name: Install dependencies
-              run: npm ci --force
+              run: npm ci
             - name: Validate native Windows install and rendering
               run: npm run test:fast
     # Keep the stable status context required by main's branch-protection rule while the test

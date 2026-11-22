@@ -1,25 +1,35 @@
 {
     "$schema": "https://json.schemastore.org/tsconfig",
-    "_version": "22.0.0",
     "compilerOptions": {
-        "lib": ["ES2024", "ESNext.Array", "ESNext.Collection", "ESNext.Iterator"],
+        "lib": [
+            "ES2024",
+            "ESNext.Array",
+            "ESNext.Collection",
+            "ESNext.Iterator"
+        ],
         "module": "nodenext",
         "target": "ES2024",
-        "types": ["node"],
+        "types": [
+            "node"
+        ],
         "rootDir": ".",
         "strict": true,
         "esModuleInterop": true,
         "skipLibCheck": true,
-        "moduleResolution": "node16",
         "declaration": false,
-        "noEmit": true
-    },
-    "ts-node": {
-        "compilerOptions": {
-            "module": "CommonJS"
+        "noEmit": true,
+        "allowUnreachableCode": false,
+        "allowImportingTsExtensions": true,
+        "paths": {
+            "pdf-to-png-converter": [
+                "./src/index.ts"
+            ]
         }
     },
-    "include": ["./src/**/*", "./__tests__/**/*", "./scripts/**/*"],
-    // benchmark.ts imports the built ../out/index.js, which `npm run clean` deletes before `build:test`.
-    "exclude": ["./scripts/benchmark.ts"]
+    "include": [
+        "src",
+        "__tests__",
+        "scripts",
+        "vitest.config.mts"
+    ]
 }

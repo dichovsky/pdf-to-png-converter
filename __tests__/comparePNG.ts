@@ -1,6 +1,7 @@
 import { existsSync, promises as fsPromises, readFileSync } from 'node:fs';
 import { parse } from 'node:path';
-import { type ComparePngOptions, comparePngAsync } from 'png-visual-compare';
+import pixelmatch from 'pixelmatch';
+import { decodePng } from './decodePng';
 
 /**
  * Compares a PNG image with its golden (expected) PNG image.
@@ -11,17 +12,14 @@ import { type ComparePngOptions, comparePngAsync } from 'png-visual-compare';
  * CI=true), even with UPDATE_GOLDENS=1.
  * @param actualFile - The path or buffer of the actual PNG image.
  * @param expectedFile - The path of the expected (golden) PNG image.
- * @param opts - Optional compare options.
  * @returns A promise that resolves to the comparison result.
  */
 export async function comparePNG({
     actualFile,
     expectedFile,
-    opts,
 }: {
     actualFile: string | Buffer;
     expectedFile: string;
-    opts?: ComparePngOptions;
 }) {
     if (!existsSync(expectedFile)) {
         if (process.env.CI) {
@@ -39,5 +37,12 @@ export async function comparePNG({
         const actualBuffer = typeof actualFile === 'string' ? readFileSync(actualFile) : actualFile;
         await fsPromises.writeFile(expectedFile, actualBuffer);
     }
-    return await comparePngAsync(actualFile, expectedFile, opts);
+    const [actual, expected] = await Promise.all([
+        decodePng(typeof actualFile === 'string' ? await fsPromises.readFile(actualFile) : actualFile),
+        decodePng(await fsPromises.readFile(expectedFile)),
+    ]);
+    if (actual.width !== expected.width || actual.height !== expected.height) {
+        throw new Error(`Golden PNG dimensions differ for ${expectedFile}: expected ${expected.width}x${expected.height}, got ${actual.width}x${actual.height}`);
+    }
+    return pixelmatch(actual.data, expected.data, null, actual.width, actual.height);
 }

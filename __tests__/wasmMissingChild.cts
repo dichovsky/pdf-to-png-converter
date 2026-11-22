@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Child process for the "pdfjs-dist has no wasm folder" test in pdf.to.png.worker.threads.test.ts.
  *
@@ -11,12 +9,14 @@
  * overrides only `pdfjs-dist/package.json` requested by `pdfjsLoader.js` and passes every other resolution to the
  * real function. pdf.js is still imported from the real package.
  *
- * Usage: node wasmMissingChild.cjs <compiled out dir> <fake pdfjs-dist root> <result dir> <codec pdf> <control pdf>
+ * Usage: node wasmMissingChild.cts <compiled out dir> <fake pdfjs-dist root> <result dir> <codec pdf> <control pdf>
  * Writes codec.png, codec-again.png and control.png into <result dir> and prints one JSON line on stdout with the
  * asset directory the loader resolved and every process warning the child saw.
  */
 
-const Module = require('node:module');
+const Module = require('node:module') as {
+    _resolveFilename: (request: string, parent: NodeModule | undefined, ...rest: unknown[]) => string;
+};
 const { writeFileSync } = require('node:fs');
 const { join } = require('node:path');
 
@@ -30,24 +30,24 @@ Module._resolveFilename = function resolveFilenameWithFakePdfjsRoot(request, par
     return realResolveFilename.call(this, request, parent, ...rest);
 };
 
-const warnings = [];
-process.on('warning', (warning) => warnings.push({ name: warning.name, code: warning.code, message: warning.message }));
+const warnings: { name: string; code?: string; message: string }[] = [];
+process.on('warning', (warning) => warnings.push({ name: warning.name, code: (warning as NodeJS.ErrnoException).code, message: warning.message }));
 
-async function main() {
-    const { pdfToPng } = require(join(outDirectory, 'index.js'));
-    const { pdfjsAssetDirectory } = require(join(outDirectory, 'pdfjsLoader.js'));
+async function main(): Promise<void> {
+    const { pdfToPng } = require(join(outDirectory, 'index.js')) as typeof import('../src/index.js');
+    const { pdfjsAssetDirectory } = require(join(outDirectory, 'pdfjsLoader.js')) as typeof import('../src/pdfjsLoader.js');
 
     const wasmDirectory = pdfjsAssetDirectory('wasm');
     const [codec] = await pdfToPng(codecPdf);
     // A second conversion in the same process must not warn again.
     const [codecAgain] = await pdfToPng(codecPdf);
     const [control] = await pdfToPng(controlPdf);
-    writeFileSync(join(resultDirectory, 'codec.png'), codec.content);
-    writeFileSync(join(resultDirectory, 'codec-again.png'), codecAgain.content);
-    writeFileSync(join(resultDirectory, 'control.png'), control.content);
+    writeFileSync(join(resultDirectory, 'codec.png'), codec.content!);
+    writeFileSync(join(resultDirectory, 'codec-again.png'), codecAgain.content!);
+    writeFileSync(join(resultDirectory, 'control.png'), control.content!);
 
     // Warnings are emitted on the next tick; let them reach the 'warning' listener before reporting.
-    await new Promise((resolveTick) => setImmediate(resolveTick));
+    await new Promise<void>((resolveTick) => setImmediate(resolveTick));
     process.stdout.write(`${JSON.stringify({ wasmDirectory, warnings })}\n`);
 }
 

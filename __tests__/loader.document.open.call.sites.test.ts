@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import ts from 'typescript';
+import { parseSync, Visitor } from 'rolldown/utils';
 import { expect, test } from 'vitest';
 
 /**
@@ -23,26 +23,30 @@ interface CallSite {
     caller: string;
 }
 
-function enclosingFunction(node: ts.Node): string {
-    for (let parent = node.parent; parent !== undefined; parent = parent.parent) {
-        if ((ts.isFunctionDeclaration(parent) || ts.isMethodDeclaration(parent)) && parent.name !== undefined) {
-            return parent.name.getText();
-        }
-    }
-    return '<module>';
-}
-
-/** Names the function enclosing each call to `callee` in `sourceText`. Comments and string literals are not calls. */
 function callersOf(callee: string, sourceText: string): string[] {
-    const source = ts.createSourceFile('module.ts', sourceText, ts.ScriptTarget.Latest, true);
+    const parsed = parseSync('module.ts', sourceText);
+    expect(parsed.errors).toEqual([]);
+    const functions: string[] = [];
     const callers: string[] = [];
-    const visit = (node: ts.Node): void => {
-        if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === callee) {
-            callers.push(enclosingFunction(node));
-        }
-        ts.forEachChild(node, visit);
-    };
-    visit(source);
+    new Visitor({
+        FunctionDeclaration(node) {
+            if (node.id) functions.push(node.id.name);
+        },
+        'FunctionDeclaration:exit'(node) {
+            if (node.id) functions.pop();
+        },
+        MethodDefinition(node) {
+            functions.push(sourceText.slice(node.key.start, node.key.end));
+        },
+        'MethodDefinition:exit'() {
+            functions.pop();
+        },
+        CallExpression(node) {
+            if (node.callee.type === 'Identifier' && node.callee.name === callee) {
+                callers.push(functions.at(-1) ?? '<module>');
+            }
+        },
+    }).visit(parsed.program);
     return callers;
 }
 

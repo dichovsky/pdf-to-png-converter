@@ -103,3 +103,5 @@
 - [x] 🟢 🐛 SEC-005 Sec: brand-check byte-container input through the `ArrayBuffer.prototype.byteLength` getter
     - **Impl:** `genuineBufferByteLength()` in `src/pdfInput.ts` reads the size through the cached `ArrayBuffer` and `SharedArrayBuffer` prototype getters, which throw for any other receiver; the cross-realm branch copies only when the getter succeeds, applies `maxInputBytes` to that real size, and lets an object that only forges the tag fall through to `Unsupported buffer type`
     - **Rat:** `{ length: n, [Symbol.toStringTag]: 'ArrayBuffer' }` passed the tag check and reached an O(n) copy past the `maxInputBytes` cap (2^26 elements got past a 1 KiB cap); JSON cannot set symbol keys, so only in-process objects could trigger it, but the cross-realm `SharedArrayBuffer` tag added next to the `ArrayBuffer` tag widened it. A Proxy around a real Array that lies about its `length` is not covered; it is equally in-process only and costs no more than passing a large real Array
+
+- TOOL-001 — Unified builds, type checks, and maintenance scripts on TypeScript 7.

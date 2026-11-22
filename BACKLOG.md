@@ -2,12 +2,6 @@
 
 > **Agent Rules:** Keep descriptions brief. When a task is complete, remove it from this file and append it to `BACKLOG-ARCHIVE.md`.
 
-## 🔧 Tooling
-
-- [ ] 🟢 🔧 TOOL-001 Toolchain: unify on a single `typescript@7.x` dependency
-    - Remove the `@typescript/typescript6` alias and `@typescript/native` after TypeScript 7.1 ships a stable compiler API and `typescript-eslint` supports TypeScript 7.
-    - Gate on: `ts-node` scripts, ESLint, and the full test suite passing with one `typescript` dependency.
-
 ## ⚙️ ARCH / Core
 
 - [ ] 🟢 🐛 ARCH-017 Core: serve pdf.js binary data through a `BinaryDataFactory`

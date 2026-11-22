@@ -157,7 +157,7 @@ export function assertValidPdfToPngOptions(props: PdfToPngOptions | undefined): 
 
 /** Ordered map with bounded concurrency, deterministic errors, and in-flight draining. */
 async function mapLimitOrdered<T, R>(items: T[], limit: number, map: (item: T, index: number) => Promise<R>): Promise<R[]> {
-    const results = new Array<R>(items.length);
+    const results: R[] = [];
     const errorsByIndex = new Map<number, unknown>();
     let nextIndex = 0;
 
@@ -336,7 +336,7 @@ export async function pdfToPng(pdfFile: string | ArrayBufferLike | Uint8Array, p
                 pdfFilePassword: options.pdfFilePassword,
                 verbosityLevel: options.verbosityLevel,
             };
-            const results = new Array<PngPageOutput>(tasks.length);
+            const results: PngPageOutput[] = [];
             await renderPagesInWorkerPool(
                 workerPdfBytes,
                 renderOptions,

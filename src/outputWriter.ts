@@ -8,7 +8,7 @@ import { MAX_FILENAME_LENGTH } from './const.js';
 // character, including when it comes from a PDF basename.
 const IS_WINDOWS_PATH = sep === '\\';
 const PATH_SEPARATOR_PATTERN = IS_WINDOWS_PATH ? /[\\/]/ : /\//;
-// eslint-disable-next-line no-control-regex -- Windows forbids U+0000-U+001F in filenames.
+// oxlint-disable-next-line no-control-regex -- Windows forbids U+0000-U+001F in filenames.
 const WINDOWS_INVALID_FILENAME_CHARACTER_PATTERN = /[<>:"|?*\u0000-\u001f]/u;
 const WINDOWS_RESERVED_DEVICE_BASENAME_PATTERN = /^(?:con|prn|aux|nul|com[1-9¹²³]|lpt[1-9¹²³]|conin\$|conout\$)$/iu;
 

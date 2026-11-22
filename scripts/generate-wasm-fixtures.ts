@@ -5,10 +5,10 @@
  * located through the `wasmUrl` document parameter. When that parameter is missing, pdf.js logs a warning (only at
  * verbosity >= 1) and paints the image blank. These fixtures prove the images decode.
  *
- *   npx ts-node scripts/generate-wasm-fixtures.ts                  write test-data/wasm/*.pdf
- *   npx ts-node scripts/generate-wasm-fixtures.ts --check          regenerate in memory, exit 1 if any committed file differs
- *   npx ts-node scripts/generate-wasm-fixtures.ts --self-test      run the encoder/decoder property tests, write nothing
- *   npx ts-node scripts/generate-wasm-fixtures.ts --dir <folder>   use another output folder (default: test-data/wasm)
+ *   node scripts/generate-wasm-fixtures.ts                  write test-data/wasm/*.pdf
+ *   node scripts/generate-wasm-fixtures.ts --check          regenerate in memory, exit 1 if any committed file differs
+ *   node scripts/generate-wasm-fixtures.ts --self-test      run the encoder/decoder property tests, write nothing
+ *   node scripts/generate-wasm-fixtures.ts --dir <folder>   use another output folder (default: test-data/wasm)
  *
  * Every file is built by hand from Node built-ins only (no downloads, no third-party scan data, so there is no
  * licensing question). Output is deterministic: no timestamps, no ids, seeded pseudo-random pictures, integer-only
@@ -64,7 +64,7 @@ import { inflateSync } from 'node:zlib';
 // Public surface
 // ---------------------------------------------------------------------------------------------------------------------
 
-export const FIXTURE_DIRECTORY: string = join(__dirname, '..', 'test-data', 'wasm');
+export const FIXTURE_DIRECTORY: string = join(import.meta.dirname, '..', 'test-data', 'wasm');
 
 /** One generated file: a name relative to the fixture directory and its exact bytes. */
 export interface FixtureFile {
@@ -237,7 +237,7 @@ function leftHalfBlack(width: number, height: number): Bitmap {
 // CCITT: ITU-T T.4 / T.6 code tables (typed twice independently and compared; see the CAVEAT in the header)
 // ---------------------------------------------------------------------------------------------------------------------
 
-// prettier-ignore
+// oxfmt-ignore
 const WHITE_TERMINATING: readonly string[] = [
     '00110101', '000111', '0111', '1000', '1011', '1100', '1110', '1111', '10011', '10100', '00111', '01000', '001000', '000011',
     '110100', '110101', '101010', '101011', '0100111', '0001100', '0001000', '0010111', '0000011', '0000100', '0101000', '0101011',
@@ -247,7 +247,7 @@ const WHITE_TERMINATING: readonly string[] = [
     '01001010', '01001011', '00110010', '00110011', '00110100',
 ];
 
-// prettier-ignore
+// oxfmt-ignore
 const BLACK_TERMINATING: readonly string[] = [
     '0000110111', '010', '11', '10', '011', '0011', '0010', '00011', '000101', '000100', '0000100', '0000101', '0000111', '00000100',
     '00000111', '000011000', '0000010111', '0000011000', '0000001000', '00001100111', '00001101000', '00001101100', '00000110111',
@@ -260,14 +260,14 @@ const BLACK_TERMINATING: readonly string[] = [
 ];
 
 /** Make-up codes for run lengths 64, 128, ... 1728. */
-// prettier-ignore
+// oxfmt-ignore
 const WHITE_MAKEUP: readonly string[] = [
     '11011', '10010', '010111', '0110111', '00110110', '00110111', '01100100', '01100101', '01101000', '01100111', '011001100',
     '011001101', '011010010', '011010011', '011010100', '011010101', '011010110', '011010111', '011011000', '011011001', '011011010',
     '011011011', '010011000', '010011001', '010011010', '011000', '010011011',
 ];
 
-// prettier-ignore
+// oxfmt-ignore
 const BLACK_MAKEUP: readonly string[] = [
     '0000001111', '000011001000', '000011001001', '000001011011', '000000110011', '000000110100', '000000110101', '0000001101100',
     '0000001101101', '0000001001010', '0000001001011', '0000001001100', '0000001001101', '0000001110010', '0000001110011',
@@ -276,7 +276,7 @@ const BLACK_MAKEUP: readonly string[] = [
 ];
 
 /** Make-up codes shared by both colours for run lengths 1792, 1856, ... 2560. */
-// prettier-ignore
+// oxfmt-ignore
 const EXTENDED_MAKEUP: readonly string[] = [
     '00000001000', '00000001100', '00000001101', '000000010010', '000000010011', '000000010100', '000000010101', '000000010110',
     '000000010111', '000000011100', '000000011101', '000000011110', '000000011111',
@@ -490,7 +490,11 @@ function encodeG3OneDimensional(bitmap: Bitmap): Uint8Array {
 class BitReader {
     public position = 0;
 
-    constructor(private readonly bytes: Uint8Array) {}
+    private readonly bytes: Uint8Array;
+
+    constructor(bytes: Uint8Array) {
+        this.bytes = bytes;
+    }
 
     public readBit(): number {
         if (this.position >= this.bytes.length * 8) {
@@ -681,7 +685,7 @@ function jbig2Mmr(bitmap: Bitmap): Uint8Array {
 }
 
 // MQ arithmetic coder (T.88 Annex E, the same coder as JPEG 2000). Rows: Qe, next state on MPS, next state on LPS, switch MPS.
-// prettier-ignore
+// oxfmt-ignore
 const QE_TABLE: ReadonlyArray<readonly [number, number, number, number]> = [
     [0x5601, 1, 1, 1], [0x3401, 2, 6, 0], [0x1801, 3, 9, 0], [0x0ac1, 4, 12, 0], [0x0521, 5, 29, 0], [0x0221, 38, 33, 0],
     [0x5601, 7, 6, 1], [0x5401, 8, 14, 0], [0x4801, 9, 14, 0], [0x3801, 10, 14, 0], [0x3001, 11, 17, 0], [0x2401, 12, 18, 0],
@@ -796,7 +800,10 @@ class MqDecoder {
     private readonly state = new Uint8Array(CONTEXT_COUNT);
     private readonly mps = new Uint8Array(CONTEXT_COUNT);
 
-    constructor(private readonly data: Uint8Array) {
+    private readonly data: Uint8Array;
+
+    constructor(data: Uint8Array) {
+        this.data = data;
         this.chigh = data[0];
         this.byteIn();
         this.chigh = ((this.chigh << 7) & 0xffff) | ((this.clow >> 9) & 0x7f);
@@ -889,7 +896,7 @@ function genericContext(ink: Uint8Array, width: number, x: number, y: number): n
         const row = y + dy;
         return column < 0 || column >= width || row < 0 ? 0 : ink[row * width + column];
     };
-    // prettier-ignore
+    // oxfmt-ignore
     const neighbours: ReadonlyArray<readonly [number, number]> = [
         [-1, 0], [-2, 0], [-3, 0], [-4, 0],
         [3, -1], [2, -1], [1, -1], [0, -1], [-1, -1], [-2, -1], [-3, -1],
@@ -984,17 +991,17 @@ function decodeJbig2(stream: Uint8Array): Bitmap {
 // Flate: built-in fixed-Huffman deflate (greedy LZ77, nearest-longest match) so the bytes never depend on the zlib build
 // ---------------------------------------------------------------------------------------------------------------------
 
-// prettier-ignore
+// oxfmt-ignore
 const LENGTH_BASE: readonly number[] = [
     3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31, 35, 43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258,
 ];
-// prettier-ignore
+// oxfmt-ignore
 const LENGTH_EXTRA_BITS: readonly number[] = [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0];
-// prettier-ignore
+// oxfmt-ignore
 const DISTANCE_BASE: readonly number[] = [
     1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193, 257, 385, 513, 769, 1025, 1537, 2049, 3073, 4097, 6145, 8193, 12289, 16385, 24577,
  ];
-// prettier-ignore
+// oxfmt-ignore
 const DISTANCE_EXTRA_BITS: readonly number[] = [
     0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13,
 ];
@@ -1642,7 +1649,7 @@ function main(): number {
             console.error(problem);
         }
         if (problems.length > 0) {
-            console.error('Run "npx ts-node scripts/generate-wasm-fixtures.ts" and commit the result.');
+            console.error('Run "node scripts/generate-wasm-fixtures.ts" and commit the result.');
             return 1;
         }
         console.log(`${options.directory} matches the generator output`);
@@ -1656,7 +1663,7 @@ function main(): number {
     return 0;
 }
 
-if (require.main === module) {
+if (process.argv[1] === import.meta.filename) {
     try {
         process.exitCode = main();
     } catch (error) {

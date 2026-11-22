@@ -12,8 +12,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 ### Changed
 
 - Raised the minimum Node.js runtime version to `>=24` (removed Node.js 22 support). Migrated the contributor toolchain (`.nvmrc`, `Dockerfile`, and Windows CI) to Node.js 26, and updated the Ubuntu CI test matrix to Node.js 24 and 26.
-- Updated `pdfjs-dist` to `~6.5.438` and `@napi-rs/canvas` to `~1.1.0`. Added the two QuickJS license files from `pdfjs-dist` 6.5.438 to the WebAssembly asset check.
-- Updated devDependencies to Vitest and `@vitest/coverage-v8` 5.1.0, ESLint 10.14.0, typescript-eslint 8.72.2, `@types/node` 26.6.6, and rimraf 6.1.4. Pinned npm 12.2.2 in the publish workflow and added `overrides` for `glob` (`^14.0.4`) and `minimatch` (`^11.0.6`) to resolve moderate audit advisories in development dependencies.
+- Updated `pdfjs-dist` to `~6.5.438` and `@napi-rs/canvas` to `~1.1.1`. Added the two QuickJS license files from `pdfjs-dist` 6.5.438 to the WebAssembly asset check.
+- Moved all maintained code to TypeScript 7. Node runs maintenance scripts directly. Oxlint checks types and Oxfmt formats source and documentation. Windows CI now installs without forcing platform compatibility. Updated Vitest and its coverage provider to 5.1.1. Pinned npm 12.2.3 in the publish workflow.
 - Rewrote project documentation in Simplified Technical English (ASD-STE100).
 
 ### Fixed

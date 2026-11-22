@@ -5,7 +5,10 @@
         "outDir": "./out",
         "noEmit": false,
         "declaration": true,
-        "incremental": false
+        "incremental": false,
+        "allowImportingTsExtensions": false
     },
-    "include": ["./src/**/*"]
+    "include": [
+        "./src/**/*"
+    ]
 }
