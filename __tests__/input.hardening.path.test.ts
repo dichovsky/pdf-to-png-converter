@@ -119,9 +119,11 @@ test.skipIf(process.platform === 'win32')('preserves symlink traversal before a 
 test.skipIf(process.platform !== 'win32')('anchors drive-relative and current-drive-rooted paths on Windows', async () => {
     const drive = parse(process.cwd()).root.slice(0, 2);
     const missing = `missing-${randomUUID()}.pdf`;
+    const asyncOpen = vi.spyOn(fsPromises, 'open');
     for (const input of [`${drive}${missing}`, `${sep}${missing}`]) {
         await expect(getPdfFileBuffer(input, MAX_INPUT_BYTES)).rejects.toMatchObject({ code: 'ENOENT', path: input });
     }
+    expect(asyncOpen).not.toHaveBeenCalled();
 });
 
 test('missing relative input errors use the caller-supplied path', async () => {
@@ -155,11 +157,11 @@ test.skipIf(process.platform === 'win32')('reads from a renamed cwd even when it
 test.skipIf(process.platform === 'win32')('reads a short relative path from a cwd deeper than the OS absolute path limit', async () => {
     const original = process.cwd();
     const base = await fsPromises.mkdtemp(join(tmpdir(), 'pdf-input-depth-'));
-    const segment = 'd'.repeat(200);
+    const segment = 'd'.repeat(64);
     let depth = 0;
     try {
         process.chdir(base);
-        while (depth < 22) {
+        while (depth < 66) {
             mkdirSync(segment);
             process.chdir(segment);
             depth++;

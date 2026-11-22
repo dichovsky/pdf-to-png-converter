@@ -1,7 +1,7 @@
 import { close, constants as fsConstants, fstat, openSync, promises as fsPromises, read } from 'node:fs';
 import type { Stats } from 'node:fs';
 import { isAbsolute, parse, sep } from 'node:path';
-import { promisify } from 'node:util';
+import { getSystemErrorMessage, promisify } from 'node:util';
 import { FILE_READ_MAX_CHUNK_BYTES, MAX_INPUT_PATH_LENGTH } from './const.js';
 
 const readDescriptor = promisify(read);
@@ -106,7 +106,22 @@ async function openInputFile(path: string): Promise<InputFile> {
 
     // Bind the relative name to its file before the caller can change directories. The OS resolves it directly,
     // including when the working directory has been renamed or its absolute path exceeds the platform limit.
-    const fd = openSync(path, flags);
+    let fd: number;
+    try {
+        fd = openSync(path, flags);
+    } catch (error) {
+        // Windows expands relative paths in native openSync errors. Keep caller-visible diagnostics relative.
+        const failure = error as NodeJS.ErrnoException;
+        if (failure.path !== undefined && failure.path !== path && typeof failure.errno === 'number') {
+            throw Object.assign(new Error(`${failure.code}: ${getSystemErrorMessage(failure.errno)}, open '${path}'`), {
+                code: failure.code,
+                errno: failure.errno,
+                syscall: failure.syscall,
+                path,
+            });
+        }
+        throw error;
+    }
     return {
         stat: () => statDescriptor(fd),
         read: (buffer, offset, length, position) => readDescriptor(fd, buffer, offset, length, position),
