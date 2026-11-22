@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { promises as fsPromises } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, parse, resolve, sep } from 'node:path';
 import { afterEach, expect, test, vi } from 'vitest';
 import { MAX_INPUT_BYTES } from '../src/const';
 import { getPdfFileBuffer } from '../src/pdfInput';
@@ -47,7 +47,7 @@ test('rejects a string one character over the limit', async () => {
 });
 
 test('still treats a string of exactly the limit as a path and passes the filesystem error through unchanged', async () => {
-    const path = '/'.padEnd(MAX_PATH_CHARS, 'a');
+    const path = parse(tmpdir()).root.padEnd(MAX_PATH_CHARS, 'a');
     const failure = Object.assign(new Error('ENOENT: no such file or directory'), { code: 'ENOENT' });
     const open = vi.spyOn(fsPromises, 'open').mockRejectedValueOnce(failure);
 
@@ -69,4 +69,60 @@ test('pdfToPng rejects an over-long string with the same short message', async (
 
     expect(error.message).toMatch(/Input PDF path is too long/);
     expect(error.message.length).toBeLessThan(200);
+});
+
+test('opens the PDF relative to the working directory at the time of the call', async () => {
+    const original = process.cwd();
+    const folder = await fsPromises.mkdtemp(join(tmpdir(), 'pdf-input-cwd-'));
+    const other = join(folder, 'other');
+    const open = fsPromises.open;
+    try {
+        await fsPromises.mkdir(other);
+        await fsPromises.copyFile(join(original, 'test-data', 'sample.pdf'), join(folder, 'report.pdf'));
+        await fsPromises.copyFile(join(original, 'test-data', '10-page-sample.pdf'), join(other, 'report.pdf'));
+        // Let the caller change directories before the filesystem consumes the submitted path.
+        vi.spyOn(fsPromises, 'open').mockImplementation(async (...args) => {
+            await Promise.resolve();
+            return open(...args);
+        });
+        process.chdir(folder);
+        const conversion = pdfToPng('report.pdf', { returnMetadataOnly: true });
+        process.chdir(other);
+        const pages = await conversion;
+        expect(pages.map((page) => page.name)).toEqual(['report_page_1.png', 'report_page_2.png']);
+    } finally {
+        process.chdir(original);
+        await fsPromises.rm(folder, { recursive: true, force: true });
+    }
+});
+
+test('preserves empty input and trailing separators for the filesystem', async () => {
+    await expect(getPdfFileBuffer('', MAX_INPUT_BYTES)).rejects.toMatchObject({ code: 'ENOENT' });
+    await expect(getPdfFileBuffer(`test-data${sep}sample.pdf${sep}`, MAX_INPUT_BYTES)).rejects.toThrow();
+});
+
+test.skipIf(process.platform === 'win32')('preserves symlink traversal before a parent component', async () => {
+    const original = process.cwd();
+    const folder = await fsPromises.mkdtemp(join(tmpdir(), 'pdf-input-symlink-'));
+    try {
+        await fsPromises.mkdir(join(folder, 'target', 'nested'), { recursive: true });
+        await fsPromises.symlink(join(folder, 'target', 'nested'), join(folder, 'link'));
+        await fsPromises.writeFile(join(folder, 'target', 'report.pdf'), 'expected');
+        process.chdir(folder);
+        const bytes = await getPdfFileBuffer('link/../report.pdf', MAX_INPUT_BYTES);
+        expect(Buffer.from(bytes).toString()).toBe('expected');
+    } finally {
+        process.chdir(original);
+        await fsPromises.rm(folder, { recursive: true, force: true });
+    }
+});
+
+test.skipIf(process.platform !== 'win32')('anchors drive-relative and current-drive-rooted paths on Windows', async () => {
+    const drive = parse(process.cwd()).root.slice(0, 2);
+    const failure = Object.assign(new Error('missing'), { code: 'ENOENT' });
+    const open = vi.spyOn(fsPromises, 'open').mockRejectedValue(failure);
+    for (const input of [`${drive}report.pdf`, `${sep}report.pdf`]) {
+        await expect(getPdfFileBuffer(input, MAX_INPUT_BYTES)).rejects.toBe(failure);
+        expect(open).toHaveBeenLastCalledWith(resolve(input), expect.any(Number));
+    }
 });

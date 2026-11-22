@@ -1,4 +1,5 @@
 import type { FileHandle } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import { afterEach, expect, test, vi } from 'vitest';
 import { getPdfFileBuffer } from '../src/pdfInput';
 
@@ -89,10 +90,11 @@ test('grows an initially empty read buffer when the file grows after fstat', asy
 test('path input validates and reads through exactly one opened handle', async () => {
     const file = mockFile(Buffer.from([1, 2, 3]));
 
-    await getPdfFileBuffer('/fake/file.pdf', 1024);
+    const path = resolve('fake', 'file.pdf');
+    await getPdfFileBuffer(path, 1024);
 
     expect(openMock).toHaveBeenCalledOnce();
-    expect(openMock).toHaveBeenCalledWith('/fake/file.pdf', fsConstants.O_RDONLY | fsConstants.O_NONBLOCK);
+    expect(openMock).toHaveBeenCalledWith(path, fsConstants.O_RDONLY | fsConstants.O_NONBLOCK);
     expect(file.stat).toHaveBeenCalledOnce();
     expect(file.read).toHaveBeenCalled();
     expect(file.close).toHaveBeenCalledOnce();

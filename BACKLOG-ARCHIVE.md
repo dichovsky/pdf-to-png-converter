@@ -52,6 +52,9 @@
 - [x] 🟡 ♻️ ARCH-010 Core: evolve OutputSink to drop sentinel + NullSink (with ARCH-009)
     - **Impl:** deleted `src/nullSink.ts`; the in-memory case is now `PageMode.kind === 'content'` with no sink at all, so a sink exists only in `file` mode and always writes — `OutputSink.write` stays `Promise<string>` (no interface change), `FilesystemSink` kept as the sole adapter
     - **Rat:** `NullSink` existed only to return the `''` sentinel for the no-write path; once the mode is explicit (ARCH-009) that path carries no sink, so the stub adapter is dead. Deliberately did NOT adopt the backlog's literal `write() → Promise<string | undefined>` — that would re-introduce a sentinel-shaped "nothing written" signal and undercut ARCH-009; `Promise<string>` honors the intent (1 real adapter, sentinel gone)
+- [x] 🟢 🐛 ARCH-021 Core: anchor relative PDF inputs and handle filesystem path limits
+    - **Impl:** Capture the input directory before asynchronous I/O. Preserve native output path errors and add guidance for a filesystem length rejection.
+    - **Rat:** A working-directory change could select a different PDF. The destination filesystem determines its filename and full-path limits.
 
 ## 🧱 TYPE / Public API
 

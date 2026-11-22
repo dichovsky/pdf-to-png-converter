@@ -185,7 +185,12 @@ export async function savePNGfile(name: string, content: Buffer, folder: OutputF
         throw new Error(`Output folder was modified during write: ${resolvedOutputFolder}`);
     }
 
-    const fd = await fsPromises.open(resolvedFilePath, 'wx');
+    const fd = await fsPromises.open(resolvedFilePath, 'wx').catch((error: unknown) => {
+        if (error instanceof Error && 'code' in error && error.code === 'ENAMETOOLONG') {
+            error.message += ' Shorten the output filename or its parent directory path.';
+        }
+        throw error;
+    });
     let created: BigIntStats | undefined;
     try {
         created = await fd.stat({ bigint: true });
