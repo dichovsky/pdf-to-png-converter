@@ -95,6 +95,66 @@ Do not bypass `build:strict` failures with `continue-on-error` in CI workflows o
 - **Accessibility:** Add explicit `public` or `private` modifiers to class members (omit `public` on constructors).
 - **Pre-commit hook:** `npm ci` installs a Husky pre-commit hook that runs `lint-staged`. It runs ESLint (`--max-warnings 0`) and Prettier on staged TypeScript files in `src/`, `__tests__/`, and `scripts/`. It also runs Prettier on staged `js`, `mjs`, `cjs`, `json`, `md`, `yml`, `yaml`, and `.prettierrc` files.
 
+## Writing documentation
+
+Write repository prose with the writing rules of [ASD-STE100 Simplified Technical English, Issue 9 (January 2025)](https://www.asd-ste100.org/assets/files/ASD-STE100_ISSUE9.pdf). Part 1 of the standard gives the writing rules. Part 2 gives the dictionary. The standard is copyrighted by ASD. Do not copy dictionary entries into this repository.
+
+**Scope:** `README.md`, `CONTRIBUTING.md`, `SECURITY.md`, `docs/ARCHITECTURE.md`, `BACKLOG.md`, and the public JSDoc in `src/types.ts`.
+
+**Not in scope:** `CHANGELOG.md`, `BACKLOG-ARCHIVE.md`, and `RELEASE_PLAN.md` (historical records), `LICENSE` (legal text), agent instruction files (`CLAUDE.md`, `.github/copilot-instructions.md`, and the Agent Rules note in `BACKLOG.md`), and runtime strings (error messages, CLI help and output, and process warnings). Tests and users depend on the exact runtime strings.
+
+### Rules
+
+- Write a maximum of 20 words in a procedural sentence and 25 words in a descriptive sentence.
+- Write one topic in each paragraph, with a maximum of 6 sentences.
+- Write instructions in the imperative. Write one instruction in each sentence, unless the actions occur at the same time.
+- Use the active voice in procedures. Use the active voice as much as possible in descriptions.
+- Keep the articles (`the`, `a`, `an`). Do not use a telegraphic style.
+- Use vertical lists for sequences, conditions, and alternatives.
+- Keep instructions separate from descriptive text.
+- Start a warning with a short command. Then give the reason. Do not make the hazard weaker.
+- Use one word for one meaning, and one word for one concept.
+- Do not use idioms. Do not use a phrasal verb when a single verb has the same meaning.
+- Do not use `it`, `this`, or `that` when the noun is not clear.
+- Before you change a word, find its entry in Part 2 of the standard. Use the approved alternative that keeps the meaning.
+
+### Terminology
+
+STE Rules 1.5 and 1.12 let you use technical nouns and technical verbs that the dictionary does not contain. This project uses the terms in this table. Keep these terms. Do not use the "Do not use" terms for the same concept.
+
+| Term                           | Category       | Meaning                                                                        | Do not use                                |
+| ------------------------------ | -------------- | ------------------------------------------------------------------------------ | ----------------------------------------- |
+| `pdf-to-png-converter`         | Product name   | This package and its CLI                                                       | the tool, the converter                   |
+| pdf.js, `pdfjs-dist`           | Product name   | The PDF engine (pdf.js) and its npm package (`pdfjs-dist`)                     | PDF.js, pdfjs                             |
+| `@napi-rs/canvas`              | Product name   | The native canvas package                                                      | napi canvas                               |
+| render                         | Technical verb | Draw a PDF page into a canvas                                                  | paint, draw (for pages)                   |
+| convert, conversion            | Technical verb | Make PNG output or metadata from a PDF (one `pdfToPng()` call)                 | transform, export                         |
+| encode                         | Technical verb | Make PNG bytes from a canvas                                                   | compress, serialize                       |
+| decode                         | Technical verb | Make pixels from an embedded image                                             | unpack                                    |
+| run                            | Technical verb | Start and execute a command, test, script, or workflow                         | operate, launch                           |
+| return, throw, reject, resolve | Technical verb | JavaScript function and promise results                                        | give back, raise                          |
+| validate, check, verify        | Technical verb | Test a value or state against a rule                                           | ensure, confirm                           |
+| load                           | Technical verb | Read a module, document, or worker entry into memory                           | import (except for the `import()` syntax) |
+| emit                           | Technical verb | Send a Node.js process warning                                                 | raise, fire                               |
+| pass                           | Technical verb | Give an argument, option, or flag to a function or command                     | supply (for arguments)                    |
+| page                           | Technical noun | One page of the PDF document                                                   | sheet                                     |
+| option                         | Technical noun | A property of `PdfToPngOptions`                                                | setting, parameter (for options)          |
+| flag                           | Technical noun | A CLI argument that starts with `--`                                           | switch                                    |
+| main thread, worker thread     | Technical noun | The Node.js thread that calls `pdfToPng()`, and a `node:worker_threads` thread | background thread                         |
+| process                        | Technical noun | An operating-system process                                                    | program                                   |
+| metadata                       | Technical noun | Page number, name, width, height, and rotation without image data              | info, details                             |
+| golden PNG                     | Technical noun | A committed reference image for visual tests                                   | snapshot, baseline                        |
+| should, may, never, must       | Exception      | Requirement strength. Keep these words as written                              | (no replacement)                          |
+
+### Validate your changes
+
+1. Run `npm run format:check`.
+2. Run `npm run lint` and `npm run build:test` if you changed JSDoc.
+3. Run the tests that pin documented values. Example: `npx vitest run __tests__/pdf.to.png.options.validation.test.ts` pins the `Default:` values in `src/types.ts`.
+4. Read the full diff. Make sure that no limit, default, condition, warning, or requirement word changed.
+
+Sentence-length and word-list checks help the review. They do not prove that the text obeys the standard.
+
 ## Commit Messages
 
 Use [Conventional Commits](https://www.conventionalcommits.org/):
