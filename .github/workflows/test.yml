@@ -52,8 +52,11 @@ jobs:
               with:
                   node-version: '26'
                   cache: 'npm'
-            - name: Install dependencies
-              run: npm ci
+            - name: Check the production install on Windows
+              run: npm ci --omit=dev --ignore-scripts --engine-strict
+            # The visual test dependency declares only Darwin and Linux.
+            - name: Install development dependencies on Windows
+              run: npm ci --force
             - name: Validate native Windows install and rendering
               run: npm run test:fast
     # Keep the stable status context required by main's branch-protection rule while the test

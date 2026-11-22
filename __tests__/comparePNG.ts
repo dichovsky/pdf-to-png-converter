@@ -1,7 +1,9 @@
 import { existsSync, promises as fsPromises } from 'node:fs';
 import { dirname, join } from 'node:path';
-import pixelmatch from 'pixelmatch';
-import { PNG } from 'pngjs';
+import { comparePng } from 'png-visual-compare';
+import { MAX_CANVAS_PIXELS, MAX_CANVAS_SIDE } from '../src/const.js';
+
+const compareOptions = { maxDimension: MAX_CANVAS_SIDE, maxPixels: MAX_CANVAS_PIXELS };
 
 /**
  * Compares a PNG image with its golden (expected) PNG image.
@@ -29,8 +31,9 @@ export async function comparePNG({ actualFile, expectedFile }: { actualFile: str
         }
     }
     const actualBytes = typeof actualFile === 'string' ? await fsPromises.readFile(actualFile) : actualFile;
-    const actual = PNG.sync.read(actualBytes);
     if (missingGolden) {
+        // Validate the entire PNG before publishing it as a new reference image.
+        comparePng(actualBytes, actualBytes, compareOptions);
         const directory = dirname(expectedFile);
         await fsPromises.mkdir(directory, { recursive: true });
         const staging = await fsPromises.mkdtemp(join(directory, '.golden-'));
@@ -47,11 +50,16 @@ export async function comparePNG({ actualFile, expectedFile }: { actualFile: str
             await fsPromises.rm(staging, { recursive: true, force: true });
         }
     }
-    const expected = PNG.sync.read(await fsPromises.readFile(expectedFile));
-    if (actual.width !== expected.width || actual.height !== expected.height) {
+    const expectedBytes = await fsPromises.readFile(expectedFile);
+    // The comparator pads different-sized images. Goldens require identical IHDR dimensions.
+    const actualWidth = actualBytes.readUInt32BE(16);
+    const actualHeight = actualBytes.readUInt32BE(20);
+    const expectedWidth = expectedBytes.readUInt32BE(16);
+    const expectedHeight = expectedBytes.readUInt32BE(20);
+    if (actualWidth !== expectedWidth || actualHeight !== expectedHeight) {
         throw new Error(
-            `Golden PNG dimensions differ for ${expectedFile}: expected ${expected.width}x${expected.height}, got ${actual.width}x${actual.height}`,
+            `Golden PNG dimensions differ for ${expectedFile}: expected ${expectedWidth}x${expectedHeight}, got ${actualWidth}x${actualHeight}`,
         );
     }
-    return pixelmatch(actual.data, expected.data, undefined, actual.width, actual.height);
+    return comparePng(actualBytes, expectedBytes, compareOptions);
 }
