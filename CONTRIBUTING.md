@@ -43,7 +43,7 @@ UPDATE_GOLDENS=1 npx vitest run __tests__/<filename>.test.ts
 
 Review the new image and commit it. The helper refuses `UPDATE_GOLDENS=1` when `CI` is set, and it never overwrites an existing golden file. To replace an existing golden PNG, delete the file first, run the test with `UPDATE_GOLDENS=1`, review the image, and commit it.
 
-The visual tests allow fewer than `RELAXED_COMPARE_DIFFERENCE_THRESHOLD` (6) different pixels (`__tests__/test-data-constants.ts`). This tolerance handles small platform rendering differences. The Ubuntu CI jobs verify that golden files match on Linux. The Ubuntu CI jobs also fail if a test run adds or modifies any file in `test-data/`.
+The visual tests accept less than `RELAXED_COMPARE_DIFFERENCE_THRESHOLD` (6) different pixels (`__tests__/test-data-constants.ts`). This tolerance handles small platform rendering differences. The Ubuntu CI jobs verify that golden files match on Linux. The Ubuntu CI jobs also fail if a test run adds or modifies any file in `test-data/`.
 
 ## Strict type-check
 
@@ -59,7 +59,7 @@ If an upstream type causes a `build:strict` error, add a suppression comment on 
 
 When an upstream update fixes the type, `tsc` reports the unused `@ts-expect-error` directive so you can remove it.
 
-**When to use `@ts-ignore` instead:** `@ts-expect-error` fails if no type error occurs. Some upstream type errors appear only when `skipLibCheck` is `false` (`build:strict`) and disappear when `skipLibCheck` is `true` (`build:test`). In that case, `@ts-expect-error` breaks `build:test`. Use these two lines instead:
+**When to use `@ts-ignore`:** `@ts-expect-error` fails if no type error occurs. Some upstream type errors occur only when `skipLibCheck` is `false` (`build:strict`). They do not occur when `skipLibCheck` is `true` (`build:test`). In that condition, `@ts-expect-error` breaks `build:test`. As an alternative, use these two lines:
 
 ```ts
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -72,9 +72,9 @@ Do not bypass `build:strict` failures with `continue-on-error` in CI workflows o
 
 ## pdf.js dependency upgrades
 
-`pdfjs-dist` provides both TypeScript declarations and the rendering engine. Follow these steps when you upgrade `pdfjs-dist`:
+`pdfjs-dist` supplies the TypeScript declarations and the rendering engine. Follow these steps when you upgrade `pdfjs-dist`:
 
-- Check `__tests__/pdfjs.assets.test.ts`. This test compares the installed `cmaps`, `standard_fonts`, and `wasm` directory contents, plus the top-level `pdfjs-dist` directories, against `__tests__/test-data-constants.ts`. Review the upstream package diff before you update those lists. Inspect every top-level folder in `pdfjs-dist`, not only `cmaps`, `standard_fonts`, and `wasm` (issue #278 occurred because `wasm` was missed). The `iccs` folder is intentionally omitted because pdf.js disables ICC WebAssembly in Node.js and never reads that folder. The loader always resolves asset folders from the installed `pdfjs-dist` package, never from the working directory.
+- Check `__tests__/pdfjs.assets.test.ts`. This test compares the installed `cmaps`, `standard_fonts`, and `wasm` directory contents, plus the top-level `pdfjs-dist` directories, against `__tests__/test-data-constants.ts`. Review the upstream package diff before you update those lists. Inspect all top-level folders in `pdfjs-dist`, not only `cmaps`, `standard_fonts`, and `wasm` (issue #278 occurred because `wasm` was missed). The `iccs` folder is intentionally omitted because pdf.js disables ICC WebAssembly in Node.js and never reads that folder. The loader always resolves asset folders from the installed `pdfjs-dist` package, never from the working directory.
 - Run the visual-comparison tests against the existing golden PNGs in `test-data/`. Do not create or replace golden files only to make an upgrade pass. If an upstream rendering change is intentional, delete the affected golden file, regenerate it with `UPDATE_GOLDENS=1`, review the image, and commit it.
 - Run the worker-thread integration tests in `__tests__/pdf.to.png.worker.threads.test.ts`. Worker threads and the main thread produce identical PNG bytes. These tests use spies on `renderPagesInWorkerPool` and `renderPdfPage` (through the `pdfToPngInWorkers()` helper) to verify that the worker pool ran.
 - Run a clean install and execute these verification commands:
@@ -123,9 +123,17 @@ The `.github/workflows/publish.yml` workflow publishes the package to npm when y
 
 1. Create a release branch and update the version with `npm version <x.y.z> --no-git-tag-version`. This command updates `package.json` and `package-lock.json`.
 2. In `CHANGELOG.md`, move the entries from `## [Unreleased]` into a new `## [x.y.z] — <date>` section. Update the comparison links at the bottom of `CHANGELOG.md`: set `[Unreleased]` to compare `vx.y.z...HEAD`, and add a `[x.y.z]` link that compares the previous tag with `vx.y.z`.
-3. Run `npm run check && npm run build`, then run `RELEASE_TAG=vx.y.z npm run release:precheck`. The precheck verifies that the tag matches `package.json`, the version is not published yet, `CHANGELOG.md` has the version section and an empty `[Unreleased]` section, the tarball contains all `main`, `types`, `bin`, and `exports` targets from `package.json`, each `bin` file starts with `#!/usr/bin/env node`, and no source or test files are packed.
+3. Run `npm run check && npm run build`, then run `RELEASE_TAG=vx.y.z npm run release:precheck`. The precheck verifies these conditions:
+    - The tag matches `package.json`.
+    - The version is not published at this time.
+    - `CHANGELOG.md` has the version section and an empty `[Unreleased]` section.
+    - The tarball contains all `main`, `types`, `bin`, and `exports` targets from `package.json`.
+    - Each `bin` file starts with `#!/usr/bin/env node`.
+    - The tarball contains no source or test files.
 4. Merge the release branch into `main`. Create and publish a non-prerelease GitHub Release with the exact tag `vx.y.z`.
-5. The publish workflow runs `release:precheck`, `npm publish --provenance`, and `release:postcheck`. The postcheck verifies the published version, the `latest` dist-tag, the provenance attestation, a clean install in a temporary directory, and a worker-thread conversion test. Because npm indexes new releases asynchronously, `release:postcheck` retries registry lookups for up to 5 minutes when npm returns `E404` or empty output. Any other npm error fails immediately. A published version without provenance also fails immediately. If `npm publish` succeeds but `release:postcheck` times out, do not re-run the workflow (`release:precheck` will fail because the version already exists). Instead, run `npm run release:postcheck` locally from the release commit.
+5. The publish workflow runs `release:precheck`, `npm publish --provenance`, and `release:postcheck`. The postcheck verifies the published version, the `latest` dist-tag, the provenance attestation, a clean install in a temporary directory, and a worker-thread conversion test. npm indexes new releases asynchronously. Thus, `release:postcheck` retries registry lookups for a maximum of 5 minutes when npm returns `E404` or empty output. All other npm errors fail immediately. A published version without provenance also fails immediately.
+
+    **If `npm publish` succeeds but `release:postcheck` times out, do not re-run the workflow.** If you re-run it, `release:precheck` fails because the version exists in the registry. As an alternative, run `npm run release:postcheck` locally from the release commit.
 
 ## Reporting Bugs / Security Issues
 
