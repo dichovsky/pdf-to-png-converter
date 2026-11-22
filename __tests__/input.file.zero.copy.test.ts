@@ -1,4 +1,5 @@
 import type { FileHandle } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import { afterEach, expect, test, vi } from 'vitest';
 import { getPdfFileBuffer } from '../src/pdfInput';
 
@@ -47,7 +48,7 @@ test('stable file-path input transfers the dedicated read allocation without cop
     const raw = Buffer.alloc(8, 7);
     const file = mockFile(raw);
 
-    const result = await getPdfFileBuffer('/fake/file.pdf', 1024);
+    const result = await getPdfFileBuffer(resolve('/fake/file.pdf'), 1024);
 
     expect(result).toBeInstanceOf(Uint8Array);
     expect(result.buffer).toBe(file.firstReadBuffer?.buffer);
@@ -59,7 +60,7 @@ test('file-path input copies an exact-size result when the file shrinks after fs
     const raw = Buffer.alloc(8, 5);
     const file = mockFile(raw, 32);
 
-    const result = await getPdfFileBuffer('/fake/file.pdf', 1024);
+    const result = await getPdfFileBuffer(resolve('/fake/file.pdf'), 1024);
 
     expect(result.buffer).not.toBe(file.firstReadBuffer?.buffer);
     expect(result.byteLength).toBe(raw.byteLength);
@@ -69,7 +70,7 @@ test('file-path input copies an exact-size result when the file shrinks after fs
 test('empty file-path input returns a plain empty Uint8Array', async () => {
     mockFile(Buffer.alloc(0), 0);
 
-    const result = await getPdfFileBuffer('/fake/file.pdf', 1024);
+    const result = await getPdfFileBuffer(resolve('/fake/file.pdf'), 1024);
 
     expect(result).toBeInstanceOf(Uint8Array);
     expect(result.byteLength).toBe(0);
@@ -79,7 +80,7 @@ test('empty file-path input returns a plain empty Uint8Array', async () => {
 test('grows an initially empty read buffer when the file grows after fstat', async () => {
     const file = mockFile(Buffer.from([9]), 0);
 
-    const result = await getPdfFileBuffer('/fake/growing.pdf', 1024);
+    const result = await getPdfFileBuffer(resolve('/fake/growing.pdf'), 1024);
 
     expect(Array.from(result)).toEqual([9]);
     expect(file.read).toHaveBeenCalledTimes(2);
@@ -89,10 +90,11 @@ test('grows an initially empty read buffer when the file grows after fstat', asy
 test('path input validates and reads through exactly one opened handle', async () => {
     const file = mockFile(Buffer.from([1, 2, 3]));
 
-    await getPdfFileBuffer('/fake/file.pdf', 1024);
+    const path = resolve('fake', 'file.pdf');
+    await getPdfFileBuffer(path, 1024);
 
     expect(openMock).toHaveBeenCalledOnce();
-    expect(openMock).toHaveBeenCalledWith('/fake/file.pdf', fsConstants.O_RDONLY | fsConstants.O_NONBLOCK);
+    expect(openMock).toHaveBeenCalledWith(path, fsConstants.O_RDONLY | fsConstants.O_NONBLOCK);
     expect(file.stat).toHaveBeenCalledOnce();
     expect(file.read).toHaveBeenCalled();
     expect(file.close).toHaveBeenCalledOnce();
@@ -103,7 +105,7 @@ test('opened file handle closes when fstat fails', async () => {
     const failure = new Error('fstat failed');
     openMock.mockResolvedValueOnce({ stat: vi.fn().mockRejectedValue(failure), close } as unknown as FileHandle);
 
-    await expect(getPdfFileBuffer('/fake/file.pdf', 1024)).rejects.toBe(failure);
+    await expect(getPdfFileBuffer(resolve('/fake/file.pdf'), 1024)).rejects.toBe(failure);
     expect(close).toHaveBeenCalledOnce();
 });
 
@@ -116,6 +118,6 @@ test('opened file handle closes when a read fails', async () => {
         close,
     } as unknown as FileHandle);
 
-    await expect(getPdfFileBuffer('/fake/file.pdf', 1024)).rejects.toBe(failure);
+    await expect(getPdfFileBuffer(resolve('/fake/file.pdf'), 1024)).rejects.toBe(failure);
     expect(close).toHaveBeenCalledOnce();
 });

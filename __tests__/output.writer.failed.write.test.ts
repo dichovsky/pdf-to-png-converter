@@ -174,3 +174,22 @@ test('pdfToPng leaves no truncated PNG behind when a page write fails, so the sa
     expect(pages.map((page) => page.name)).toEqual(['buffer_page_1.png']);
     expect((await fsPromises.stat(join(baseDir, 'buffer_page_1.png'))).size).toBeGreaterThan(PARTIAL_BYTES.length);
 });
+
+test('preserves the filesystem error and target path for a name below the portable length limit', async () => {
+    const name = 'a'.repeat(144);
+    const path = join(baseDir, name);
+    const failure = Object.assign(new Error('File name too long'), { code: 'ENAMETOOLONG', errno: -36, path, syscall: 'open' });
+    const open = vi.spyOn(fsPromises, 'open').mockRejectedValueOnce(failure);
+
+    await expect(savePNGfile(name, PNG_BYTES, folder)).rejects.toMatchObject({
+        cause: failure,
+        code: failure.code,
+        errno: failure.errno,
+        path,
+        syscall: 'open',
+        stack: expect.stringContaining('Shorten the output filename'),
+    });
+    expect(failure.message).toBe('File name too long');
+    expect(open).toHaveBeenCalledExactlyOnceWith(path, 'wx');
+    await expect(fsPromises.readdir(baseDir)).resolves.toEqual([]);
+});

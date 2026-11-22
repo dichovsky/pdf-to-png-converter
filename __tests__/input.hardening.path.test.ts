@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { promises as fsPromises } from 'node:fs';
+import { mkdirSync, promises as fsPromises, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, parse, sep } from 'node:path';
 import { afterEach, expect, test, vi } from 'vitest';
 import { MAX_INPUT_BYTES } from '../src/const';
 import { getPdfFileBuffer } from '../src/pdfInput';
@@ -47,7 +47,7 @@ test('rejects a string one character over the limit', async () => {
 });
 
 test('still treats a string of exactly the limit as a path and passes the filesystem error through unchanged', async () => {
-    const path = '/'.padEnd(MAX_PATH_CHARS, 'a');
+    const path = parse(tmpdir()).root.padEnd(MAX_PATH_CHARS, 'a');
     const failure = Object.assign(new Error('ENOENT: no such file or directory'), { code: 'ENOENT' });
     const open = vi.spyOn(fsPromises, 'open').mockRejectedValueOnce(failure);
 
@@ -69,4 +69,117 @@ test('pdfToPng rejects an over-long string with the same short message', async (
 
     expect(error.message).toMatch(/Input PDF path is too long/);
     expect(error.message.length).toBeLessThan(200);
+});
+
+test('opens the PDF relative to the working directory at the time of the call', async () => {
+    const original = process.cwd();
+    const folder = await fsPromises.mkdtemp(join(tmpdir(), 'pdf-input-cwd-'));
+    const other = join(folder, 'other');
+    try {
+        await fsPromises.mkdir(other);
+        await fsPromises.copyFile(join(original, 'test-data', 'sample.pdf'), join(folder, 'report.pdf'));
+        await fsPromises.copyFile(join(original, 'test-data', '10-page-sample.pdf'), join(other, 'report.pdf'));
+        process.chdir(folder);
+        const conversion = pdfToPng('report.pdf', { returnMetadataOnly: true });
+        process.chdir(other);
+        const pages = await conversion;
+        expect(pages.map((page) => page.name)).toEqual(['report_page_1.png', 'report_page_2.png']);
+    } finally {
+        process.chdir(original);
+        await fsPromises.rm(folder, { recursive: true, force: true });
+    }
+});
+
+test('preserves empty input and trailing separators for the filesystem', async () => {
+    await expect(getPdfFileBuffer('', MAX_INPUT_BYTES)).rejects.toMatchObject({ code: 'ENOENT' });
+    const input = `test-data${sep}sample.pdf${sep}`;
+    if (process.platform === 'win32') {
+        await expect(getPdfFileBuffer(input, MAX_INPUT_BYTES)).resolves.toEqual(new Uint8Array(await fsPromises.readFile(input)));
+    } else {
+        await expect(getPdfFileBuffer(input, MAX_INPUT_BYTES)).rejects.toMatchObject({ code: 'ENOTDIR', path: input });
+    }
+});
+
+test.skipIf(process.platform === 'win32')('preserves symlink traversal before a parent component', async () => {
+    const original = process.cwd();
+    const folder = await fsPromises.mkdtemp(join(tmpdir(), 'pdf-input-symlink-'));
+    try {
+        await fsPromises.mkdir(join(folder, 'target', 'nested'), { recursive: true });
+        await fsPromises.symlink(join(folder, 'target', 'nested'), join(folder, 'link'));
+        await fsPromises.writeFile(join(folder, 'target', 'report.pdf'), 'expected');
+        process.chdir(folder);
+        const bytes = await getPdfFileBuffer('link/../report.pdf', MAX_INPUT_BYTES);
+        expect(Buffer.from(bytes).toString()).toBe('expected');
+    } finally {
+        process.chdir(original);
+        await fsPromises.rm(folder, { recursive: true, force: true });
+    }
+});
+
+test.skipIf(process.platform !== 'win32')('anchors drive-relative and current-drive-rooted paths on Windows', async () => {
+    const drive = parse(process.cwd()).root.slice(0, 2);
+    const missing = `missing-${randomUUID()}.pdf`;
+    const asyncOpen = vi.spyOn(fsPromises, 'open');
+    for (const input of [`${drive}${missing}`, `${sep}${missing}`]) {
+        await expect(getPdfFileBuffer(input, MAX_INPUT_BYTES)).rejects.toMatchObject({ code: 'ENOENT', path: input });
+    }
+    expect(asyncOpen).not.toHaveBeenCalled();
+});
+
+test('missing relative input errors use the caller-supplied path', async () => {
+    const input = `missing-${randomUUID()}.pdf`;
+    const error = await rejectionOf(getPdfFileBuffer(input, MAX_INPUT_BYTES));
+    expect(error).toMatchObject({ code: 'ENOENT', path: input });
+    expect(error.message).toContain(input);
+    expect(error.message).not.toContain(process.cwd());
+});
+
+test.skipIf(process.platform === 'win32')('reads from a renamed cwd even when its old path exists again', async () => {
+    const original = process.cwd();
+    const base = await fsPromises.mkdtemp(join(tmpdir(), 'pdf-input-rename-'));
+    const oldPath = join(base, 'old');
+    try {
+        await fsPromises.mkdir(oldPath);
+        await fsPromises.writeFile(join(oldPath, 'report.pdf'), 'original');
+        process.chdir(oldPath);
+        process.cwd(); // Populate the Node cwd cache before the rename.
+        await fsPromises.rename(oldPath, join(base, 'moved'));
+        await fsPromises.mkdir(oldPath);
+        await fsPromises.writeFile(join(oldPath, 'report.pdf'), 'replacement');
+        const bytes = await getPdfFileBuffer('report.pdf', MAX_INPUT_BYTES);
+        expect(Buffer.from(bytes).toString()).toBe('original');
+    } finally {
+        process.chdir(original);
+        await fsPromises.rm(base, { recursive: true, force: true });
+    }
+});
+
+test.skipIf(process.platform === 'win32')('reads a short relative path from a cwd deeper than the OS absolute path limit', async () => {
+    const original = process.cwd();
+    const base = await fsPromises.mkdtemp(join(tmpdir(), 'pdf-input-depth-'));
+    const segment = 'd'.repeat(64);
+    let depth = 0;
+    try {
+        process.chdir(base);
+        while (depth < 66) {
+            mkdirSync(segment);
+            process.chdir(segment);
+            depth++;
+        }
+        writeFileSync('report.pdf', 'deep');
+        try {
+            const bytes = await getPdfFileBuffer('report.pdf', MAX_INPUT_BYTES);
+            expect(Buffer.from(bytes).toString()).toBe('deep');
+        } finally {
+            await fsPromises.unlink('report.pdf');
+        }
+    } finally {
+        while (depth > 0) {
+            process.chdir('..');
+            await fsPromises.rmdir(segment);
+            depth--;
+        }
+        process.chdir(original);
+        await fsPromises.rm(base, { recursive: true, force: true });
+    }
 });

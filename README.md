@@ -102,7 +102,7 @@ const pngPages: PngPageOutput[] = await pdfToPng('document.pdf', {
 > - If a write fails after the library creates a file (for example, when the disk is full), the library removes that partial file. This removal is best effort. It occurs only while the path continues to point to the created file. Then the library rethrows the original error.
 > - Pages that the library wrote before the failure stay on disk.
 > - In one disk-output call, filenames must be unique after Unicode normalization and case folding. On all platforms, these pairs count as duplicates: `Page.png` and `page.png`, `straße.png` and `STRASSE.png`, and precomposed and decomposed `é`.
-> - Duplicate filenames fail validation before the library creates the output folder. Filenames longer than 255 units also fail at that time. A unit is a UTF-16 code unit on macOS and Windows, and a UTF-8 byte on other platforms.
+> - Duplicate filenames fail validation before the library creates the output folder. Filenames longer than 255 units also fail at that time. A unit is a UTF-16 code unit on macOS and Windows, and a UTF-8 byte on other platforms. If the destination filesystem rejects a shorter name or the full path, the write reports the filesystem error. Shorten the filename or the output folder path.
 
 ---
 

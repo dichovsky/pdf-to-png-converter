@@ -18,6 +18,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- Relative PDF inputs now open synchronously in the working directory at the time of the call. File reads remain asynchronous. Changing directories during a conversion can no longer select a different input file. Output writes that exceed a filesystem path limit report how to shorten the path.
+
 - Development tooling only (no change to the published package): `release:postcheck` now retries registry lookups for up to 5 minutes (21 attempts, 15 seconds apart) instead of 27 seconds while waiting for npm to index a newly published version.
 
 ## [4.3.0] — 2026-10-27

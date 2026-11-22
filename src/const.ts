@@ -51,9 +51,8 @@ export const MAX_INPUT_PATH_LENGTH = 4096;
 export const FILE_READ_MAX_CHUNK_BYTES = 2 ** 30;
 
 /**
- * NAME_MAX: one path segment holds at most 255 units on every common filesystem. APFS, HFS+ and NTFS count UTF-16 code
- * units; ext4, xfs, btrfs and most other hosts count UTF-8 bytes, which are never fewer than the code units. Node
- * exposes no pathconf, so `assertValidOutputFilename()` lets the host family stand in for the filesystem.
+ * Portable filename preflight limit. Count UTF-16 code units on macOS and Windows and UTF-8 bytes elsewhere.
+ * The destination filesystem can enforce a lower limit when the file is opened.
  */
 export const MAX_FILENAME_LENGTH = 255;
 
