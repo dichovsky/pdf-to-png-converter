@@ -57,7 +57,7 @@
         "format": "oxfmt --write .",
         "format:check": "oxfmt --check .",
         "lint": "oxlint --type-aware --deny-warnings .",
-        "prepare": "husky",
+        "preprepare": "husky",
         "prepublishOnly": "npm run check && npm run build",
         "release:precheck": "node scripts/release-precheck.ts",
         "release:postcheck": "node scripts/release-postcheck.ts",
