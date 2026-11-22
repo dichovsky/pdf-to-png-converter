@@ -98,7 +98,10 @@ test('opens the PDF relative to the working directory at the time of the call', 
 
 test('preserves empty input and trailing separators for the filesystem', async () => {
     await expect(getPdfFileBuffer('', MAX_INPUT_BYTES)).rejects.toMatchObject({ code: 'ENOENT' });
-    await expect(getPdfFileBuffer(`test-data${sep}sample.pdf${sep}`, MAX_INPUT_BYTES)).rejects.toThrow();
+    const open = vi.spyOn(fsPromises, 'open').mockRejectedValueOnce(new Error('open probe'));
+    const input = `test-data${sep}sample.pdf${sep}`;
+    await expect(getPdfFileBuffer(input, MAX_INPUT_BYTES)).rejects.toThrow('open probe');
+    expect(open).toHaveBeenCalledWith(resolve('test-data', 'sample.pdf') + sep, expect.any(Number));
 });
 
 test.skipIf(process.platform === 'win32')('preserves symlink traversal before a parent component', async () => {
