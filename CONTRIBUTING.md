@@ -59,7 +59,7 @@ If an upstream type causes a `build:strict` error, add a suppression comment on 
 
 When an upstream update fixes the type, `tsc` reports the unused `@ts-expect-error` directive so you can remove it.
 
-**When to use `@ts-ignore`:** `@ts-expect-error` fails if no type error occurs. Some upstream type errors occur only when `skipLibCheck` is `false` (`build:strict`). They do not occur when `skipLibCheck` is `true` (`build:test`). In that condition, `@ts-expect-error` breaks `build:test`. As an alternative, use these two lines:
+**When to use `@ts-ignore` instead of `@ts-expect-error`:** `@ts-expect-error` fails if no type error occurs. Some upstream type errors occur only when `skipLibCheck` is `false` (`build:strict`). They do not occur when `skipLibCheck` is `true` (`build:test`). In that condition, `@ts-expect-error` breaks `build:test`. Thus, do not use `@ts-expect-error`. Use these two lines:
 
 ```ts
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -193,7 +193,7 @@ The `.github/workflows/publish.yml` workflow publishes the package to npm when y
 4. Merge the release branch into `main`. Create and publish a non-prerelease GitHub Release with the exact tag `vx.y.z`.
 5. The publish workflow runs `release:precheck`, `npm publish --provenance`, and `release:postcheck`. The postcheck verifies the published version, the `latest` dist-tag, the provenance attestation, a clean install in a temporary directory, and a worker-thread conversion test. npm indexes new releases asynchronously. Thus, `release:postcheck` retries registry lookups for a maximum of 5 minutes when npm returns `E404` or empty output. All other npm errors fail immediately. A published version without provenance also fails immediately.
 
-    **If `npm publish` succeeds but `release:postcheck` times out, do not re-run the workflow.** If you re-run it, `release:precheck` fails because the version exists in the registry. As an alternative, run `npm run release:postcheck` locally from the release commit.
+    **If `npm publish` succeeds but `release:postcheck` times out, do not re-run the workflow.** If you re-run it, `release:precheck` fails because the version exists in the registry. Run `npm run release:postcheck` locally from the release commit.
 
 ## Reporting Bugs / Security Issues
 

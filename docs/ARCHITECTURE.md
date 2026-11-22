@@ -21,7 +21,7 @@ Internal module paths are not exported.
 All library conversions start in `pdfToPng()` (`src/pdfToPng.ts`):
 
 1. `pdfToPng()` validates options and resolves the output folder synchronously before its first `await`:
-    - `normalizeOptions()` validates options and applies defaults one time. It uses `null` as unset for all options. It rejects `viewportScale` values above `MAX_VIEWPORT_SCALE` (100). In parallel or worker mode, it rejects `concurrencyLimit` values above `MAX_CONCURRENCY_LIMIT` (16).
+    - `normalizeOptions()` validates options and applies defaults one time. It treats `null` as unset for all options. It rejects `viewportScale` values above `MAX_VIEWPORT_SCALE` (100). In parallel or worker mode, it rejects `concurrencyLimit` values above `MAX_CONCURRENCY_LIMIT` (16).
     - `pagesToProcess` must be a real `Array` of positive integers. Typed arrays, `Set`s, strings, array-likes, and sparse arrays are rejected. `normalizeOptions()` copies the array. Thus, later mutations by the caller do not change the conversion.
     - If the caller passes `disableFontFace: false`, the library uses `true`, because pdf.js has no Font Loading API in Node.js. This coercion emits process warning `PDF_TO_PNG_DISABLE_FONT_FACE_IGNORED` a maximum of one time for each thread.
     - Unless `returnMetadataOnly` is `true`, `pdfToPng()` immediately resolves a relative `outputFolder` against `process.cwd()`. Thus, later `process.chdir()` calls cannot redirect output.
@@ -132,7 +132,7 @@ Custom filenames must be non-empty and must not contain host path separators in 
 
 - `pdfjsAssetDirectory()` resolves the installed `pdfjs-dist` package one time through `require.resolve('pdfjs-dist/package.json')` and appends the folder names from `PDFJS_ASSET_DIRECTORIES` (`cmaps`, `standard_fonts`, `wasm`). It never uses `process.cwd()`.
 - `getPdfDocument()` passes `cMapUrl`, `standardFontDataUrl`, and `wasmUrl` as forward-slash directory paths ending in `/`.
-- The `wasm` directory contains `jbig2.wasm` (CCITT/JBIG2) and `openjpeg.wasm` (JPEG 2000). Without `wasmUrl`, pdf.js renders those images blank without throwing an error (issue #278). `warnIfWasmDecodersMissing()` makes sure that the two `.wasm` files are present. If one of the files is missing, it emits process warning `PDF_TO_PNG_WASM_MISSING` a maximum of one time for each thread.
+- The `wasm` directory contains `jbig2.wasm` (CCITT/JBIG2) and `openjpeg.wasm` (JPEG 2000). Without `wasmUrl`, pdf.js renders those images blank without throwing an error (issue #278). `warnIfWasmDecodersMissing()` checks that the two `.wasm` files are present. If a file is missing, it emits process warning `PDF_TO_PNG_WASM_MISSING` a maximum of one time for each thread.
 - `pdfToPng()` awaits `warmUpWasmDecoders()` one time for each thread, before it opens main-thread documents (issue #288, mozilla/pdf.js#22131; remove under `BACKLOG.md` ARCH-018). The warm-up decodes a tiny built-in PDF that contains 8×8 CCITT G4 and JPEG 2000 images. Thus, pdf.js caches the two WebAssembly decoders. The warm-up has a `WASM_WARM_UP_TIMEOUT_MS` (10 s) timeout.
 - When pdf.js decodes an image, it allocates a temporary canvas on the rendering thread. This canvas uses approximately 8 bytes for each declared pixel.
 - In `@napi-rs/canvas` 1.0.12+, a canvas of approximately 537 million pixels or more (> 2 GiB) is created, but it silently ignores drawing calls. Thus, Flate, JPEG, CCITT, or JBIG2 images are blank, and no error occurs. JPEG 2000 images above pdf.js's internal limit decode at reduced resolution, with a warning.

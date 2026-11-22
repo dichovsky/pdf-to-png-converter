@@ -119,7 +119,7 @@ npx pdf-to-png-converter my-document.pdf --output-folder ./output
 - `--output-folder <dir>`: Directory where PNG files are saved. Required for image conversion. Existing files are never overwritten (`EEXIST`).
 - `--viewport-scale <number>`: Scale factor for each page viewport (default: `1`, maximum: `100`).
 - `--use-system-fonts`: Use fonts installed on the host system as a fallback.
-- `--disable-font-face <true|false|1|0>`: Draw glyphs as vector paths (default: `true`; pdf.js continues to use embedded fonts). If you pass `false`, the CLI uses `true` and emits process warning `PDF_TO_PNG_DISABLE_FONT_FACE_IGNORED`, because pdf.js has no Font Loading API in Node.js.
+- `--disable-font-face <true|false|1|0>`: Draw glyphs as vector paths (default: `true`; pdf.js continues to use embedded fonts). If you pass `false`, the library ignores it, uses `true`, and emits process warning `PDF_TO_PNG_DISABLE_FONT_FACE_IGNORED`, because pdf.js has no Font Loading API in Node.js.
 - `--enable-xfa <true|false|1|0>`: Render XFA forms.
 - `--pdf-file-password <pwd>`: Password for an encrypted PDF. If you do not give this flag, the CLI reads the `PDF_TO_PNG_PASSWORD` environment variable (the flag takes precedence, and an empty variable counts as unset). We recommend `PDF_TO_PNG_PASSWORD` loaded from a secret store or CI secret, because command-line flags show in process lists and shell history (see [SECURITY.md](SECURITY.md)). Put quotes around passwords that contain spaces.
 - `--pages-to-process <n,m,...>`: Comma-separated list of 1-based page numbers.
@@ -135,11 +135,11 @@ npx pdf-to-png-converter my-document.pdf --output-folder ./output
 The CLI supports two output modes:
 
 - **Image conversion:** Writes PNG files to `--output-folder`.
-- **Metadata inspection:** Prints JSON metadata to `stdout` when `--return-metadata-only` is set (also with `--silent` or `--verbosity-level 5`).
+- **Metadata inspection:** Prints JSON metadata to `stdout` when `--return-metadata-only` is set. The CLI also prints this JSON when `--silent` or `--verbosity-level 5` is set.
 
 To get PNG buffers in memory, use the library API (`returnPageContent`), not the CLI.
 
-Pass one `<pdf-file-path>` and no other positional arguments to the CLI. Use a shell loop to convert multiple files. A second positional argument causes a usage error with exit code 1. Examples are `--use-system-fonts false` and an unquoted path with spaces. The CLI always enforces the 256 MiB input limit. For a different limit, use the library `maxInputBytes` option.
+Pass one `<pdf-file-path>` and no other positional arguments to the CLI. Use a shell loop to convert multiple files. A second positional argument causes a usage error with exit code 1. Examples of a second positional argument are `--use-system-fonts false` and an unquoted path with spaces. The CLI always enforces the 256 MiB input limit. For a different limit, use the library `maxInputBytes` option.
 
 ---
 
@@ -321,7 +321,7 @@ Metadata mode skips image rendering and is useful for checking page counts, dime
 
 ## Performance Notes
 
-- **Pipelined processing:** PNG encoding runs on the libuv threadpool and overlaps subsequent page renders. Files can finish writing out of page order, also in default mode. Read results from the returned array, which always preserves the requested page order.
+- **Pipelined processing:** PNG encoding runs on the libuv threadpool and overlaps subsequent page renders. Files can finish writing out of page order. This can occur in default mode too. Read results from the returned array, which always preserves the requested page order.
 - **Threadpool sizing:** PNG encoding and file writes share Node's libuv threadpool (4 threads by default). On multi-core machines, a larger pool size can increase throughput for parallel file output: `UV_THREADPOOL_SIZE=8 node app.js`.
 - **Strict serial processing:** To keep at most one page in flight at a time, set `processPagesInParallel: true` and `concurrencyLimit: 1`.
 - **Multi-core rendering:** `processPagesInParallel` interleaves asynchronous work on the main thread. Thus, rasterization stays single-threaded. Set `renderInWorkerThreads: true` to rasterize pages across a pool of worker threads (`concurrencyLimit` sets the maximum pool size). Each worker keeps its own PDF copy and pdf.js instance. During the conversion, the main thread also keeps one more copy of the PDF bytes. Use worker threads for multi-page, render-heavy PDFs.

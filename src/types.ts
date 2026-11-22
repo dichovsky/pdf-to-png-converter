@@ -122,8 +122,8 @@ export interface PdfToPngOptions {
      * When `true`, only page metadata is returned for each page without rendering any PNG image.
      * The returned `PngPageOutput` objects will have `pageNumber`, `name`, `width`, `height`, and
      * `rotation` populated, but `content` will always be `undefined` and `path` will always be `""`.
-     * No canvas is created, no rendering is performed, and no files are written to disk, also if
-     * `outputFolder` is set.
+     * No canvas is created, no rendering is performed, and no files are written to disk. This is
+     * also true when `outputFolder` is set.
      * This mode is significantly faster than full rendering. Use it to inspect page dimensions
      * and rotation without generating images.
      * To stay consistent with a real render, this mode also rejects pages that cannot be rendered at the requested
@@ -194,7 +194,7 @@ export interface PdfToPngOptions {
      * The cap bounds the input bytes only, not the memory that pdf.js needs to parse them.
      * A non-PDF payload can be one long sequence of a single byte value (zeros, for example). In the pdf.js recovery
      * scan, this payload uses approximately 32 to 64 heap bytes for each input byte. It can abort the process on heap
-     * exhaustion, also below this cap.
+     * exhaustion. This can also occur when the input is below this cap.
      * Convert untrusted files in an isolated process (with `--max-old-space-size` set), or in a Node.js `Worker` that you
      * start yourself with `resourceLimits`. `renderInWorkerThreads` does not help, because the main thread also opens
      * all documents.
