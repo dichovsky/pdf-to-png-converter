@@ -1,3 +1,4 @@
+import { resolve } from 'node:path';
 import { promises as fsPromises } from 'node:fs';
 import type { FileHandle } from 'node:fs/promises';
 import { afterEach, expect, test, vi } from 'vitest';
@@ -11,7 +12,7 @@ import { getPdfFileBuffer } from '../src/pdfInput';
 // claims the span.
 
 const INT32_MAX = 2 ** 31 - 1;
-const FAKE_PATH = '/pretend/huge.pdf';
+const FAKE_PATH = resolve('/pretend/huge.pdf');
 
 type ReadStub = (target: Buffer, offset: number, length: number, position: number) => Promise<{ bytesRead: number; buffer: Buffer }>;
 

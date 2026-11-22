@@ -38,7 +38,7 @@ test('pdfToPng rejects a Buffer input larger than maxInputBytes', async () => {
 });
 
 test('getPdfFileBuffer rejects a path whose stat() reports it is not a regular file', async () => {
-    const fakePath = '/dev/zero';
+    const fakePath = resolve('/dev/zero');
     const close = vi.fn().mockResolvedValue(undefined);
     vi.spyOn(fsPromises, 'open').mockResolvedValueOnce({
         stat: vi.fn().mockResolvedValue({ size: 0, isFile: (): boolean => false }),
@@ -91,7 +91,7 @@ test('getPdfFileBuffer detects growth with a bounded read and closes the handle'
         close,
     } as unknown as FileHandle);
 
-    await expect(getPdfFileBuffer('/pretend/grew-mid-read.pdf', 512)).rejects.toThrow('513 > 512 bytes');
+    await expect(getPdfFileBuffer(resolve('/pretend/grew-mid-read.pdf'), 512)).rejects.toThrow('513 > 512 bytes');
     expect(close).toHaveBeenCalledOnce();
     expect(read).toHaveBeenCalled();
     for (const call of read.mock.calls) {
@@ -115,7 +115,7 @@ test('getPdfFileBuffer accepts growth up to exactly maxInputBytes', async () => 
         close,
     } as unknown as FileHandle);
 
-    const result = await getPdfFileBuffer('/pretend/grew-within-limit.pdf', bytes.byteLength);
+    const result = await getPdfFileBuffer(resolve('/pretend/grew-within-limit.pdf'), bytes.byteLength);
 
     expect(result.byteLength).toBe(bytes.byteLength);
     expect(Buffer.from(result).equals(bytes)).toBe(true);

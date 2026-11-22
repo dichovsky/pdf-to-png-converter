@@ -187,7 +187,13 @@ export async function savePNGfile(name: string, content: Buffer, folder: OutputF
 
     const fd = await fsPromises.open(resolvedFilePath, 'wx').catch((error: unknown) => {
         if (error instanceof Error && 'code' in error && error.code === 'ENAMETOOLONG') {
-            error.message += ' Shorten the output filename or its parent directory path.';
+            const cause = error as NodeJS.ErrnoException;
+            throw Object.assign(new Error(`${cause.message} Shorten the output filename or its parent directory path.`, { cause }), {
+                code: cause.code,
+                errno: cause.errno,
+                path: cause.path,
+                syscall: cause.syscall,
+            });
         }
         throw error;
     });

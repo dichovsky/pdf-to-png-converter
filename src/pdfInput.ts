@@ -1,7 +1,18 @@
-import { constants as fsConstants, promises as fsPromises } from 'node:fs';
-import type { FileHandle } from 'node:fs/promises';
-import { isAbsolute, parse, resolve, sep } from 'node:path';
+import { close, constants as fsConstants, fstat, openSync, promises as fsPromises, read } from 'node:fs';
+import type { Stats } from 'node:fs';
+import { isAbsolute, parse, sep } from 'node:path';
+import { promisify } from 'node:util';
 import { FILE_READ_MAX_CHUNK_BYTES, MAX_INPUT_PATH_LENGTH } from './const.js';
+
+const readDescriptor = promisify(read);
+const statDescriptor = promisify(fstat);
+const closeDescriptor = promisify(close);
+
+interface InputFile {
+    stat(): Promise<Stats>;
+    read(buffer: Buffer, offset: number, length: number, position: number): Promise<{ bytesRead: number }>;
+    close(): Promise<void>;
+}
 
 const FILE_READ_GROWTH_BYTES = 64 * 1024;
 
@@ -48,7 +59,7 @@ function toTransferableView(buffer: Buffer, byteLength: number): Uint8Array {
  * `FileHandle.readFile()` is deliberately not used: if the file grows after `fstat()`, it reads and
  * allocates through the new EOF before a post-read size check can enforce `maxInputBytes`.
  */
-async function readBoundedFile(fileHandle: FileHandle, reportedSize: number, maxInputBytes: number): Promise<Uint8Array> {
+async function readBoundedFile(fileHandle: InputFile, reportedSize: number, maxInputBytes: number): Promise<Uint8Array> {
     // allocUnsafeSlow produces a dedicated, full-span ArrayBuffer. That preserves the normal
     // stable-file zero-copy handoff without exposing bytes from Node's shared small-buffer pool.
     let buffer = Buffer.allocUnsafeSlow(reportedSize);
@@ -86,16 +97,21 @@ async function readBoundedFile(fileHandle: FileHandle, reportedSize: number, max
     }
 }
 
-/** Anchor the path before open() dispatches to the filesystem. Keep symlink/.. and trailing separators intact. */
-function anchorInputPath(path: string): string {
-    const { root } = parse(path);
-    // On Windows a single leading slash still depends on the current drive.
-    if (path === '' || (isAbsolute(path) && (sep === '/' || root.length > 1))) {
-        return path;
+async function openInputFile(path: string): Promise<InputFile> {
+    const flags = fsConstants.O_RDONLY | fsConstants.O_NONBLOCK;
+    // A single leading slash on Windows is relative to the current drive.
+    if (isAbsolute(path) && (sep === '/' || parse(path).root.length > 1)) {
+        return fsPromises.open(path, flags);
     }
-    // An empty root selects the current directory. A Windows drive-relative root selects that drive's directory.
-    const base = resolve(root);
-    return base + (base.endsWith(sep) ? '' : sep) + path.slice(root.length);
+
+    // Bind the relative name to its file before the caller can change directories. The OS resolves it directly,
+    // including when the working directory has been renamed or its absolute path exceeds the platform limit.
+    const fd = openSync(path, flags);
+    return {
+        stat: () => statDescriptor(fd),
+        read: (buffer, offset, length, position) => readDescriptor(fd, buffer, offset, length, position),
+        close: () => closeDescriptor(fd),
+    };
 }
 
 /**
@@ -116,7 +132,7 @@ export async function getPdfFileBuffer(pdfFile: string | ArrayBufferLike | Uint8
         // open() cannot make validation apply to one file while bytes come from another.
         // O_NONBLOCK avoids waiting on special paths such as FIFOs on platforms that honor the
         // flag; fstat() then rejects anything non-regular. It has no effect on regular-file reads.
-        const fileHandle = await fsPromises.open(anchorInputPath(pdfFile), fsConstants.O_RDONLY | fsConstants.O_NONBLOCK);
+        const fileHandle = await openInputFile(pdfFile);
         try {
             const stats = await fileHandle.stat();
             if (!stats.isFile()) {

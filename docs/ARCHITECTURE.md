@@ -108,7 +108,7 @@ Custom filenames must be non-empty and must not contain host path separators in 
 
 ### Input
 
-- Path inputs are opened once with `O_RDONLY | O_NONBLOCK`, inspected with `stat()`, read positionally through that same handle, and closed in `finally`. Path strings longer than `MAX_INPUT_PATH_LENGTH` (4096 characters) are rejected before a filesystem call. The error message does not include the string. Relative input paths use the working directory at the time of the call. The filesystem resolves symbolic links and parent components when it opens the file.
+- Path inputs are opened once with `O_RDONLY | O_NONBLOCK`, inspected with `stat()`, read positionally through that same handle, and closed in `finally`. Path strings longer than `MAX_INPUT_PATH_LENGTH` (4096 characters) are rejected before a filesystem call. The error message does not include the string. For relative paths, the kernel opens the input synchronously at call time. This preserves symbolic links, parent components, and relative paths in filesystem errors. The open can block on a slow filesystem. Stat, reads, and close are asynchronous. Fully qualified inputs also open asynchronously.
 - Only regular files are accepted. Reads enforce `maxInputBytes` and probe 1 byte past the initial size to detect files that grow during reading. The code does not use `FileHandle.readFile()`. Thus, a growing file cannot allocate unbounded memory before the size check.
 - File reads use chunks of at most `FILE_READ_MAX_CHUNK_BYTES` (1 GiB) because Node's `FileHandle.read()` takes a signed 32-bit integer length.
 - When possible, file reads allocate a dedicated buffer that matches the file size. This buffer lets the code give the bytes to pdf.js without a copy.

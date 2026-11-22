@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { promises as fsPromises } from 'node:fs';
+import { mkdirSync, promises as fsPromises, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, parse, resolve, sep } from 'node:path';
+import { join, parse, sep } from 'node:path';
 import { afterEach, expect, test, vi } from 'vitest';
 import { MAX_INPUT_BYTES } from '../src/const';
 import { getPdfFileBuffer } from '../src/pdfInput';
@@ -75,16 +75,10 @@ test('opens the PDF relative to the working directory at the time of the call', 
     const original = process.cwd();
     const folder = await fsPromises.mkdtemp(join(tmpdir(), 'pdf-input-cwd-'));
     const other = join(folder, 'other');
-    const open = fsPromises.open;
     try {
         await fsPromises.mkdir(other);
         await fsPromises.copyFile(join(original, 'test-data', 'sample.pdf'), join(folder, 'report.pdf'));
         await fsPromises.copyFile(join(original, 'test-data', '10-page-sample.pdf'), join(other, 'report.pdf'));
-        // Let the caller change directories before the filesystem consumes the submitted path.
-        vi.spyOn(fsPromises, 'open').mockImplementation(async (...args) => {
-            await Promise.resolve();
-            return open(...args);
-        });
         process.chdir(folder);
         const conversion = pdfToPng('report.pdf', { returnMetadataOnly: true });
         process.chdir(other);
@@ -98,10 +92,12 @@ test('opens the PDF relative to the working directory at the time of the call', 
 
 test('preserves empty input and trailing separators for the filesystem', async () => {
     await expect(getPdfFileBuffer('', MAX_INPUT_BYTES)).rejects.toMatchObject({ code: 'ENOENT' });
-    const open = vi.spyOn(fsPromises, 'open').mockRejectedValueOnce(new Error('open probe'));
     const input = `test-data${sep}sample.pdf${sep}`;
-    await expect(getPdfFileBuffer(input, MAX_INPUT_BYTES)).rejects.toThrow('open probe');
-    expect(open).toHaveBeenCalledWith(resolve('test-data', 'sample.pdf') + sep, expect.any(Number));
+    if (process.platform === 'win32') {
+        await expect(getPdfFileBuffer(input, MAX_INPUT_BYTES)).resolves.toEqual(new Uint8Array(await fsPromises.readFile(input)));
+    } else {
+        await expect(getPdfFileBuffer(input, MAX_INPUT_BYTES)).rejects.toMatchObject({ code: 'ENOTDIR', path: input });
+    }
 });
 
 test.skipIf(process.platform === 'win32')('preserves symlink traversal before a parent component', async () => {
@@ -122,10 +118,66 @@ test.skipIf(process.platform === 'win32')('preserves symlink traversal before a 
 
 test.skipIf(process.platform !== 'win32')('anchors drive-relative and current-drive-rooted paths on Windows', async () => {
     const drive = parse(process.cwd()).root.slice(0, 2);
-    const failure = Object.assign(new Error('missing'), { code: 'ENOENT' });
-    const open = vi.spyOn(fsPromises, 'open').mockRejectedValue(failure);
-    for (const input of [`${drive}report.pdf`, `${sep}report.pdf`]) {
-        await expect(getPdfFileBuffer(input, MAX_INPUT_BYTES)).rejects.toBe(failure);
-        expect(open).toHaveBeenLastCalledWith(resolve(input), expect.any(Number));
+    const missing = `missing-${randomUUID()}.pdf`;
+    for (const input of [`${drive}${missing}`, `${sep}${missing}`]) {
+        await expect(getPdfFileBuffer(input, MAX_INPUT_BYTES)).rejects.toMatchObject({ code: 'ENOENT', path: input });
+    }
+});
+
+test('missing relative input errors use the caller-supplied path', async () => {
+    const input = `missing-${randomUUID()}.pdf`;
+    const error = await rejectionOf(getPdfFileBuffer(input, MAX_INPUT_BYTES));
+    expect(error).toMatchObject({ code: 'ENOENT', path: input });
+    expect(error.message).toContain(input);
+    expect(error.message).not.toContain(process.cwd());
+});
+
+test.skipIf(process.platform === 'win32')('reads from a renamed cwd even when its old path exists again', async () => {
+    const original = process.cwd();
+    const base = await fsPromises.mkdtemp(join(tmpdir(), 'pdf-input-rename-'));
+    const oldPath = join(base, 'old');
+    try {
+        await fsPromises.mkdir(oldPath);
+        await fsPromises.writeFile(join(oldPath, 'report.pdf'), 'original');
+        process.chdir(oldPath);
+        process.cwd(); // Populate the Node cwd cache before the rename.
+        await fsPromises.rename(oldPath, join(base, 'moved'));
+        await fsPromises.mkdir(oldPath);
+        await fsPromises.writeFile(join(oldPath, 'report.pdf'), 'replacement');
+        const bytes = await getPdfFileBuffer('report.pdf', MAX_INPUT_BYTES);
+        expect(Buffer.from(bytes).toString()).toBe('original');
+    } finally {
+        process.chdir(original);
+        await fsPromises.rm(base, { recursive: true, force: true });
+    }
+});
+
+test.skipIf(process.platform === 'win32')('reads a short relative path from a cwd deeper than the OS absolute path limit', async () => {
+    const original = process.cwd();
+    const base = await fsPromises.mkdtemp(join(tmpdir(), 'pdf-input-depth-'));
+    const segment = 'd'.repeat(200);
+    let depth = 0;
+    try {
+        process.chdir(base);
+        while (depth < 22) {
+            mkdirSync(segment);
+            process.chdir(segment);
+            depth++;
+        }
+        writeFileSync('report.pdf', 'deep');
+        try {
+            const bytes = await getPdfFileBuffer('report.pdf', MAX_INPUT_BYTES);
+            expect(Buffer.from(bytes).toString()).toBe('deep');
+        } finally {
+            await fsPromises.unlink('report.pdf');
+        }
+    } finally {
+        while (depth > 0) {
+            process.chdir('..');
+            await fsPromises.rmdir(segment);
+            depth--;
+        }
+        process.chdir(original);
+        await fsPromises.rm(base, { recursive: true, force: true });
     }
 });
