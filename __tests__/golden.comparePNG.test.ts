@@ -139,7 +139,15 @@ test('rejects JPEG data with the same pixels as a golden PNG', async () => {
     context.fillStyle = 'white';
     context.fillRect(0, 0, 8, 8);
     const expectedFile = existingGolden(canvas.toBuffer('image/png'));
-    await expect(comparePNG({ actualFile: canvas.toBuffer('image/jpeg'), expectedFile })).rejects.toThrow();
+    await expect(comparePNG({ actualFile: canvas.toBuffer('image/jpeg'), expectedFile })).rejects.toThrow(
+        'Invalid PNG header in actual image',
+    );
+});
+
+test('identifies a truncated golden before reading its dimensions', async () => {
+    const actualFile = solidPng('white');
+    const expectedFile = existingGolden(actualFile.subarray(0, 20));
+    await expect(comparePNG({ actualFile, expectedFile })).rejects.toThrow(`Invalid PNG header in ${expectedFile}`);
 });
 
 test('rejects different PNG dimensions even when padding would match the extra pixels', async () => {
@@ -167,8 +175,11 @@ test('invalid PNG data cannot create a golden', async () => {
 });
 
 test.each([
-    ['rgb(20, 145, 155)', 0],
+    ['rgb(20, 145, 155)', 64],
     ['rgb(80, 125, 105)', 64],
+    ['rgb(160, 128, 128)', 64],
+    ['rgb(128, 150, 128)', 64],
+    ['rgb(129, 128, 128)', 0],
 ])('counts pixelmatch 8 mismatches for %s against mid-gray', async (color, differences) => {
     const expectedFile = existingGolden(solidPng('rgb(128, 128, 128)'));
     await expect(comparePNG({ actualFile: solidPng(color), expectedFile })).resolves.toBe(differences);
