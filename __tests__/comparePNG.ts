@@ -1,7 +1,18 @@
 import { existsSync, promises as fsPromises } from 'node:fs';
 import { dirname, join } from 'node:path';
-import pixelmatch from 'pixelmatch';
-import { PNG } from 'pngjs';
+import { comparePng } from 'png-visual-compare';
+import { MAX_CANVAS_PIXELS, MAX_CANVAS_SIDE } from '../src/const.js';
+
+const compareOptions = { maxDimension: MAX_CANVAS_SIDE, maxPixels: MAX_CANVAS_PIXELS, pixelmatchOptions: { threshold: 0.074 } };
+const pngHeaderPrefix = Buffer.from('89504e470d0a1a0a0000000d49484452', 'hex');
+
+function readPngDimensions(bytes: Buffer, source: string) {
+    // The first chunk must be a complete 13-byte IHDR, with length, type and CRC.
+    if (bytes.length < 33 || !bytes.subarray(0, pngHeaderPrefix.length).equals(pngHeaderPrefix)) {
+        throw new Error(`Invalid PNG header in ${source}: expected a PNG signature and a complete IHDR chunk`);
+    }
+    return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
+}
 
 /**
  * Compares a PNG image with its golden (expected) PNG image.
@@ -29,8 +40,9 @@ export async function comparePNG({ actualFile, expectedFile }: { actualFile: str
         }
     }
     const actualBytes = typeof actualFile === 'string' ? await fsPromises.readFile(actualFile) : actualFile;
-    const actual = PNG.sync.read(actualBytes);
     if (missingGolden) {
+        // Validate the entire PNG before publishing it as a new reference image.
+        comparePng(actualBytes, actualBytes, compareOptions);
         const directory = dirname(expectedFile);
         await fsPromises.mkdir(directory, { recursive: true });
         const staging = await fsPromises.mkdtemp(join(directory, '.golden-'));
@@ -47,11 +59,14 @@ export async function comparePNG({ actualFile, expectedFile }: { actualFile: str
             await fsPromises.rm(staging, { recursive: true, force: true });
         }
     }
-    const expected = PNG.sync.read(await fsPromises.readFile(expectedFile));
+    const expectedBytes = await fsPromises.readFile(expectedFile);
+    // The comparator pads different-sized images. Goldens require identical IHDR dimensions.
+    const actual = readPngDimensions(actualBytes, typeof actualFile === 'string' ? actualFile : 'actual image');
+    const expected = readPngDimensions(expectedBytes, expectedFile);
     if (actual.width !== expected.width || actual.height !== expected.height) {
         throw new Error(
             `Golden PNG dimensions differ for ${expectedFile}: expected ${expected.width}x${expected.height}, got ${actual.width}x${actual.height}`,
         );
     }
-    return pixelmatch(actual.data, expected.data, undefined, actual.width, actual.height);
+    return comparePng(actualBytes, expectedBytes, compareOptions);
 }

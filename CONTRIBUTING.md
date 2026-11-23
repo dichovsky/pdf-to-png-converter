@@ -15,6 +15,8 @@ cd pdf-to-png-converter
 npm ci
 ```
 
+On Windows, use `npm ci --force` for the development install. The visual test dependency declares support for macOS and Linux and requires Node.js 26. CI runs the full tests on Node.js 24 and 26, then checks a strict production install and a real render on Node.js 24 and Windows.
+
 ## Running Tests
 
 ```sh
@@ -43,7 +45,7 @@ UPDATE_GOLDENS=1 npx vitest run __tests__/<filename>.test.ts
 
 Review the new image and commit it. The helper refuses `UPDATE_GOLDENS=1` when `CI` is set, and it never overwrites an existing golden file. To replace an existing golden PNG, delete the file first, run the test with `UPDATE_GOLDENS=1`, review the image, and commit it.
 
-The tests decode PNGs with `pngjs` and count pixel differences with `pixelmatch` 7.2. Keep this version range until a change to the comparison algorithm has been reviewed against the golden images.
+The tests use `png-visual-compare` 8.0.0 to count mismatched pixels with pixelmatch 8. The per-pixel color threshold is `0.074` so the comparison detects a shift from mid-gray to teal. The helper also requires the two PNGs to have identical dimensions.
 
 The visual tests require the number of different pixels to be below `RELAXED_COMPARE_DIFFERENCE_THRESHOLD` (6) (`__tests__/test-data-constants.ts`). This tolerance handles small platform rendering differences. The Ubuntu CI jobs verify that golden files match on Linux. The Ubuntu CI jobs also fail if a test run adds or modifies any file in `test-data/`.
 

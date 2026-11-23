@@ -20,10 +20,15 @@ jobs:
             - name: Setup Node.js
               uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
               with:
-                  node-version: ${{ matrix.node-version }}
+                  node-version: '26'
                   cache: 'npm'
-            - name: Install dependencies
-              run: npm ci
+            - name: Install development dependencies on Node.js 26
+              run: npm ci --engine-strict
+            - name: Switch to the Node.js 24 runtime
+              if: matrix.node-version == '24'
+              uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+              with:
+                  node-version: '24'
             - name: Audit dependencies
               run: npm audit --audit-level=high
             - name: Validate
@@ -40,6 +45,15 @@ jobs:
                   name: coverage-node-${{ matrix.node-version }}
                   path: test-results/coverage/
                   if-no-files-found: error
+            - name: Build the converter
+              if: matrix.node-version == '24'
+              run: npm run build
+            - name: Install production dependencies on Node.js 24
+              if: matrix.node-version == '24'
+              run: npm ci --omit=dev --engine-strict --ignore-scripts
+            - name: Render with the Node.js 24 production install
+              if: matrix.node-version == '24'
+              run: node out/cli.js test-data/sample.pdf --pages-to-process 1 --output-folder test-results/production
     windows:
         name: windows (26)
         runs-on: windows-latest
@@ -52,10 +66,17 @@ jobs:
               with:
                   node-version: '26'
                   cache: 'npm'
-            - name: Install dependencies
-              run: npm ci
-            - name: Validate native Windows install and rendering
+            # The visual test dependency declares only Darwin and Linux.
+            - name: Install development dependencies on Windows
+              run: npm ci --force
+            - name: Run the Windows test suite
               run: npm run test:fast
+            - name: Build the converter
+              run: npm run build
+            - name: Install production dependencies on Windows
+              run: npm ci --omit=dev --engine-strict --ignore-scripts
+            - name: Render with the native Windows production install
+              run: node out/cli.js test-data/sample.pdf --pages-to-process 1 --output-folder test-results/production
     # Keep the stable status context required by main's branch-protection rule while the test
     # matrix exposes each supported Node.js line separately. The Windows smoke publishes its own
     # non-required status: Windows support is best-effort and must not block merges.

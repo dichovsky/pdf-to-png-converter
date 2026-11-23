@@ -13,7 +13,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 - Raised the minimum Node.js runtime version to `>=24` (removed Node.js 22 support). Migrated the contributor toolchain (`.nvmrc`, `Dockerfile`, and Windows CI) to Node.js 26, and updated the Ubuntu CI test matrix to Node.js 24 and 26.
 - Updated `pdfjs-dist` to `~6.5.438` and `@napi-rs/canvas` to `~1.1.1`. Added the two QuickJS license files from `pdfjs-dist` 6.5.438 to the WebAssembly asset check.
-- Moved all maintained code to TypeScript 7. Node runs maintenance scripts directly. Oxlint checks types and Oxfmt formats source and documentation. Windows CI now installs without forcing platform compatibility. Updated Vitest and its coverage provider to 5.1.1. Pinned npm 12.2.3 in the publish workflow.
+- Moved all maintained code to TypeScript 7. Node runs maintenance scripts directly. Oxlint checks types and Oxfmt formats source and documentation. Updated Vitest and its coverage provider to 5.1.1. Pinned npm 12.2.3 in the publish workflow.
+- Migrated the visual tests to `png-visual-compare` 8.0.0. Pixelmatch 8 uses a new color-distance metric. A per-pixel threshold of `0.074` detects visible shifts from gray to teal. The golden images and the six-pixel acceptance threshold stay the same.
 - Rewrote project documentation in Simplified Technical English (ASD-STE100).
 
 ### Fixed
