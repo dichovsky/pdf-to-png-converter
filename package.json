@@ -74,7 +74,7 @@
         "*.{js,mjs,cjs,json,md,yml,yaml}": "oxfmt --write"
     },
     "dependencies": {
-        "@napi-rs/canvas": "~1.1.1",
+        "@napi-rs/canvas": "~1.2.0",
         "pdfjs-dist": "~6.5.438"
     },
     "devDependencies": {
